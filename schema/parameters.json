@@ -1,5 +1,5 @@
 {
-  "$comment": "Processor parameters (guide §16). IDs are persistence contracts: never rename or reuse one after release. Edit, then run `pnpm codegen`.",
+  "$comment": "Processor parameters (guide \u00a716). IDs are persistence contracts: never rename or reuse one after release. Edit, then run `pnpm codegen`.",
   "parameters": [
     {
       "id": "tone.level",
@@ -14,6 +14,106 @@
     {
       "id": "metronome.level",
       "name": "Click level",
+      "unit": "dB",
+      "min": -60,
+      "max": 0,
+      "default": -12,
+      "curve": "linear",
+      "step": 0.5
+    },
+    {
+      "id": "synth.waveform",
+      "name": "Waveform",
+      "unit": "",
+      "min": 0,
+      "max": 3,
+      "default": 2,
+      "curve": "linear",
+      "step": 1
+    },
+    {
+      "id": "synth.pitch",
+      "name": "Pitch",
+      "unit": "st",
+      "min": -24,
+      "max": 24,
+      "default": 0,
+      "curve": "linear",
+      "step": 1
+    },
+    {
+      "id": "synth.detune",
+      "name": "Detune",
+      "unit": "ct",
+      "min": 0,
+      "max": 50,
+      "default": 8,
+      "curve": "linear",
+      "step": 0.5
+    },
+    {
+      "id": "synth.cutoff",
+      "name": "Brightness",
+      "unit": "Hz",
+      "min": 40,
+      "max": 18000,
+      "default": 4000,
+      "curve": "logarithmic",
+      "step": 1
+    },
+    {
+      "id": "synth.resonance",
+      "name": "Resonance",
+      "unit": "",
+      "min": 0.5,
+      "max": 10,
+      "default": 0.8,
+      "curve": "logarithmic",
+      "step": 0.01
+    },
+    {
+      "id": "synth.attack",
+      "name": "Attack",
+      "unit": "s",
+      "min": 0.001,
+      "max": 5,
+      "default": 0.005,
+      "curve": "logarithmic",
+      "step": 0.001
+    },
+    {
+      "id": "synth.decay",
+      "name": "Decay",
+      "unit": "s",
+      "min": 0.001,
+      "max": 5,
+      "default": 0.3,
+      "curve": "logarithmic",
+      "step": 0.001
+    },
+    {
+      "id": "synth.sustain",
+      "name": "Sustain",
+      "unit": "",
+      "min": 0,
+      "max": 1,
+      "default": 0.6,
+      "curve": "linear",
+      "step": 0.01
+    },
+    {
+      "id": "synth.release",
+      "name": "Release",
+      "unit": "s",
+      "min": 0.001,
+      "max": 10,
+      "default": 0.4,
+      "curve": "logarithmic",
+      "step": 0.001
+    },
+    {
+      "id": "synth.volume",
+      "name": "Volume",
       "unit": "dB",
       "min": -60,
       "max": 0,

@@ -9,6 +9,7 @@ add_library(ap_core STATIC
     src/engine/OfflineRenderer.cpp
     src/engine/RenderGraph.cpp
     src/engine/Transport.cpp
+    src/instruments/Synth.cpp
     src/model/Commands.cpp
     src/model/Project.cpp
     src/model/ProjectDocument.cpp

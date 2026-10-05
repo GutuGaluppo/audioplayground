@@ -23,7 +23,16 @@ export function snapToStep(d: ParameterDescriptor, value: number): number {
   return clamp(Number(snapped.toFixed(6)), d.min, d.max);
 }
 
+/** Human-friendly display: ms below one second, kHz above 1000 Hz, precision from the step. */
 export function formatValue(d: ParameterDescriptor, value: number): string {
+  if (d.unit === 's' && Math.abs(value) < 1) {
+    const ms = value * 1000;
+    return `${ms.toFixed(ms < 10 ? 1 : 0)} ms`;
+  }
+  if (d.unit === 's') return `${value.toFixed(2)} s`;
+  if (d.unit === 'Hz' && value >= 1000)
+    return `${(value / 1000).toFixed(value >= 10000 ? 1 : 2)} kHz`;
+
   const decimals = d.step >= 1 ? 0 : d.step >= 0.1 ? 1 : 2;
   const text = value.toFixed(decimals);
   return d.unit ? `${text} ${d.unit}` : text;

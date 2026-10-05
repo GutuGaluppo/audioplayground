@@ -284,6 +284,10 @@ export function createSimulatedBridge(): Bridge {
             sendProject();
           });
           return;
+        case 'note.on':
+        case 'note.off':
+        case 'note.allOff':
+          return; // no sound in the browser simulation
         case 'edit.undo':
           queueMicrotask(() => {
             const edit = undoStack.pop();

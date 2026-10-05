@@ -155,6 +155,38 @@ struct ProjectRename
     bool operator== (const ProjectRename&) const = default;
 };
 
+struct NoteOn
+{
+    static constexpr std::string_view type = "note.on";
+    static constexpr int noteMin = 0;
+    static constexpr int noteMax = 127;
+    static constexpr double velocityMin = 0.0;
+    static constexpr double velocityMax = 1.0;
+
+    int note = 0;
+    double velocity = 0.0;
+
+    bool operator== (const NoteOn&) const = default;
+};
+
+struct NoteOff
+{
+    static constexpr std::string_view type = "note.off";
+    static constexpr int noteMin = 0;
+    static constexpr int noteMax = 127;
+
+    int note = 0;
+
+    bool operator== (const NoteOff&) const = default;
+};
+
+struct NoteAllOff
+{
+    static constexpr std::string_view type = "note.allOff";
+
+    bool operator== (const NoteAllOff&) const = default;
+};
+
 struct EngineStatus
 {
     static constexpr std::string_view type = "engine.status";
@@ -277,7 +309,7 @@ struct AppNotice
     bool operator== (const AppNotice&) const = default;
 };
 
-using Intent = std::variant<AppReady, AudioOpenSettings, ToneSetEnabled, TransportPlay, TransportStop, TransportReturnToStart, TransportSetTempo, TransportSetCountIn, MetronomeSetEnabled, ParamSet, EditUndo, EditRedo, ProjectNew, ProjectOpen, ProjectSave, ProjectSaveAs, ProjectRename>;
+using Intent = std::variant<AppReady, AudioOpenSettings, ToneSetEnabled, TransportPlay, TransportStop, TransportReturnToStart, TransportSetTempo, TransportSetCountIn, MetronomeSetEnabled, ParamSet, EditUndo, EditRedo, ProjectNew, ProjectOpen, ProjectSave, ProjectSaveAs, ProjectRename, NoteOn, NoteOff, NoteAllOff>;
 using Event = std::variant<EngineStatus, EngineMeters, TransportState, TransportPosition, ParamValue, HistoryState, ProjectState, AppNotice>;
 
 } // namespace ap::bridge

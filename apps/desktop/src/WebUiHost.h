@@ -19,7 +19,9 @@ namespace ap::desktop
 // - Navigation anywhere else is refused; new windows are refused.
 // - The only channel from the page is the "ap.intent" event, strictly validated by the
 //   generated codec. Malformed messages are dropped.
-class WebUiHost final : public juce::Component, private juce::Timer
+class WebUiHost final
+    : public juce::Component
+    , private juce::Timer
 {
 public:
     WebUiHost (AudioDeviceHost& host, engine::Engine& engine, Session& session, ProjectActions& actions);
@@ -45,6 +47,9 @@ private:
     void handle (const ap::bridge::ProjectSave&);
     void handle (const ap::bridge::ProjectSaveAs&);
     void handle (const ap::bridge::ProjectRename&);
+    void handle (const ap::bridge::NoteOn&);
+    void handle (const ap::bridge::NoteOff&);
+    void handle (const ap::bridge::NoteAllOff&);
     void handle (const ap::bridge::TransportPlay&);
     void handle (const ap::bridge::TransportStop&);
     void handle (const ap::bridge::TransportReturnToStart&);

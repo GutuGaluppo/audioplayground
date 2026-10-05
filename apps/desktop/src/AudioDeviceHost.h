@@ -13,9 +13,11 @@ namespace ap::desktop
 //
 // Opens outputs only. Inputs stay closed until recording needs them, so the microphone
 // permission is never requested at launch (guide §25).
-class AudioDeviceHost final : private juce::AudioIODeviceCallback,
-                              private juce::ChangeListener,
-                              private juce::AsyncUpdater
+class AudioDeviceHost final
+    : private juce::AudioIODeviceCallback
+    , private juce::MidiInputCallback
+    , private juce::ChangeListener
+    , private juce::AsyncUpdater
 {
 public:
     struct Status
@@ -50,6 +52,9 @@ private:
     void audioDeviceStopped() override;
     void audioDeviceError (const juce::String& errorMessage) override;
 
+    void handleIncomingMidiMessage (juce::MidiInput* source, const juce::MidiMessage& message) override;
+    void enableAllMidiInputs();
+
     void changeListenerCallback (juce::ChangeBroadcaster* source) override;
     void notifyStatusChanged();
     void handleAsyncUpdate() override;
@@ -57,6 +62,7 @@ private:
 
     engine::Engine& engine;
     juce::AudioDeviceManager deviceManager;
+    juce::MidiDeviceListConnection midiDevicesChanged;
 
     mutable juce::CriticalSection errorLock; // never taken on the audio thread
     juce::String lastError;

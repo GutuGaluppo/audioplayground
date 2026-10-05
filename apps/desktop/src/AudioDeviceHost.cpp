@@ -20,6 +20,7 @@ AudioDeviceHost::~AudioDeviceHost()
 {
     cancelPendingUpdate();
     deviceManager.removeChangeListener (this);
+    deviceManager.removeMidiInputDeviceCallback ({}, this);
     deviceManager.removeAudioCallback (this);
     deviceManager.closeAudioDevice();
 }
@@ -30,7 +31,35 @@ void AudioDeviceHost::initialise (const juce::XmlElement* savedState)
     setError (error);
 
     deviceManager.addAudioCallback (this);
+
+    // Every MIDI keyboard just works, including ones plugged in later.
+    deviceManager.addMidiInputDeviceCallback ({}, this);
+    enableAllMidiInputs();
+    midiDevicesChanged = juce::MidiDeviceListConnection::make ([this] { enableAllMidiInputs(); });
+
     notifyStatusChanged();
+}
+
+void AudioDeviceHost::enableAllMidiInputs()
+{
+    for (const auto& input : juce::MidiInput::getAvailableDevices())
+        if (!deviceManager.isMidiInputDeviceEnabled (input.identifier))
+            deviceManager.setMidiInputDeviceEnabled (input.identifier, true);
+}
+
+void AudioDeviceHost::handleIncomingMidiMessage (juce::MidiInput*, const juce::MidiMessage& message)
+{
+    // JUCE serialises MIDI callbacks from all devices, so this is the queue's single producer.
+    using instruments::NoteEvent;
+    if (message.isNoteOn())
+        engine.sendNoteFromMidi ({NoteEvent::Type::noteOn,
+                                  static_cast<std::uint8_t> (message.getNoteNumber()),
+                                  message.getFloatVelocity()});
+    else if (message.isNoteOff())
+        engine.sendNoteFromMidi (
+            {NoteEvent::Type::noteOff, static_cast<std::uint8_t> (message.getNoteNumber()), 0.0f});
+    else if (message.isAllNotesOff() || message.isAllSoundOff())
+        engine.sendNoteFromMidi ({NoteEvent::Type::allNotesOff, 0, 0.0f});
 }
 
 std::unique_ptr<juce::XmlElement> AudioDeviceHost::createStateXml() const

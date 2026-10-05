@@ -3,11 +3,13 @@
 #include "ap/core/AudioBlock.h"
 #include "ap/core/RealtimeSafety.h"
 #include "ap/core/SnapshotExchange.h"
+#include "ap/core/SpscQueue.h"
 #include "ap/dsp/LinearSmoothedValue.h"
 #include "ap/dsp/SineOscillator.h"
 #include "ap/engine/Metronome.h"
 #include "ap/engine/RenderGraph.h"
 #include "ap/engine/Transport.h"
+#include "ap/instruments/Synth.h"
 #include "ap/params/Parameters.h"
 
 #include <atomic>
@@ -46,6 +48,12 @@ public:
 
     [[nodiscard]] bool isTestToneEnabled() const noexcept;
 
+    // Live notes for the synth. Each source has its own single-producer queue: call
+    // sendNoteFromUi only from the message thread and sendNoteFromMidi only from the MIDI
+    // callback thread. Returns false if the queue is full (the note is dropped, never blocks).
+    bool sendNoteFromUi (const instruments::NoteEvent& event) noexcept { return uiNotes.push (event); }
+    bool sendNoteFromMidi (const instruments::NoteEvent& event) noexcept { return midiNotes.push (event); }
+
     // Render structure (message thread). Snapshots are swapped in at the next block boundary;
     // retired ones are freed by collectGarbage(), which must be called periodically.
     void publishRenderGraph (std::unique_ptr<RenderGraph> next) noexcept
@@ -80,6 +88,9 @@ private:
     std::atomic<std::uint64_t> renderedGraphVersion {0};
     Transport transport;
     Metronome metronome;
+    instruments::Synth synth;
+    core::SpscQueue<instruments::NoteEvent, 256> uiNotes;
+    core::SpscQueue<instruments::NoteEvent, 256> midiNotes;
 
     dsp::SineOscillator toneOscillator;
     dsp::LinearSmoothedValue toneGain;

@@ -18,3 +18,4 @@ AlignOperands: AlignAfterOperator
 BreakConstructorInitializers: BeforeComma
 PackConstructorInitializers: Never
 SpaceBeforeCpp11BracedList: true
+BreakInheritanceList: BeforeComma

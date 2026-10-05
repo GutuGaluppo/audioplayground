@@ -58,17 +58,21 @@ kbd {
 
 .stage {
   flex: 1;
-  display: grid;
-  place-content: center;
-  justify-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: center;
+  align-content: center;
   gap: var(--ap-space-6);
   padding: var(--ap-space-6);
+  overflow: auto;
 }
 
 .card {
   display: grid;
   gap: var(--ap-space-4);
   width: min(380px, 100%);
+  align-content: start;
   padding: var(--ap-space-6);
   background: var(--ap-surface);
   border: 1px solid var(--ap-border);
@@ -416,4 +420,127 @@ kbd {
   background: transparent;
   color: var(--ap-text-muted);
   cursor: pointer;
+}
+
+.card--compact {
+  width: min(300px, 100%);
+}
+
+/* Synth ------------------------------------------------------------------------------------- */
+
+.synth {
+  width: min(520px, 100%);
+}
+
+.synth__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--ap-space-3) var(--ap-space-6);
+}
+
+.synth__grid .field {
+  grid-template-columns: 6.5em 1fr 4.5em;
+}
+
+.segmented {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  padding: 2px;
+  border: 1px solid var(--ap-border);
+  border-radius: var(--ap-radius-md);
+  background: var(--ap-bg);
+}
+
+.segmented button {
+  padding: var(--ap-space-1) var(--ap-space-2);
+  border: 0;
+  border-radius: var(--ap-radius-sm);
+  background: transparent;
+  color: var(--ap-text-muted);
+  font-size: var(--ap-text-sm);
+  cursor: pointer;
+}
+
+.segmented button[aria-checked='true'] {
+  background: var(--ap-surface);
+  color: var(--ap-text);
+  box-shadow: 0 0 0 1px var(--ap-border);
+}
+
+/* Keyboard ---------------------------------------------------------------------------------- */
+
+.keyboard {
+  display: grid;
+  gap: var(--ap-space-2);
+  padding: var(--ap-space-3) var(--ap-space-4) var(--ap-space-4);
+  border-top: 1px solid var(--ap-border);
+  background: var(--ap-surface);
+}
+
+.keyboard__info {
+  display: flex;
+  gap: var(--ap-space-6);
+  font-size: var(--ap-text-xs);
+  color: var(--ap-text-muted);
+}
+
+.keyboard__info strong {
+  color: var(--ap-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.keyboard__info kbd + kbd {
+  margin-left: 2px;
+}
+
+.keyboard__keys {
+  --white-keys: 15;
+  position: relative;
+  height: 120px;
+  touch-action: none;
+}
+
+.key {
+  position: absolute;
+  top: 0;
+  padding: 0;
+  border: 1px solid var(--ap-border);
+  cursor: pointer;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.key--white {
+  left: calc(var(--key-index) * 100% / var(--white-keys));
+  width: calc(100% / var(--white-keys));
+  height: 100%;
+  border-radius: 0 0 var(--ap-radius-sm) var(--ap-radius-sm);
+  background: #e9e9ec;
+}
+
+.key--black {
+  z-index: 1;
+  left: calc(var(--key-index) * 100% / var(--white-keys) - (100% / var(--white-keys)) * 0.3);
+  width: calc(100% / var(--white-keys) * 0.6);
+  height: 62%;
+  border-color: #000;
+  border-radius: 0 0 3px 3px;
+  background: #1c1d21;
+}
+
+.key[data-held='true'] {
+  background: var(--ap-accent);
+}
+
+.key__label {
+  margin-bottom: var(--ap-space-1);
+  font-size: var(--ap-text-xs);
+  color: #6b6c72;
+  pointer-events: none;
+}
+
+.key--black .key__label {
+  color: #8a8b90;
 }

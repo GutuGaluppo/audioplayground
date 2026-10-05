@@ -187,6 +187,40 @@ describe('App', () => {
     expect(screen.getByRole('button', { name: 'Night Drive' })).toBeTruthy();
   });
 
+  it('plays notes from the computer keyboard and releases them on blur', async () => {
+    const bridge = await renderApp();
+    const sent: string[] = [];
+    const original = bridge.send.bind(bridge);
+    bridge.send = (intent) => {
+      sent.push(
+        intent.type === 'note.on' || intent.type === 'note.off'
+          ? `${intent.type}:${String(intent.payload.note)}`
+          : intent.type,
+      );
+      original(intent);
+    };
+
+    fireEvent.keyDown(window, { code: 'KeyA' });
+    fireEvent.keyDown(window, { code: 'KeyA', repeat: true }); // auto-repeat ignored
+    expect(screen.getByRole('button', { name: 'C3' }).getAttribute('data-held')).toBe('true');
+    fireEvent.keyUp(window, { code: 'KeyA' });
+
+    fireEvent.keyDown(window, { code: 'KeyX' }); // octave up
+    fireEvent.keyDown(window, { code: 'KeyA' });
+    fireEvent.blur(window);
+
+    expect(sent).toEqual(['note.on:48', 'note.off:48', 'note.on:60', 'note.allOff']);
+  });
+
+  it('switches the synth waveform', async () => {
+    await renderApp();
+    const square = screen.getByRole('radio', { name: 'Square' });
+    fireEvent.click(square);
+    await flush();
+    expect(square.getAttribute('aria-checked')).toBe('true');
+    expect(screen.getByRole('radio', { name: 'Saw' }).getAttribute('aria-checked')).toBe('false');
+  });
+
   it('shows the bar and beat position', async () => {
     await renderApp();
     expect(screen.getByLabelText('Position').textContent).toBe('1.1');

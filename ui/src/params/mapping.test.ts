@@ -55,5 +55,11 @@ describe('parameter mapping (mirrors the C++ tests)', () => {
   it('formats with the unit and a precision matching the step', () => {
     expect(formatValue(linear, -12)).toBe('-12.0 dB');
     expect(formatValue(log, 440.4)).toBe('440 Hz');
+    expect(formatValue(log, 4000)).toBe('4.00 kHz');
+    expect(formatValue(log, 12500)).toBe('12.5 kHz');
+    const time = { ...linear, unit: 's', step: 0.001 };
+    expect(formatValue(time, 0.005)).toBe('5.0 ms');
+    expect(formatValue(time, 0.3)).toBe('300 ms');
+    expect(formatValue(time, 1.25)).toBe('1.25 s');
   });
 });

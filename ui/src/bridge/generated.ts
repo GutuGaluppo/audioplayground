@@ -104,7 +104,27 @@ export interface ProjectRename {
   };
 }
 
-export type Intent = AppReady | AudioOpenSettings | ToneSetEnabled | TransportPlay | TransportStop | TransportReturnToStart | TransportSetTempo | TransportSetCountIn | MetronomeSetEnabled | ParamSet | EditUndo | EditRedo | ProjectNew | ProjectOpen | ProjectSave | ProjectSaveAs | ProjectRename;
+export interface NoteOn {
+  readonly type: 'note.on';
+  readonly payload: {
+    readonly note: number;
+    readonly velocity: number;
+  };
+}
+
+export interface NoteOff {
+  readonly type: 'note.off';
+  readonly payload: {
+    readonly note: number;
+  };
+}
+
+export interface NoteAllOff {
+  readonly type: 'note.allOff';
+  readonly payload: {};
+}
+
+export type Intent = AppReady | AudioOpenSettings | ToneSetEnabled | TransportPlay | TransportStop | TransportReturnToStart | TransportSetTempo | TransportSetCountIn | MetronomeSetEnabled | ParamSet | EditUndo | EditRedo | ProjectNew | ProjectOpen | ProjectSave | ProjectSaveAs | ProjectRename | NoteOn | NoteOff | NoteAllOff;
 
 // Events: native -> UI
 export interface EngineStatus {

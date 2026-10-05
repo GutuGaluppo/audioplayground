@@ -253,6 +253,23 @@ void WebUiHost::handle (const ap::bridge::ProjectRename& intent)
         sendProjectState(); // rejected (e.g. empty): restore the shown name
 }
 
+void WebUiHost::handle (const ap::bridge::NoteOn& intent)
+{
+    engine.sendNoteFromUi ({instruments::NoteEvent::Type::noteOn, static_cast<std::uint8_t> (intent.note),
+                            static_cast<float> (intent.velocity)});
+}
+
+void WebUiHost::handle (const ap::bridge::NoteOff& intent)
+{
+    engine.sendNoteFromUi (
+        {instruments::NoteEvent::Type::noteOff, static_cast<std::uint8_t> (intent.note), 0.0f});
+}
+
+void WebUiHost::handle (const ap::bridge::NoteAllOff&)
+{
+    engine.sendNoteFromUi ({instruments::NoteEvent::Type::allNotesOff, 0, 0.0f});
+}
+
 void WebUiHost::sendProjectState()
 {
     ap::bridge::ProjectState event;

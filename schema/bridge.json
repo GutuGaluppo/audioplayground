@@ -58,7 +58,27 @@
         "type": "string",
         "maxLength": 512
       }
-    }
+    },
+    "note.on": {
+      "note": {
+        "type": "int",
+        "min": 0,
+        "max": 127
+      },
+      "velocity": {
+        "type": "number",
+        "min": 0,
+        "max": 1
+      }
+    },
+    "note.off": {
+      "note": {
+        "type": "int",
+        "min": 0,
+        "max": 127
+      }
+    },
+    "note.allOff": {}
   },
   "events": {
     "engine.status": {

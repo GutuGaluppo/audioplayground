@@ -269,6 +269,40 @@ std::optional<Intent> parseProjectRename (const juce::var& payloadVar)
     if (!readString (*payload, "name", ProjectRename::nameMaxLength, message.name)) return std::nullopt;
     return Intent {message};
 }
+
+std::optional<Intent> parseNoteOn (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"note", "velocity"}))
+        return std::nullopt;
+
+    NoteOn message;
+    if (!readInt (*payload, "note", NoteOn::noteMin, NoteOn::noteMax, message.note)) return std::nullopt;
+    if (!readNumber (*payload, "velocity", NoteOn::velocityMin, NoteOn::velocityMax, message.velocity)) return std::nullopt;
+    return Intent {message};
+}
+
+std::optional<Intent> parseNoteOff (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"note"}))
+        return std::nullopt;
+
+    NoteOff message;
+    if (!readInt (*payload, "note", NoteOff::noteMin, NoteOff::noteMax, message.note)) return std::nullopt;
+    return Intent {message};
+}
+
+std::optional<Intent> parseNoteAllOff (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {}))
+        return std::nullopt;
+
+    NoteAllOff message;
+
+    return Intent {message};
+}
 } // namespace
 
 std::optional<Intent> parseIntent (const juce::var& message)
@@ -318,6 +352,12 @@ std::optional<Intent> parseIntent (const juce::var& message)
         return parseProjectSaveAs (payload);
     if (typeName == ProjectRename::type)
         return parseProjectRename (payload);
+    if (typeName == NoteOn::type)
+        return parseNoteOn (payload);
+    if (typeName == NoteOff::type)
+        return parseNoteOff (payload);
+    if (typeName == NoteAllOff::type)
+        return parseNoteAllOff (payload);
 
     return std::nullopt;
 }

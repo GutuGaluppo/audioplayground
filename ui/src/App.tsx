@@ -6,6 +6,8 @@ import { Notices } from './components/Notices';
 import { ParamSlider } from './components/ParamSlider';
 import { PeakMeter } from './components/PeakMeter';
 import { TransportBar } from './components/TransportBar';
+import { Keyboard } from './instrument/Keyboard';
+import { SynthPanel } from './instrument/SynthPanel';
 import { useLatest } from './state/latestEvent';
 import { useStores } from './state/StoresContext';
 
@@ -47,7 +49,9 @@ export function App() {
       <TransportBar />
 
       <main className="stage">
-        <section className="card" aria-label="Test tone">
+        <SynthPanel />
+
+        <section className="card card--compact" aria-label="Test tone">
           <h2 className="card__title">Test tone</h2>
           <button
             type="button"
@@ -69,6 +73,8 @@ export function App() {
           <PeakMeter />
         </section>
       </main>
+
+      <Keyboard />
 
       <Notices />
 

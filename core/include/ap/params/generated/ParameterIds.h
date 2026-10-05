@@ -32,13 +32,33 @@ enum class ParamId : std::uint16_t
 {
     toneLevel,
     metronomeLevel,
+    synthWaveform,
+    synthPitch,
+    synthDetune,
+    synthCutoff,
+    synthResonance,
+    synthAttack,
+    synthDecay,
+    synthSustain,
+    synthRelease,
+    synthVolume,
 };
 
-inline constexpr std::size_t numParameters = 2;
+inline constexpr std::size_t numParameters = 12;
 
 inline constexpr std::array<ParameterDescriptor, numParameters> descriptors {{
     {"tone.level", "Test tone level", "dB", -60.0f, -6.0f, -18.0f, 0.5f, Curve::linear},
     {"metronome.level", "Click level", "dB", -60.0f, 0.0f, -12.0f, 0.5f, Curve::linear},
+    {"synth.waveform", "Waveform", "", 0.0f, 3.0f, 2.0f, 1.0f, Curve::linear},
+    {"synth.pitch", "Pitch", "st", -24.0f, 24.0f, 0.0f, 1.0f, Curve::linear},
+    {"synth.detune", "Detune", "ct", 0.0f, 50.0f, 8.0f, 0.5f, Curve::linear},
+    {"synth.cutoff", "Brightness", "Hz", 40.0f, 18000.0f, 4000.0f, 1.0f, Curve::logarithmic},
+    {"synth.resonance", "Resonance", "", 0.5f, 10.0f, 0.8f, 0.01f, Curve::logarithmic},
+    {"synth.attack", "Attack", "s", 0.001f, 5.0f, 0.005f, 0.001f, Curve::logarithmic},
+    {"synth.decay", "Decay", "s", 0.001f, 5.0f, 0.3f, 0.001f, Curve::logarithmic},
+    {"synth.sustain", "Sustain", "", 0.0f, 1.0f, 0.6f, 0.01f, Curve::linear},
+    {"synth.release", "Release", "s", 0.001f, 10.0f, 0.4f, 0.001f, Curve::logarithmic},
+    {"synth.volume", "Volume", "dB", -60.0f, 0.0f, -12.0f, 0.5f, Curve::linear},
 }};
 
 } // namespace ap::params

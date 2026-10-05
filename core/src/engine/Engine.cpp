@@ -27,6 +27,7 @@ void Engine::prepare (double newSampleRate, int /*maxBlockSize*/)
 
     transport.prepare (sampleRate);
     metronome.prepare (sampleRate);
+    synth.prepare (sampleRate);
 
     toneOscillator.prepare (sampleRate);
     toneGain.reset (sampleRate, gainRampSeconds);
@@ -60,6 +61,12 @@ void Engine::process (core::AudioBlock output) noexcept AP_NONBLOCKING
     currentGraph = graphs.acquire();
     if (currentGraph != nullptr)
         renderedGraphVersion.store (currentGraph->projectVersion, std::memory_order_release);
+
+    while (const auto note = uiNotes.pop())
+        synth.handle (*note);
+    while (const auto note = midiNotes.pop())
+        synth.handle (*note);
+    synth.render (output, parameters);
 
     const float metronomeGain = decibelsToGain (parameters.get (params::ParamId::metronomeLevel));
     transport.advance (
