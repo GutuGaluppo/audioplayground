@@ -11,6 +11,11 @@
 namespace ap::core
 {
 
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable : 4324) // padding from alignas below is intentional (avoids false sharing)
+#endif
+
 // Bounded, wait-free single-producer / single-consumer queue.
 //
 // Exactly one thread may push and exactly one (other) thread may pop. Storage is fixed at
@@ -60,5 +65,9 @@ private:
     alignas (64) std::atomic<std::size_t> writeIndex {0};
     alignas (64) std::atomic<std::size_t> readIndex {0};
 };
+
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
 
 } // namespace ap::core
