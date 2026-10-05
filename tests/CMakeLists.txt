@@ -15,6 +15,7 @@ add_executable(ap_unit_tests
     unit/ProjectModelTests.cpp
     unit/RenderGraphTests.cpp
     unit/SineOscillatorTests.cpp
+    unit/SynthDspTests.cpp
     unit/TransportTests.cpp)
 
 target_include_directories(ap_unit_tests PRIVATE support)
