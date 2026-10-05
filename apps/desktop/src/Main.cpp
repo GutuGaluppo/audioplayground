@@ -1,5 +1,5 @@
 #include "AudioDeviceHost.h"
-#include "MainComponent.h"
+#include "WebUiHost.h"
 #include "ap/engine/Engine.h"
 
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -30,12 +30,11 @@ public:
         : DocumentWindow (name, juce::Colour (0xff111214), allButtons)
     {
         setUsingNativeTitleBar (true);
-        setContentOwned (new MainComponent (host, engine), true);
+        setContentOwned (new WebUiHost (host, engine), true);
         setResizable (true, true);
         setResizeLimits (720, 480, 10000, 10000);
         centreWithSize (getWidth(), getHeight());
         setVisible (true);
-        getContentComponent()->grabKeyboardFocus();
     }
 
     void closeButtonPressed() override { juce::JUCEApplication::getInstance()->systemRequestedQuit(); }

@@ -1,0 +1,28 @@
+{
+  "$comment": "Single source of truth for UI <-> native messages (ADR-003). Edit this file, then run `pnpm codegen`. Never edit generated files.",
+  "protocolVersion": 1,
+  "intents": {
+    "app.ready": {},
+    "audio.openSettings": {},
+    "tone.setEnabled": {
+      "enabled": { "type": "bool" }
+    },
+    "tone.setLevel": {
+      "db": { "type": "number", "min": -60, "max": -6 }
+    }
+  },
+  "events": {
+    "engine.status": {
+      "deviceName": { "type": "string", "maxLength": 256 },
+      "sampleRate": { "type": "number", "min": 0, "max": 768000 },
+      "bufferSize": { "type": "int", "min": 0, "max": 65536 },
+      "outputLatencyMs": { "type": "number", "min": 0, "max": 10000 },
+      "error": { "type": "string", "maxLength": 1024 },
+      "toneEnabled": { "type": "bool" },
+      "toneLevelDb": { "type": "number", "min": -60, "max": -6 }
+    },
+    "engine.meters": {
+      "peak": { "type": "number", "min": 0, "max": 1 }
+    }
+  }
+}

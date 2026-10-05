@@ -137,6 +137,11 @@ bool Engine::isTestToneEnabled() const noexcept
     return toneEnabled.load (std::memory_order_relaxed);
 }
 
+float Engine::getTestToneLevelDb() const noexcept
+{
+    return toneLevelDb.load (std::memory_order_relaxed);
+}
+
 float Engine::consumeOutputPeak() noexcept
 {
     return outputPeak.exchange (0.0f, std::memory_order_relaxed);

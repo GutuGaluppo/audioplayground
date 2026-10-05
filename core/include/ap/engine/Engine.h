@@ -34,6 +34,7 @@ public:
     void setTestToneLevelDb (float db) noexcept;
 
     [[nodiscard]] bool isTestToneEnabled() const noexcept;
+    [[nodiscard]] float getTestToneLevelDb() const noexcept;
 
     // Highest absolute output sample since the last call. Resets the meter.
     [[nodiscard]] float consumeOutputPeak() noexcept;
