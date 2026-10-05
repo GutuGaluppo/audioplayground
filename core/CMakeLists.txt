@@ -2,7 +2,8 @@
 # Must never depend on UI code, the WebView bridge, or platform windowing.
 
 add_library(ap_core STATIC
-    src/BuildInfo.cpp)
+    src/BuildInfo.cpp
+    src/engine/Engine.cpp)
 add_library(ap::core ALIAS ap_core)
 
 target_include_directories(ap_core PUBLIC include)

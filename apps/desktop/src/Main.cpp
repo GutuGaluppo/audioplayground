@@ -1,23 +1,41 @@
+#include "AudioDeviceHost.h"
 #include "MainComponent.h"
+#include "ap/engine/Engine.h"
 
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <memory>
 
 namespace ap::desktop
 {
+namespace
+{
+constexpr auto audioDeviceStateKey = "audioDeviceState";
+
+juce::PropertiesFile::Options settingsOptions()
+{
+    juce::PropertiesFile::Options options;
+    options.applicationName = "Audio Playground";
+    options.filenameSuffix = ".settings";
+    options.folderName = "Audio Playground";
+    options.osxLibrarySubFolder = "Application Support";
+    options.storageFormat = juce::PropertiesFile::storeAsXML;
+    return options;
+}
+} // namespace
 
 class MainWindow final : public juce::DocumentWindow
 {
 public:
-    explicit MainWindow (const juce::String& name)
+    MainWindow (const juce::String& name, AudioDeviceHost& host, engine::Engine& engine)
         : DocumentWindow (name, juce::Colour (0xff111214), allButtons)
     {
         setUsingNativeTitleBar (true);
-        setContentOwned (new MainComponent(), true);
+        setContentOwned (new MainComponent (host, engine), true);
         setResizable (true, true);
         setResizeLimits (720, 480, 10000, 10000);
         centreWithSize (getWidth(), getHeight());
         setVisible (true);
+        getContentComponent()->grabKeyboardFocus();
     }
 
     void closeButtonPressed() override { juce::JUCEApplication::getInstance()->systemRequestedQuit(); }
@@ -37,14 +55,34 @@ public:
 
     void initialise (const juce::String&) override
     {
-        mainWindow = std::make_unique<MainWindow> (getApplicationName());
+        settings.setStorageParameters (settingsOptions());
+
+        audioHost = std::make_unique<AudioDeviceHost> (engine);
+        const auto savedState = settings.getUserSettings()->getXmlValue (audioDeviceStateKey);
+        audioHost->initialise (savedState.get());
+
+        mainWindow = std::make_unique<MainWindow> (getApplicationName(), *audioHost, engine);
     }
 
-    void shutdown() override { mainWindow.reset(); }
+    void shutdown() override
+    {
+        if (audioHost != nullptr)
+            if (const auto state = audioHost->createStateXml())
+                settings.getUserSettings()->setValue (audioDeviceStateKey, state.get());
+
+        settings.saveIfNeeded();
+
+        // Order matters: the window references the host, the host references the engine.
+        mainWindow.reset();
+        audioHost.reset();
+    }
 
     void systemRequestedQuit() override { quit(); }
 
 private:
+    engine::Engine engine;
+    juce::ApplicationProperties settings;
+    std::unique_ptr<AudioDeviceHost> audioHost;
     std::unique_ptr<MainWindow> mainWindow;
 };
 

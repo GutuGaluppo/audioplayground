@@ -15,9 +15,12 @@ juce_add_gui_app(ap_desktop
     HARDENED_RUNTIME_ENABLED TRUE
     HARDENED_RUNTIME_OPTIONS com.apple.security.device.audio-input)
 
-target_sources(ap_desktop PRIVATE
+set(AP_DESKTOP_SOURCES
+    src/AudioDeviceHost.cpp
     src/Main.cpp
     src/MainComponent.cpp)
+
+target_sources(ap_desktop PRIVATE ${AP_DESKTOP_SOURCES})
 
 target_compile_definitions(ap_desktop PRIVATE
     JUCE_WEB_BROWSER=0      # Enabled in Task 004 (WebView shell)
@@ -28,6 +31,8 @@ target_compile_definitions(ap_desktop PRIVATE
 target_link_libraries(ap_desktop
     PRIVATE
         ap::core
+        juce::juce_audio_devices
+        juce::juce_audio_utils
         juce::juce_gui_basics
     PUBLIC
         juce::juce_recommended_config_flags
@@ -35,5 +40,5 @@ target_link_libraries(ap_desktop
 
 # First-party warnings apply to our sources only, not to JUCE module sources compiled into this target.
 get_target_property(_ap_desktop_opts ap_project_options INTERFACE_COMPILE_OPTIONS)
-set_source_files_properties(src/Main.cpp src/MainComponent.cpp
+set_source_files_properties(${AP_DESKTOP_SOURCES}
     PROPERTIES COMPILE_OPTIONS "${_ap_desktop_opts}")

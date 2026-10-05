@@ -16,6 +16,13 @@ else()
         -Wshadow -Wconversion -Wsign-conversion
         -Wnon-virtual-dtor -Wold-style-cast -Woverloaded-virtual
         -Wdouble-promotion -Wimplicit-fallthrough)
+
+    # Compile-time real-time safety for functions marked AP_NONBLOCKING (core/include/ap/core/RealtimeSafety.h).
+    include(CheckCXXCompilerFlag)
+    check_cxx_compiler_flag(-Wfunction-effects AP_HAS_FUNCTION_EFFECTS)
+    if(AP_HAS_FUNCTION_EFFECTS)
+        target_compile_options(ap_project_options INTERFACE -Wfunction-effects)
+    endif()
     if(AP_WARNINGS_AS_ERRORS)
         target_compile_options(ap_project_options INTERFACE -Werror)
     endif()
