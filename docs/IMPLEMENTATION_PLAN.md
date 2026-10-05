@@ -265,7 +265,23 @@ Cada fase termina num **gate**: CI verde (sanitizers inclusos), benchmarks dentr
 
 ---
 
-## 5. Backlog inicial (substitui a §35 do Guia)
+## 5. Progresso (atualizado em 2026-10-05)
+
+| Tarefa | Estado |
+|---|---|
+| 001–009 (Fase 0 e 1: fundação, motor, transporte, parâmetros, modelo/undo, snapshots, salvar/abrir/autosave) | ✅ Concluídas |
+| 010–013 (Fase 2: DSP do synth, synth polifônico + QWERTY/MIDI, sampler + importação, bateria + sequenciador) | ✅ Concluídas |
+| Verificação auditiva da Fase 2 (critério de aceite) | ⏳ Precisa de um ouvinte humano |
+| 014 (captura retroativa) | ↪ Movida para depois da 017: precisa de clipes de notas como destino |
+| 015–017 (gravação, waveforms, timeline) | Próximas. Ordem ajustada: 017 (modelo de clipes + reprodução) → 015 (gravar em clipe) → 016 |
+
+Decisões tomadas durante a execução:
+- JUCE 9.0.3, e não 8.
+- Kit de bateria sintetizado por código: sem licenças de samples e funciona na primeira abertura.
+- Tolerância dos goldens com funções transcendentais: 1e-4 (−80 dBFS), pela diferença medida entre a libm da Apple e a do Linux/Windows.
+- Schema v1 permanece rascunho até o primeiro release (ADR-006).
+
+## 5.1 Backlog inicial (substitui a §35 do Guia)
 
 | ID | Tarefa | Depende de |
 |---|---|---|
