@@ -32,6 +32,10 @@ public:
     [[nodiscard]] bool isDirty() const noexcept { return doc.version() != savedVersion; }
     [[nodiscard]] const std::optional<io::ProjectFolder>& location() const noexcept { return folder; }
 
+    // Where the project's audio files live right now: its folder, or the scratch folder while
+    // it has never been saved.
+    [[nodiscard]] const io::ProjectFolder& assetRoot() const noexcept { return folder ? *folder : scratch; }
+
     void newProject();
     [[nodiscard]] std::optional<std::string> save(); // needs a location
     [[nodiscard]] std::optional<std::string> saveAs (const io::ProjectFolder& target);
@@ -41,7 +45,8 @@ public:
     // project was never saved). Returns a message for the user when something was recovered.
     std::optional<std::string> recoverFromAutosave (std::optional<io::ProjectFolder> lastProject);
 
-    // Removes autosaves of the never-saved project (after "Don't Save" or a successful save).
+    // Removes autosaves and imported audio of the never-saved project (after "Don't Save" or a
+    // successful save). Only ever touches the app's own scratch folder.
     void discardScratchAutosaves();
 
     // Writes an autosave now if there are unsaved changes since the last one.

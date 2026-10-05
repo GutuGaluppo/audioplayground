@@ -544,3 +544,72 @@ kbd {
 .key--black .key__label {
   color: #8a8b90;
 }
+
+/* Instrument area --------------------------------------------------------------------------- */
+
+.instrument {
+  display: grid;
+  gap: var(--ap-space-3);
+  width: min(520px, 100%);
+}
+
+.tabs {
+  display: flex;
+  gap: var(--ap-space-1);
+}
+
+.tabs button {
+  padding: var(--ap-space-1) var(--ap-space-3);
+  border: 1px solid transparent;
+  border-radius: var(--ap-radius-sm);
+  background: transparent;
+  color: var(--ap-text-muted);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tabs button[aria-selected='true'] {
+  border-color: var(--ap-border);
+  background: var(--ap-surface);
+  color: var(--ap-text);
+}
+
+.instrument .synth {
+  width: 100%;
+}
+
+.sampler__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sampler__sample {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--ap-space-3);
+  font-size: var(--ap-text-sm);
+}
+
+.sampler__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sampler__status {
+  flex: none;
+  color: var(--ap-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.sampler__sample[data-missing='true'] .sampler__status {
+  color: var(--ap-meter-clip);
+}
+
+.waveform {
+  width: 100%;
+  height: 72px;
+  border-radius: var(--ap-radius-sm);
+  background: var(--ap-bg);
+}

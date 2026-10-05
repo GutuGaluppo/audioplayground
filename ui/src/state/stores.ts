@@ -10,6 +10,8 @@ export function createStores(bridge: Bridge) {
     parameters: createParameterStore(bridge),
     history: createLatestEventStore(bridge, 'history.state'),
     project: createLatestEventStore(bridge, 'project.state'),
+    instrument: createLatestEventStore(bridge, 'instrument.state'),
+    sampler: createLatestEventStore(bridge, 'sampler.state'),
   };
 }
 

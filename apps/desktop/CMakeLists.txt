@@ -69,6 +69,7 @@ set(AP_DESKTOP_SOURCES
     src/AudioDeviceHost.cpp
     src/Main.cpp
     src/ProjectActions.cpp
+    src/SampleLoader.cpp
     src/Session.cpp
     src/WebUiHost.cpp
     src/generated/BridgeCodec.cpp)
@@ -87,6 +88,7 @@ target_link_libraries(ap_desktop
     PRIVATE
         ap::core
         juce::juce_audio_devices
+        juce::juce_audio_formats
         juce::juce_audio_utils
         juce::juce_gui_extra
     PUBLIC

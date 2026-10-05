@@ -26,6 +26,8 @@ Project sampleProject()
     REQUIRE (doc.perform (SetTrackPan {doc.project().tracks[1].id, 0.25f}));
     REQUIRE (doc.perform (SetTrackMute {doc.project().tracks[1].id, true}));
     REQUIRE (doc.perform (SetParameter {ap::params::ParamId::toneLevel, -30.0f}));
+    REQUIRE (doc.perform (AddAsset {"audio/1-kick.wav", "kick.wav"}));
+    REQUIRE (doc.perform (SetSamplerAsset {doc.project().assets[0].id}));
     return doc.project();
 }
 
@@ -113,6 +115,14 @@ TEST_CASE ("Malformed and hostile project files are rejected", "[persistence][se
         {"known parameter out of range", [] (auto& j) { j["parameters"]["tone.level"] = 100; }},
         {"malformed parameter id", [] (auto& j) { j["parameters"]["../../x"] = 1; }},
         {"bad timestamp", [] (auto& j) { j["createdAt"] = "yesterday<script>"; }},
+        {"asset path traversal", [] (auto& j) { j["assets"][0]["path"] = "audio/../../etc/passwd"; }},
+        {"asset absolute path", [] (auto& j) { j["assets"][0]["path"] = "/etc/passwd"; }},
+        {"asset outside audio folder", [] (auto& j) { j["assets"][0]["path"] = "project.json"; }},
+        {"asset hidden file", [] (auto& j) { j["assets"][0]["path"] = "audio/.secret"; }},
+        {"duplicate asset ids", [] (auto& j) { j["assets"].push_back (j["assets"][0]); }},
+        {"nextAssetId too low", [] (auto& j) { j["nextAssetId"] = 1; }},
+        {"sampler asset missing", [] (auto& j) { j["samplerAsset"] = 99; }},
+        {"sampler asset negative", [] (auto& j) { j["samplerAsset"] = -1; }},
         {"too many tracks",
          [] (auto& j)
          {

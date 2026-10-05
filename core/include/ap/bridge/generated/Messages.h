@@ -6,6 +6,7 @@
 #include <string>
 #include <string_view>
 #include <variant>
+#include <vector>
 
 namespace ap::bridge
 {
@@ -187,6 +188,24 @@ struct NoteAllOff
     bool operator== (const NoteAllOff&) const = default;
 };
 
+struct InstrumentSelect
+{
+    static constexpr std::string_view type = "instrument.select";
+    static constexpr int instrumentMin = 0;
+    static constexpr int instrumentMax = 1;
+
+    int instrument = 0;
+
+    bool operator== (const InstrumentSelect&) const = default;
+};
+
+struct SamplerLoad
+{
+    static constexpr std::string_view type = "sampler.load";
+
+    bool operator== (const SamplerLoad&) const = default;
+};
+
 struct EngineStatus
 {
     static constexpr std::string_view type = "engine.status";
@@ -309,7 +328,38 @@ struct AppNotice
     bool operator== (const AppNotice&) const = default;
 };
 
-using Intent = std::variant<AppReady, AudioOpenSettings, ToneSetEnabled, TransportPlay, TransportStop, TransportReturnToStart, TransportSetTempo, TransportSetCountIn, MetronomeSetEnabled, ParamSet, EditUndo, EditRedo, ProjectNew, ProjectOpen, ProjectSave, ProjectSaveAs, ProjectRename, NoteOn, NoteOff, NoteAllOff>;
-using Event = std::variant<EngineStatus, EngineMeters, TransportState, TransportPosition, ParamValue, HistoryState, ProjectState, AppNotice>;
+struct InstrumentState
+{
+    static constexpr std::string_view type = "instrument.state";
+    static constexpr int instrumentMin = 0;
+    static constexpr int instrumentMax = 1;
+
+    int instrument = 0;
+
+    bool operator== (const InstrumentState&) const = default;
+};
+
+struct SamplerState
+{
+    static constexpr std::string_view type = "sampler.state";
+    static constexpr std::size_t nameMaxLength = 256;
+    static constexpr double durationSecondsMin = 0.0;
+    static constexpr double durationSecondsMax = 100000.0;
+    static constexpr float overviewMin = 0.0f;
+    static constexpr float overviewMax = 1.0f;
+    static constexpr std::size_t overviewMaxItems = 512;
+
+    std::string name {};
+    bool loaded = false;
+    bool missing = false;
+    bool loading = false;
+    double durationSeconds = 0.0;
+    std::vector<float> overview {};
+
+    bool operator== (const SamplerState&) const = default;
+};
+
+using Intent = std::variant<AppReady, AudioOpenSettings, ToneSetEnabled, TransportPlay, TransportStop, TransportReturnToStart, TransportSetTempo, TransportSetCountIn, MetronomeSetEnabled, ParamSet, EditUndo, EditRedo, ProjectNew, ProjectOpen, ProjectSave, ProjectSaveAs, ProjectRename, NoteOn, NoteOff, NoteAllOff, InstrumentSelect, SamplerLoad>;
+using Event = std::variant<EngineStatus, EngineMeters, TransportState, TransportPosition, ParamValue, HistoryState, ProjectState, AppNotice, InstrumentState, SamplerState>;
 
 } // namespace ap::bridge

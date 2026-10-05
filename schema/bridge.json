@@ -78,7 +78,15 @@
         "max": 127
       }
     },
-    "note.allOff": {}
+    "note.allOff": {},
+    "instrument.select": {
+      "instrument": {
+        "type": "int",
+        "min": 0,
+        "max": 1
+      }
+    },
+    "sampler.load": {}
   },
   "events": {
     "engine.status": {
@@ -207,6 +215,39 @@
       "message": {
         "type": "string",
         "maxLength": 1024
+      }
+    },
+    "instrument.state": {
+      "instrument": {
+        "type": "int",
+        "min": 0,
+        "max": 1
+      }
+    },
+    "sampler.state": {
+      "name": {
+        "type": "string",
+        "maxLength": 256
+      },
+      "loaded": {
+        "type": "bool"
+      },
+      "missing": {
+        "type": "bool"
+      },
+      "loading": {
+        "type": "bool"
+      },
+      "durationSeconds": {
+        "type": "number",
+        "min": 0,
+        "max": 100000
+      },
+      "overview": {
+        "type": "floatArray",
+        "min": 0,
+        "max": 1,
+        "maxItems": 512
       }
     }
   }

@@ -25,6 +25,30 @@ std::optional<std::size_t> Project::indexOf (TrackId id) const noexcept
     return static_cast<std::size_t> (it - tracks.begin());
 }
 
+const Asset* Project::findAsset (AssetId id) const noexcept
+{
+    const auto it = std::find_if (assets.begin(), assets.end(), [id] (const Asset& a) { return a.id == id; });
+    return it == assets.end() ? nullptr : &*it;
+}
+
+bool isSafeAssetPath (std::string_view path) noexcept
+{
+    constexpr std::string_view prefix = "audio/";
+    if (path.size() <= prefix.size() || path.size() > 200 || path.substr (0, prefix.size()) != prefix)
+        return false;
+
+    const auto file = path.substr (prefix.size());
+    if (file.front() == '.' || file.find ("..") != std::string_view::npos)
+        return false;
+
+    return std::all_of (file.begin(), file.end(),
+                        [] (char c)
+                        {
+                            return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+                                || c == '-' || c == '_' || c == '.';
+                        });
+}
+
 std::optional<std::string> sanitiseName (std::string_view input, std::size_t maxBytes)
 {
     std::string result;

@@ -109,6 +109,24 @@ std::optional<std::string> Session::save()
 
 std::optional<std::string> Session::saveAs (const io::ProjectFolder& target)
 {
+    // Bring the audio files along when the project moves (first save, or Save As elsewhere).
+    const auto& source = assetRoot();
+    std::error_code ec;
+    if (!std::filesystem::equivalent (source.root, target.root, ec))
+    {
+        std::filesystem::create_directories (target.audioDirectory(), ec);
+        for (const auto& asset : doc.project().assets)
+        {
+            const auto from = io::resolveAssetPath (source, asset.relativePath);
+            if (!from || !std::filesystem::exists (*from))
+                continue; // missing files stay missing; the reference is kept
+            const auto to = target.root / std::filesystem::path (asset.relativePath);
+            std::filesystem::copy_file (*from, to, std::filesystem::copy_options::skip_existing, ec);
+            if (ec)
+                return "Could not copy the project's audio files.";
+        }
+    }
+
     auto updated = metadata;
     updated.updatedAt = model::currentTimestampUtc();
 
@@ -164,6 +182,7 @@ void Session::discardScratchAutosaves()
     std::error_code ec;
     for (const auto& file : io::listAutosaves (scratch))
         std::filesystem::remove (file, ec);
+    std::filesystem::remove_all (scratch.audioDirectory(), ec);
 }
 
 void Session::autosaveIfNeeded()

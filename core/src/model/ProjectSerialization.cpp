@@ -185,7 +185,8 @@ LoadedProject parseV1 (const Json& root)
 {
     requireExactKeys (root,
                       {"format", "schemaVersion", "name", "createdAt", "updatedAt", "tempo", "timeSignature",
-                       "exportSampleRate", "nextTrackId", "tracks", "parameters"},
+                       "exportSampleRate", "nextTrackId", "tracks", "parameters", "assets", "nextAssetId",
+                       "samplerAsset"},
                       "project");
 
     LoadedProject loaded;
@@ -228,6 +229,41 @@ LoadedProject parseV1 (const Json& root)
     project.nextTrackId = positiveInteger (root["nextTrackId"], "nextTrackId");
     if (project.nextTrackId <= highestId)
         invalid ("nextTrackId must be greater than every track id");
+
+    const auto& assets = root["assets"];
+    if (!assets.is_array())
+        invalid ("assets must be a list");
+    if (assets.size() > Project::maxAssets)
+        invalid ("too many assets");
+
+    std::set<std::uint64_t> assetIds;
+    std::uint64_t highestAssetId = 0;
+    for (const auto& json : assets)
+    {
+        requireExactKeys (json, {"id", "path", "name"}, "asset");
+        Asset asset;
+        asset.id = AssetId {positiveInteger (json["id"], "asset id")};
+        if (!json["path"].is_string() || !isSafeAssetPath (json["path"].get_ref<const std::string&>()))
+            invalid ("asset path is not allowed");
+        asset.relativePath = json["path"].get<std::string>();
+        asset.name = name (json["name"], Asset::maxNameLength, "asset name");
+        if (!assetIds.insert (asset.id.value).second)
+            invalid ("two assets share the same id");
+        highestAssetId = std::max (highestAssetId, asset.id.value);
+        project.assets.push_back (std::move (asset));
+    }
+
+    project.nextAssetId = positiveInteger (root["nextAssetId"], "nextAssetId");
+    if (project.nextAssetId <= highestAssetId)
+        invalid ("nextAssetId must be greater than every asset id");
+
+    const auto& samplerAsset = root["samplerAsset"];
+    if (!samplerAsset.is_number_unsigned()
+        && !(samplerAsset.is_number_integer() && samplerAsset.get<std::int64_t>() == 0))
+        invalid ("samplerAsset must be an asset id or 0");
+    project.samplerAsset = AssetId {samplerAsset.get<std::uint64_t>()};
+    if (project.samplerAsset.isValid() && project.findAsset (project.samplerAsset) == nullptr)
+        invalid ("samplerAsset refers to a missing asset");
 
     const auto& parameters = root["parameters"];
     if (!parameters.is_object())
@@ -289,6 +325,19 @@ std::string serialiseProject (const Project& project, const ProjectMetadata& met
     for (const auto& [id, value] : project.preservedParameters)
         parameters[id] = value;
     root["parameters"] = std::move (parameters);
+
+    auto assets = OrderedJson::array();
+    for (const auto& asset : project.assets)
+    {
+        OrderedJson json;
+        json["id"] = asset.id.value;
+        json["path"] = asset.relativePath;
+        json["name"] = asset.name;
+        assets.push_back (std::move (json));
+    }
+    root["assets"] = std::move (assets);
+    root["nextAssetId"] = project.nextAssetId;
+    root["samplerAsset"] = project.samplerAsset.value;
 
     return root.dump (2) + "\n";
 }

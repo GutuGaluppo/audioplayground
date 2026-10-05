@@ -41,21 +41,25 @@ endif()
 if(AP_BUILD_DESKTOP)
     add_executable(ap_desktop_tests
         desktop/BridgeCodecTests.cpp
+        desktop/SampleLoaderTests.cpp
         desktop/SessionTests.cpp
+        "${PROJECT_SOURCE_DIR}/apps/desktop/src/SampleLoader.cpp"
         "${PROJECT_SOURCE_DIR}/apps/desktop/src/Session.cpp"
         "${PROJECT_SOURCE_DIR}/apps/desktop/src/generated/BridgeCodec.cpp")
     target_include_directories(ap_desktop_tests PRIVATE "${PROJECT_SOURCE_DIR}/apps/desktop/src" support)
     target_compile_definitions(ap_desktop_tests PRIVATE
         JUCE_STANDALONE_APPLICATION=1
         JUCE_USE_CURL=0
-        JUCE_WEB_BROWSER=0)
+        JUCE_WEB_BROWSER=0
+        JUCE_MODAL_LOOPS_PERMITTED=1)
     target_link_libraries(ap_desktop_tests PRIVATE
         ap::core
-        juce::juce_events
+        juce::juce_audio_formats
+        juce::juce_gui_basics
         juce::juce_recommended_config_flags
         Catch2::Catch2WithMain)
     get_target_property(_ap_test_opts ap_project_options INTERFACE_COMPILE_OPTIONS)
-    set_source_files_properties(desktop/BridgeCodecTests.cpp desktop/SessionTests.cpp
+    set_source_files_properties(desktop/BridgeCodecTests.cpp desktop/SampleLoaderTests.cpp desktop/SessionTests.cpp
         PROPERTIES COMPILE_OPTIONS "${_ap_test_opts}")
     catch_discover_tests(ap_desktop_tests)
 endif()

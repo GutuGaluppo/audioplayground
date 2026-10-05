@@ -7,7 +7,7 @@ import { ParamSlider } from './components/ParamSlider';
 import { PeakMeter } from './components/PeakMeter';
 import { TransportBar } from './components/TransportBar';
 import { Keyboard } from './instrument/Keyboard';
-import { SynthPanel } from './instrument/SynthPanel';
+import { InstrumentArea } from './instrument/InstrumentArea';
 import { useLatest } from './state/latestEvent';
 import { useStores } from './state/StoresContext';
 
@@ -49,7 +49,7 @@ export function App() {
       <TransportBar />
 
       <main className="stage">
-        <SynthPanel />
+        <InstrumentArea />
 
         <section className="card card--compact" aria-label="Test tone">
           <h2 className="card__title">Test tone</h2>

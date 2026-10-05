@@ -263,3 +263,37 @@ TEST_CASE ("Random edit sequences undo to the start and redo to the end", "[mode
     }
     CHECK (doc.project() == final);
 }
+
+TEST_CASE ("Assets are added with safe paths and the sampler can only point at existing ones", "[model]")
+{
+    ProjectDocument doc;
+    CHECK_FALSE (doc.perform (AddAsset {"../x.wav", "x"}));
+    CHECK_FALSE (doc.perform (AddAsset {"audio/a b.wav", "x"}));
+    CHECK_FALSE (doc.perform (AddAsset {"audio/x.wav", "  "}));
+    CHECK_FALSE (doc.perform (SetSamplerAsset {AssetId {5}}));
+
+    REQUIRE (doc.perform (AddAsset {"audio/1-kick.wav", "kick.wav"}));
+    const auto id = doc.project().assets.back().id;
+    REQUIRE (doc.perform (SetSamplerAsset {id}));
+    CHECK (doc.project().samplerAsset == id);
+    CHECK (doc.undoDescription() == "Change sample");
+
+    REQUIRE (doc.undo());
+    CHECK_FALSE (doc.project().samplerAsset.isValid());
+    REQUIRE (doc.undo());
+    CHECK (doc.project().assets.empty());
+    REQUIRE (doc.redo());
+    CHECK (doc.project().assets.back().id == id); // same id on redo
+}
+
+TEST_CASE ("isSafeAssetPath accepts only audio/<plain name>", "[model][security]")
+{
+    CHECK (isSafeAssetPath ("audio/1-kick.wav"));
+    CHECK (isSafeAssetPath ("audio/Take_02.flac"));
+    for (const char* bad : {"", "audio/", "audio/.x", "audio/../x", "audio/a/b.wav", "x/a.wav",
+                            "/audio/a.wav", "audio/a b.wav", "audio/a\\b.wav", "audio/caf\xC3\xA9.wav"})
+    {
+        INFO (bad);
+        CHECK_FALSE (isSafeAssetPath (bad));
+    }
+}

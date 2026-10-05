@@ -112,11 +112,12 @@ private:
 };
 
 WebUiHost::WebUiHost (AudioDeviceHost& hostToUse, engine::Engine& engineToUse, Session& sessionToUse,
-                      ProjectActions& actionsToUse)
+                      ProjectActions& actionsToUse, SampleLoader& samplesToUse)
     : host (hostToUse)
     , engine (engineToUse)
     , session (sessionToUse)
     , actions (actionsToUse)
+    , samples (samplesToUse)
 {
     const auto devUrl = developmentServerUrl();
 
@@ -140,8 +141,15 @@ WebUiHost::WebUiHost (AudioDeviceHost& hostToUse, engine::Engine& engineToUse, S
     addAndMakeVisible (*webView);
     webView->goToURL (devUrl.isNotEmpty() ? devUrl : juce::WebBrowserComponent::getResourceProviderRoot());
 
-    host.onStatusChanged = [this] { sendStatus(); };
+    host.onStatusChanged = [this]
+    {
+        samples.sync (host.getStatus().sampleRate);
+        sendStatus();
+    };
     session.onChanged = [this] { onProjectChanged(); };
+    samples.onStateChanged = [this] { sendSamplerState(); };
+    samples.onError
+        = [this] (const std::string& message) { showNotice (ProjectActions::NoticeLevel::error, message); };
     setSize (1100, 720);
     startTimerHz (meterRefreshHz);
 }
@@ -151,6 +159,8 @@ WebUiHost::~WebUiHost()
     stopTimer();
     host.onStatusChanged = nullptr;
     session.onChanged = nullptr;
+    samples.onStateChanged = nullptr;
+    samples.onError = nullptr;
 }
 
 void WebUiHost::resized()
@@ -180,6 +190,8 @@ void WebUiHost::handle (const ap::bridge::AppReady&)
         sendParameter (static_cast<params::ParamId> (i));
     sendHistory();
     sendProjectState();
+    sendInstrumentState();
+    sendSamplerState();
 }
 
 void WebUiHost::handle (const ap::bridge::AudioOpenSettings&)
@@ -287,8 +299,40 @@ void WebUiHost::showNotice (ProjectActions::NoticeLevel level, const std::string
     emit (event);
 }
 
+void WebUiHost::handle (const ap::bridge::InstrumentSelect& intent)
+{
+    engine.setLiveInstrument (intent.instrument == 1 ? engine::Engine::LiveInstrument::sampler
+                                                     : engine::Engine::LiveInstrument::synth);
+    sendInstrumentState();
+}
+
+void WebUiHost::handle (const ap::bridge::SamplerLoad&)
+{
+    samples.chooseAndImport();
+}
+
+void WebUiHost::sendInstrumentState()
+{
+    emit (ap::bridge::InstrumentState {static_cast<int> (engine.getLiveInstrument())});
+}
+
+void WebUiHost::sendSamplerState()
+{
+    const auto& state = samples.getState();
+    ap::bridge::SamplerState event;
+    event.name = model::sanitiseName (state.name, ap::bridge::SamplerState::nameMaxLength).value_or ("");
+    event.loaded = state.loaded;
+    event.missing = state.missing;
+    event.loading = state.loading;
+    event.durationSeconds
+        = std::clamp (state.durationSeconds, 0.0, ap::bridge::SamplerState::durationSecondsMax);
+    event.overview = state.overview;
+    emit (event);
+}
+
 void WebUiHost::onProjectChanged()
 {
+    samples.sync (host.getStatus().sampleRate);
     sendProjectState();
     sendTransportState();
     for (std::size_t i = 0; i < params::numParameters; ++i)

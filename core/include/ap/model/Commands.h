@@ -168,9 +168,35 @@ struct SetParameter
     float previous = 0.0f;
 };
 
-using Command
-    = std::variant<SetTempo, SetTimeSignature, RenameProject, AddTrack, RemoveTrack, MoveTrack, RenameTrack,
-                   SetTrackVolume, SetTrackPan, SetTrackMute, SetTrackSolo, SetParameter>;
+// Registers a file already copied into the project's audio folder.
+struct AddAsset
+{
+    AddAsset (std::string path, std::string displayName)
+        : relativePath (std::move (path))
+        , name (std::move (displayName))
+    {
+    }
+
+    std::string relativePath;
+    std::string name;
+    AssetId created; // captured
+    std::uint64_t previousNextAssetId = 0;
+};
+
+struct SetSamplerAsset
+{
+    explicit SetSamplerAsset (AssetId newAsset) noexcept
+        : asset (newAsset)
+    {
+    }
+
+    AssetId asset; // invalid = no sample
+    AssetId previous;
+};
+
+using Command = std::variant<SetTempo, SetTimeSignature, RenameProject, AddTrack, RemoveTrack, MoveTrack,
+                             RenameTrack, SetTrackVolume, SetTrackPan, SetTrackMute, SetTrackSolo,
+                             SetParameter, AddAsset, SetSamplerAsset>;
 
 enum class ApplyResult
 {

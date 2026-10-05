@@ -221,6 +221,19 @@ describe('App', () => {
     expect(screen.getByRole('radio', { name: 'Saw' }).getAttribute('aria-checked')).toBe('false');
   });
 
+  it('switches to the sampler and loads a sample', async () => {
+    await renderApp();
+    fireEvent.click(screen.getByRole('tab', { name: 'Sampler' }));
+    await flush();
+    expect(screen.getByRole('tab', { name: 'Sampler' }).getAttribute('aria-selected')).toBe('true');
+    expect(screen.getByText('No sample loaded')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Load sample…' }));
+    await flush();
+    expect(screen.getByText('Simulated sample.wav')).toBeTruthy();
+    expect(screen.getByText('1.50 s')).toBeTruthy();
+  });
+
   it('shows the bar and beat position', async () => {
     await renderApp();
     expect(screen.getByLabelText('Position').textContent).toBe('1.1');

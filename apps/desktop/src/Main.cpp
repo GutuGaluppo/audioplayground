@@ -1,6 +1,7 @@
 #include "AppPaths.h"
 #include "AudioDeviceHost.h"
 #include "ProjectActions.h"
+#include "SampleLoader.h"
 #include "Session.h"
 #include "WebUiHost.h"
 #include "ap/engine/Engine.h"
@@ -90,12 +91,14 @@ public:
             engine, io::ProjectFolder {toPath (appDataDirectory().getChildFile ("Unsaved"))});
         actions = std::make_unique<ProjectActions> (*session, *settings.getUserSettings());
 
-        auto* ui = new WebUiHost (*audioHost, engine, *session, *actions);
+        samples = std::make_unique<SampleLoader> (*session, engine);
+        auto* ui = new WebUiHost (*audioHost, engine, *session, *actions, *samples);
         actions->onNotice = [ui] (ProjectActions::NoticeLevel level, const std::string& message)
         { ui->showNotice (level, message); };
         mainWindow = std::make_unique<MainWindow> (getApplicationName(), ui);
 
         actions->restoreLastSession (lock->previousSessionCrashed);
+        samples->sync (audioHost->getStatus().sampleRate);
     }
 
     void shutdown() override
@@ -109,6 +112,7 @@ public:
         // Order matters: the window references the actions, session and host, which reference
         // the engine.
         mainWindow.reset();
+        samples.reset();
         actions.reset();
         session.reset();
         audioHost.reset();
@@ -133,6 +137,7 @@ private:
     std::unique_ptr<AudioDeviceHost> audioHost;
     std::unique_ptr<Session> session;
     std::unique_ptr<ProjectActions> actions;
+    std::unique_ptr<SampleLoader> samples;
     std::unique_ptr<MainWindow> mainWindow;
 };
 

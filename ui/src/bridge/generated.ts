@@ -124,7 +124,19 @@ export interface NoteAllOff {
   readonly payload: {};
 }
 
-export type Intent = AppReady | AudioOpenSettings | ToneSetEnabled | TransportPlay | TransportStop | TransportReturnToStart | TransportSetTempo | TransportSetCountIn | MetronomeSetEnabled | ParamSet | EditUndo | EditRedo | ProjectNew | ProjectOpen | ProjectSave | ProjectSaveAs | ProjectRename | NoteOn | NoteOff | NoteAllOff;
+export interface InstrumentSelect {
+  readonly type: 'instrument.select';
+  readonly payload: {
+    readonly instrument: number;
+  };
+}
+
+export interface SamplerLoad {
+  readonly type: 'sampler.load';
+  readonly payload: {};
+}
+
+export type Intent = AppReady | AudioOpenSettings | ToneSetEnabled | TransportPlay | TransportStop | TransportReturnToStart | TransportSetTempo | TransportSetCountIn | MetronomeSetEnabled | ParamSet | EditUndo | EditRedo | ProjectNew | ProjectOpen | ProjectSave | ProjectSaveAs | ProjectRename | NoteOn | NoteOff | NoteAllOff | InstrumentSelect | SamplerLoad;
 
 // Events: native -> UI
 export interface EngineStatus {
@@ -202,7 +214,26 @@ export interface AppNotice {
   };
 }
 
-export type NativeEvent = EngineStatus | EngineMeters | TransportState | TransportPosition | ParamValue | HistoryState | ProjectState | AppNotice;
+export interface InstrumentState {
+  readonly type: 'instrument.state';
+  readonly payload: {
+    readonly instrument: number;
+  };
+}
+
+export interface SamplerState {
+  readonly type: 'sampler.state';
+  readonly payload: {
+    readonly name: string;
+    readonly loaded: boolean;
+    readonly missing: boolean;
+    readonly loading: boolean;
+    readonly durationSeconds: number;
+    readonly overview: readonly number[];
+  };
+}
+
+export type NativeEvent = EngineStatus | EngineMeters | TransportState | TransportPosition | ParamValue | HistoryState | ProjectState | AppNotice | InstrumentState | SamplerState;
 export type NativeEventType = NativeEvent['type'];
 
 /** Payload type for each native event type. */
@@ -215,12 +246,22 @@ export interface NativeEventPayloads {
   'history.state': HistoryState['payload'];
   'project.state': ProjectState['payload'];
   'app.notice': AppNotice['payload'];
+  'instrument.state': InstrumentState['payload'];
+  'sampler.state': SamplerState['payload'];
 }
 
 type Payload = Record<string, unknown>;
 
 function isPayload(value: unknown): value is Payload {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isNumberArray(value: unknown, min: number, max: number, maxItems: number): boolean {
+  return (
+    Array.isArray(value) &&
+    value.length <= maxItems &&
+    value.every((item: unknown) => typeof item === 'number' && Number.isFinite(item) && item >= min && item <= max)
+  );
 }
 
 function hasOnlyKeys(payload: Payload, keys: readonly string[]): boolean {
@@ -272,6 +313,17 @@ const eventValidators: Record<NativeEventType, (payload: Payload) => boolean> = 
     hasOnlyKeys(payload, ['level', 'message']) &&
     Number.isInteger(payload['level']) && (payload['level'] as number) >= 0 && (payload['level'] as number) <= 2 &&
     typeof payload['message'] === 'string' && payload['message'].length <= 1024,
+  'instrument.state': (payload) =>
+    hasOnlyKeys(payload, ['instrument']) &&
+    Number.isInteger(payload['instrument']) && (payload['instrument'] as number) >= 0 && (payload['instrument'] as number) <= 1,
+  'sampler.state': (payload) =>
+    hasOnlyKeys(payload, ['name', 'loaded', 'missing', 'loading', 'durationSeconds', 'overview']) &&
+    typeof payload['name'] === 'string' && payload['name'].length <= 256 &&
+    typeof payload['loaded'] === 'boolean' &&
+    typeof payload['missing'] === 'boolean' &&
+    typeof payload['loading'] === 'boolean' &&
+    typeof payload['durationSeconds'] === 'number' && Number.isFinite(payload['durationSeconds']) && payload['durationSeconds'] >= 0 && payload['durationSeconds'] <= 100000 &&
+    isNumberArray(payload['overview'], 0, 1, 512),
 };
 
 /** Strictly validates a message received from native code. Returns null if it is malformed. */

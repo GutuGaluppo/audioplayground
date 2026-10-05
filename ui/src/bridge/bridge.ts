@@ -200,6 +200,18 @@ export function createSimulatedBridge(): Bridge {
             for (const id of params.keys()) sendParam(id);
             sendHistory();
             sendProject();
+            router.dispatch({ type: 'instrument.state', payload: { instrument: 0 } });
+            router.dispatch({
+              type: 'sampler.state',
+              payload: {
+                name: '',
+                loaded: false,
+                missing: false,
+                loading: false,
+                durationSeconds: 0,
+                overview: [],
+              },
+            });
           });
           return;
         case 'audio.openSettings':
@@ -282,6 +294,31 @@ export function createSimulatedBridge(): Bridge {
               dirty = true;
             }
             sendProject();
+          });
+          return;
+        case 'instrument.select': {
+          const instrument = intent.payload.instrument;
+          queueMicrotask(() => {
+            router.dispatch({ type: 'instrument.state', payload: { instrument } });
+          });
+          return;
+        }
+        case 'sampler.load':
+          queueMicrotask(() => {
+            router.dispatch({
+              type: 'sampler.state',
+              payload: {
+                name: 'Simulated sample.wav',
+                loaded: true,
+                missing: false,
+                loading: false,
+                durationSeconds: 1.5,
+                overview: Array.from(
+                  { length: 128 },
+                  (_, i) => Math.abs(Math.sin(i / 6)) * Math.exp(-i / 60),
+                ),
+              },
+            });
           });
           return;
         case 'note.on':

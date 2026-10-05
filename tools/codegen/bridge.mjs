@@ -25,7 +25,7 @@ const banner = (comment) =>
 // ---------------------------------------------------------------------------------------------
 // Schema loading and validation
 
-const FIELD_TYPES = new Set(['bool', 'int', 'number', 'string']);
+const FIELD_TYPES = new Set(['bool', 'int', 'number', 'string', 'floatArray']);
 const NAME_PATTERN = /^[a-z][a-zA-Z0-9]*\.[a-z][a-zA-Z0-9]*$/;
 const FIELD_PATTERN = /^[a-z][a-zA-Z0-9]*$/;
 
@@ -53,8 +53,13 @@ function loadSchema() {
           if (!FIELD_TYPES.has(spec.type)) fail(`${name}.${fieldName}: unknown type "${spec.type}"`);
           if (spec.type === 'string' && !Number.isInteger(spec.maxLength))
             fail(`${name}.${fieldName}: strings need maxLength`);
-          if ((spec.type === 'int' || spec.type === 'number') && !(Number.isFinite(spec.min) && Number.isFinite(spec.max)))
+          if (
+            (spec.type === 'int' || spec.type === 'number' || spec.type === 'floatArray') &&
+            !(Number.isFinite(spec.min) && Number.isFinite(spec.max))
+          )
             fail(`${name}.${fieldName}: numbers need finite min and max`);
+          if (spec.type === 'floatArray' && !(Number.isInteger(spec.maxItems) && spec.maxItems > 0))
+            fail(`${name}.${fieldName}: arrays need a positive maxItems`);
           if (spec.min > spec.max) fail(`${name}.${fieldName}: min > max`);
           return { name: fieldName, ...spec };
         }),
@@ -67,13 +72,19 @@ function loadSchema() {
 // ---------------------------------------------------------------------------------------------
 // C++: JUCE-free message structs (core)
 
-const cppType = { bool: 'bool', int: 'int', number: 'double', string: 'std::string' };
-const cppDefault = { bool: 'false', int: '0', number: '0.0', string: '' };
+const cppType = { bool: 'bool', int: 'int', number: 'double', string: 'std::string', floatArray: 'std::vector<float>' };
+const cppDefault = { bool: 'false', int: '0', number: '0.0', string: '', floatArray: '' };
 const cppNumber = (value) => (Number.isInteger(value) ? `${value}.0` : `${value}`);
+const cppFloat = (value) => `${cppNumber(value)}f`;
 
 function cppStruct(message) {
   const lines = [`struct ${message.typeName}`, '{', `    static constexpr std::string_view type = "${message.name}";`];
   for (const field of message.fields) {
+    if (field.type === 'floatArray') {
+      lines.push(`    static constexpr float ${field.name}Min = ${cppFloat(field.min)};`);
+      lines.push(`    static constexpr float ${field.name}Max = ${cppFloat(field.max)};`);
+      lines.push(`    static constexpr std::size_t ${field.name}MaxItems = ${field.maxItems};`);
+    }
     if (field.type === 'int' || field.type === 'number') {
       const literal = field.type === 'int' ? (v) => `${v}` : cppNumber;
       lines.push(`    static constexpr ${cppType[field.type]} ${field.name}Min = ${literal(field.min)};`);
@@ -99,6 +110,7 @@ function generateCppMessages(schema) {
 #include <string>
 #include <string_view>
 #include <variant>
+#include <vector>
 
 namespace ap::bridge
 {
@@ -129,6 +141,8 @@ function cppFieldReader(message, field) {
       return `    if (!readNumber (*payload, "${field.name}", ${message.typeName}::${field.name}Min, ${message.typeName}::${field.name}Max, ${target})) return std::nullopt;`;
     case 'string':
       return `    if (!readString (*payload, "${field.name}", ${message.typeName}::${field.name}MaxLength, ${target})) return std::nullopt;`;
+    case 'floatArray':
+      return `    if (!readFloatArray (*payload, "${field.name}", ${message.typeName}::${field.name}Min, ${message.typeName}::${field.name}Max, ${message.typeName}::${field.name}MaxItems, ${target})) return std::nullopt;`;
     default:
       return fail(`unhandled type ${field.type} (${lookup})`);
   }
@@ -151,7 +165,8 @@ ${message.fields.map((f) => cppFieldReader(message, f)).join('\n')}
 function cppEventWriter(message) {
   const setters = message.fields
     .map((f) => {
-      const value = f.type === 'string' ? `juce::String (m.${f.name})` : `m.${f.name}`;
+      const value =
+        f.type === 'string' ? `juce::String (m.${f.name})` : f.type === 'floatArray' ? `toVarArray (m.${f.name})` : `m.${f.name}`;
       return `                payload->setProperty ("${f.name}", ${value});`;
     })
     .join('\n');
@@ -191,6 +206,7 @@ namespace ap::desktop::bridge
 
 #include <cmath>
 #include <initializer_list>
+#include <utility>
 
 namespace ap::desktop::bridge
 {
@@ -254,6 +270,35 @@ bool hasOnlyKeys (const juce::DynamicObject& object, std::initializer_list<const
     return true;
 }
 
+[[maybe_unused]] bool readFloatArray (const juce::DynamicObject& object, const char* key, float min, float max, std::size_t maxItems, std::vector<float>& out)
+{
+    const auto* array = object.getProperty (key).getArray();
+    if (array == nullptr || static_cast<std::size_t> (array->size()) > maxItems)
+        return false;
+    std::vector<float> values;
+    values.reserve (static_cast<std::size_t> (array->size()));
+    for (const auto& item : *array)
+    {
+        if (!(item.isDouble() || item.isInt() || item.isInt64()))
+            return false;
+        const auto number = static_cast<double> (item);
+        if (!std::isfinite (number) || number < static_cast<double> (min) || number > static_cast<double> (max))
+            return false;
+        values.push_back (static_cast<float> (number));
+    }
+    out = std::move (values);
+    return true;
+}
+
+[[maybe_unused]] juce::var toVarArray (const std::vector<float>& values)
+{
+    juce::Array<juce::var> array;
+    array.ensureStorageAllocated (static_cast<int> (values.size()));
+    for (const float value : values)
+        array.add (static_cast<double> (value));
+    return array;
+}
+
 template <typename... Fns>
 struct Overloaded : Fns...
 {
@@ -305,7 +350,7 @@ ${schema.events.map(cppEventWriter).join(',\n')}},
 // ---------------------------------------------------------------------------------------------
 // TypeScript
 
-const tsType = { bool: 'boolean', int: 'number', number: 'number', string: 'string' };
+const tsType = { bool: 'boolean', int: 'number', number: 'number', string: 'string', floatArray: 'readonly number[]' };
 
 function tsInterface(message) {
   const fields = message.fields.map((f) => `    readonly ${f.name}: ${tsType[f.type]};`).join('\n');
@@ -326,6 +371,8 @@ function tsFieldCheck(field) {
       return `typeof ${value} === 'number' && Number.isFinite(${value}) && ${value} >= ${field.min} && ${value} <= ${field.max}`;
     case 'string':
       return `typeof ${value} === 'string' && ${value}.length <= ${field.maxLength}`;
+    case 'floatArray':
+      return `isNumberArray(${value}, ${field.min}, ${field.max}, ${field.maxItems})`;
     default:
       return fail(`unhandled type ${field.type}`);
   }
@@ -364,6 +411,14 @@ type Payload = Record<string, unknown>;
 
 function isPayload(value: unknown): value is Payload {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isNumberArray(value: unknown, min: number, max: number, maxItems: number): boolean {
+  return (
+    Array.isArray(value) &&
+    value.length <= maxItems &&
+    value.every((item: unknown) => typeof item === 'number' && Number.isFinite(item) && item >= min && item <= max)
+  );
 }
 
 function hasOnlyKeys(payload: Payload, keys: readonly string[]): boolean {

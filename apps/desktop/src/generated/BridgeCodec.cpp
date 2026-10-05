@@ -4,6 +4,7 @@
 
 #include <cmath>
 #include <initializer_list>
+#include <utility>
 
 namespace ap::desktop::bridge
 {
@@ -65,6 +66,35 @@ bool hasOnlyKeys (const juce::DynamicObject& object, std::initializer_list<const
         return false;
     out = utf8;
     return true;
+}
+
+[[maybe_unused]] bool readFloatArray (const juce::DynamicObject& object, const char* key, float min, float max, std::size_t maxItems, std::vector<float>& out)
+{
+    const auto* array = object.getProperty (key).getArray();
+    if (array == nullptr || static_cast<std::size_t> (array->size()) > maxItems)
+        return false;
+    std::vector<float> values;
+    values.reserve (static_cast<std::size_t> (array->size()));
+    for (const auto& item : *array)
+    {
+        if (!(item.isDouble() || item.isInt() || item.isInt64()))
+            return false;
+        const auto number = static_cast<double> (item);
+        if (!std::isfinite (number) || number < static_cast<double> (min) || number > static_cast<double> (max))
+            return false;
+        values.push_back (static_cast<float> (number));
+    }
+    out = std::move (values);
+    return true;
+}
+
+[[maybe_unused]] juce::var toVarArray (const std::vector<float>& values)
+{
+    juce::Array<juce::var> array;
+    array.ensureStorageAllocated (static_cast<int> (values.size()));
+    for (const float value : values)
+        array.add (static_cast<double> (value));
+    return array;
 }
 
 template <typename... Fns>
@@ -303,6 +333,28 @@ std::optional<Intent> parseNoteAllOff (const juce::var& payloadVar)
 
     return Intent {message};
 }
+
+std::optional<Intent> parseInstrumentSelect (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"instrument"}))
+        return std::nullopt;
+
+    InstrumentSelect message;
+    if (!readInt (*payload, "instrument", InstrumentSelect::instrumentMin, InstrumentSelect::instrumentMax, message.instrument)) return std::nullopt;
+    return Intent {message};
+}
+
+std::optional<Intent> parseSamplerLoad (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {}))
+        return std::nullopt;
+
+    SamplerLoad message;
+
+    return Intent {message};
+}
 } // namespace
 
 std::optional<Intent> parseIntent (const juce::var& message)
@@ -358,6 +410,10 @@ std::optional<Intent> parseIntent (const juce::var& message)
         return parseNoteOff (payload);
     if (typeName == NoteAllOff::type)
         return parseNoteAllOff (payload);
+    if (typeName == InstrumentSelect::type)
+        return parseInstrumentSelect (payload);
+    if (typeName == SamplerLoad::type)
+        return parseSamplerLoad (payload);
 
     return std::nullopt;
 }
@@ -432,6 +488,23 @@ juce::var toVar (const Event& event)
                 payload->setProperty ("level", m.level);
                 payload->setProperty ("message", juce::String (m.message));
                 return envelope (AppNotice::type, payload);
+            },
+            [] (const InstrumentState& m) -> juce::var
+            {
+                auto* payload = new juce::DynamicObject();
+                payload->setProperty ("instrument", m.instrument);
+                return envelope (InstrumentState::type, payload);
+            },
+            [] (const SamplerState& m) -> juce::var
+            {
+                auto* payload = new juce::DynamicObject();
+                payload->setProperty ("name", juce::String (m.name));
+                payload->setProperty ("loaded", m.loaded);
+                payload->setProperty ("missing", m.missing);
+                payload->setProperty ("loading", m.loading);
+                payload->setProperty ("durationSeconds", m.durationSeconds);
+                payload->setProperty ("overview", toVarArray (m.overview));
+                return envelope (SamplerState::type, payload);
             }},
         event);
 }

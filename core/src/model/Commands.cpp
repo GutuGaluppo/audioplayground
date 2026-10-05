@@ -168,6 +168,29 @@ ApplyResult apply (Command& command, Project& project)
                 return applyTrackField (project, c.id, &Track::soloed, c.soloed, c.previous,
                                         [] (bool v) { return std::optional<bool> (v); });
             },
+            [&project] (AddAsset& c) -> ApplyResult
+            {
+                if (project.assets.size() >= Project::maxAssets || !isSafeAssetPath (c.relativePath))
+                    return ApplyResult::rejected;
+                auto name = sanitiseName (c.name, Asset::maxNameLength);
+                if (!name)
+                    return ApplyResult::rejected;
+                c.name = std::move (*name);
+                c.created = AssetId {project.nextAssetId};
+                c.previousNextAssetId = project.nextAssetId;
+                project.assets.push_back ({c.created, c.relativePath, c.name});
+                ++project.nextAssetId;
+                return ApplyResult::applied;
+            },
+            [&project] (SetSamplerAsset& c) -> ApplyResult
+            {
+                if (c.asset.isValid() && project.findAsset (c.asset) == nullptr)
+                    return ApplyResult::rejected;
+                if (c.asset == project.samplerAsset)
+                    return ApplyResult::unchanged;
+                c.previous = std::exchange (project.samplerAsset, c.asset);
+                return ApplyResult::applied;
+            },
             [&project] (SetParameter& c) -> ApplyResult
             {
                 const auto index = static_cast<std::size_t> (c.id);
@@ -241,6 +264,12 @@ void revert (const Command& command, Project& project)
                 if (auto* t = project.findTrack (c.id))
                     t->soloed = c.previous;
             },
+            [&project] (const AddAsset& c)
+            {
+                std::erase_if (project.assets, [&c] (const Asset& a) { return a.id == c.created; });
+                project.nextAssetId = c.previousNextAssetId;
+            },
+            [&project] (const SetSamplerAsset& c) { project.samplerAsset = c.previous; },
             [&project] (const SetParameter& c)
             { project.parameters[static_cast<std::size_t> (c.id)] = c.previous; },
         },
@@ -263,6 +292,8 @@ std::string_view describe (const Command& command) noexcept
             [] (const SetTrackMute&) { return std::string_view ("Mute track"); },
             [] (const SetTrackSolo&) { return std::string_view ("Solo track"); },
             [] (const SetParameter& c) { return params::descriptor (c.id).name; },
+            [] (const AddAsset&) { return std::string_view ("Import audio"); },
+            [] (const SetSamplerAsset&) { return std::string_view ("Change sample"); },
         },
         command);
 }

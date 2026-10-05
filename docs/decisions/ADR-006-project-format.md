@@ -16,3 +16,11 @@ MySong.playground/
 - The project's `sampleRate` is only the default export rate. Assets keep their native rate and are resampled off the audio thread.
 - No SQLite in the MVP.
 - No codename in persisted identifiers (guide §37).
+
+## Amendments
+- 2026-10-05: v1 is a **draft until the first public release**. Until then it may gain fields
+  without a migration (assets, `nextAssetId`, `samplerAsset` were added this way). From the first
+  release on, every change needs a schema version bump and a migration.
+- Imported audio is **copied** into `audio/` under a safe generated name
+  (`audio/<id>-<name>.<ext>`, see `model::isSafeAssetPath`); the user's original file is never
+  referenced or modified. Save As copies the project's audio files to the new folder.

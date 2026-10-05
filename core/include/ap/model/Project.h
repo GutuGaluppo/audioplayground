@@ -24,6 +24,32 @@ struct TrackId
     constexpr auto operator<=> (const TrackId&) const = default;
 };
 
+// Stable identity for an imported audio file in the project folder. Never reused.
+struct AssetId
+{
+    std::uint64_t value = 0; // 0 = none
+
+    [[nodiscard]] constexpr bool isValid() const noexcept { return value != 0; }
+    constexpr auto operator<=> (const AssetId&) const = default;
+};
+
+// An audio file owned by the project, stored under its folder (ADR-006). The project only ever
+// references copies it owns; the user's original files are never modified or referenced.
+struct Asset
+{
+    static constexpr std::size_t maxNameLength = 128;
+
+    AssetId id;
+    std::string relativePath; // canonical, e.g. "audio/3-kick.wav" (see isSafeAssetPath)
+    std::string name;         // shown to the user, e.g. "kick.wav"
+
+    bool operator== (const Asset&) const = default;
+};
+
+// Pure syntax check for asset references: "audio/" + one plain file name, ASCII letters, digits,
+// '-', '_', '.', no leading dot. The filesystem check (symlinks) lives in io::resolveAssetPath.
+[[nodiscard]] bool isSafeAssetPath (std::string_view path) noexcept;
+
 enum class TrackKind : std::uint8_t
 {
     audio,
@@ -53,6 +79,7 @@ struct Project
 {
     static constexpr std::size_t maxNameLength = 128;
     static constexpr std::size_t maxTracks = 64;
+    static constexpr std::size_t maxAssets = 1024;
 
     std::string name = "Untitled";
     double tempoBpm = 120.0;              // fixed per project in the MVP (decision D4)
@@ -61,6 +88,10 @@ struct Project
     std::vector<Track> tracks;
     std::array<float, params::numParameters> parameters = defaultParameterValues();
     std::uint64_t nextTrackId = 1;
+
+    std::vector<Asset> assets;
+    std::uint64_t nextAssetId = 1;
+    AssetId samplerAsset; // sample loaded in the sampler (none if invalid)
 
     // Parameters this build does not know (written by a newer version with the same schema).
     // Kept verbatim and written back so opening and saving never loses them (guide §11).
@@ -82,6 +113,7 @@ struct Project
     [[nodiscard]] const Track* findTrack (TrackId id) const noexcept;
     [[nodiscard]] Track* findTrack (TrackId id) noexcept;
     [[nodiscard]] std::optional<std::size_t> indexOf (TrackId id) const noexcept;
+    [[nodiscard]] const Asset* findAsset (AssetId id) const noexcept;
 
     bool operator== (const Project&) const = default;
 };
