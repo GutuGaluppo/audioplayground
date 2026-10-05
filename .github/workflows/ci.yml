@@ -33,8 +33,11 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: cmake --preset dev
+      # Step-level timeouts keep the log if something hangs (a job-level timeout discards it).
       - run: cmake --build --preset dev --parallel
-      - run: ctest --preset dev
+        timeout-minutes: 30
+      - run: ctest --preset dev --timeout 300
+        timeout-minutes: 10
 
   sanitizers:
     name: C++ tests (ASan + UBSan)
