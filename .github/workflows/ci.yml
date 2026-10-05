@@ -30,7 +30,7 @@ jobs:
 
   sanitizers:
     name: C++ tests (ASan + UBSan)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       CC: clang
       CXX: clang++
@@ -42,9 +42,29 @@ jobs:
       - run: cmake --build --preset asan --parallel
       - run: ctest --preset asan
 
+  realtime-sanitizer:
+    name: C++ tests (RealtimeSanitizer)
+    runs-on: ubuntu-24.04
+    env:
+      CC: clang-20
+      CXX: clang++-20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Clang 20 from the signed LLVM apt repository
+        run: |
+          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
+          echo "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-20 main" | sudo tee /etc/apt/sources.list.d/llvm-20.list
+          sudo apt-get update -q
+          sudo apt-get install -y -q clang-20
+      - run: cmake --preset rtsan
+      - run: cmake --build --preset rtsan --parallel
+      - run: ctest --preset rtsan
+
   cpp-format:
     name: clang-format
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -53,7 +73,7 @@ jobs:
 
   ui:
     name: UI typecheck, lint, format, test, build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

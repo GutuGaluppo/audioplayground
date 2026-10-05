@@ -3,7 +3,8 @@
 
 add_library(ap_core STATIC
     src/BuildInfo.cpp
-    src/engine/Engine.cpp)
+    src/engine/Engine.cpp
+    src/engine/OfflineRenderer.cpp)
 add_library(ap::core ALIAS ap_core)
 
 target_include_directories(ap_core PUBLIC include)

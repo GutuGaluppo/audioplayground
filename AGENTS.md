@@ -28,6 +28,12 @@ ctest --preset dev
 # C++ with AddressSanitizer + UBSan (tests only)
 cmake --preset asan && cmake --build --preset asan && ctest --preset asan
 
+# RealtimeSanitizer (Clang >= 20; runs in CI — Apple Clang does not ship it)
+cmake --preset rtsan && cmake --build --preset rtsan && ctest --preset rtsan
+
+# Regenerate golden audio references after an intended sound change (review + listen before committing)
+AP_UPDATE_GOLDENS=1 ./build/dev/tests/ap_unit_tests "[golden]"
+
 # UI
 pnpm install
 pnpm check                          # typecheck + lint + format:check + test
@@ -36,6 +42,7 @@ pnpm ui:build
 
 ## Non-negotiable rules
 - The audio thread never allocates, locks, does I/O, logs or parses (guide §8). Answer the §34 checklist in every audio PR.
+- Mark every function reachable from the audio callback `AP_NONBLOCKING` (`ap/core/RealtimeSafety.h`). Clang then rejects violations at compile time (`-Wfunction-effects`) and RTSan catches them at run time.
 - Positions are `int64` ticks (PPQ 960) or samples, never floating point (ADR-004).
 - Project state changes go through core commands (ADR-003). The UI sends intents only.
 - Project files and imported audio are untrusted input (ADR-006).
