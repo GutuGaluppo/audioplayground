@@ -1,0 +1,17 @@
+# Matches the JUCE-adjacent style used in apps/ and core/.
+BasedOnStyle: LLVM
+ColumnLimit: 110
+IndentWidth: 4
+AccessModifierOffset: -4
+BreakBeforeBraces: Allman
+SpaceBeforeParens: NonEmptyParentheses
+PointerAlignment: Left
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLambdasOnASingleLine: All
+NamespaceIndentation: None
+FixNamespaceComments: true
+IncludeBlocks: Regroup
+SortIncludes: CaseSensitive
+BreakBeforeBinaryOperators: All
+AlignOperands: AlignAfterOperator

@@ -1,0 +1,46 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--ap-bg);
+  color: var(--ap-text);
+  font-family: var(--ap-font-sans);
+  font-size: var(--ap-text-md);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ap-accent);
+  outline-offset: 2px;
+}
+
+.app {
+  display: grid;
+  place-content: center;
+  height: 100%;
+  text-align: center;
+  gap: var(--ap-space-2);
+}
+
+.app__title {
+  margin: 0;
+  font-size: var(--ap-text-lg);
+  font-weight: 600;
+}
+
+.app__subtitle {
+  margin: 0;
+  color: var(--ap-text-muted);
+  font-size: var(--ap-text-sm);
+}

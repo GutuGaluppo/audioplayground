@@ -1,0 +1,21 @@
+# Build output
+/build/
+/out/
+/cmake-build-*/
+
+# Node
+node_modules/
+ui/dist/
+ui/coverage/
+
+# IDE / OS
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.xcworkspace/xcuserdata/
+.cache/
+compile_commands.json
+
+# Never commit user audio or local projects
+*.playground/

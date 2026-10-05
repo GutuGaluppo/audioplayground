@@ -1,0 +1,53 @@
+/* Design tokens. Components use these variables only — never raw values. */
+:root {
+  --ap-font-sans: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --ap-font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  --ap-text-xs: 0.75rem;
+  --ap-text-sm: 0.8125rem;
+  --ap-text-md: 0.9375rem;
+  --ap-text-lg: 1.375rem;
+
+  --ap-space-1: 4px;
+  --ap-space-2: 8px;
+  --ap-space-3: 12px;
+  --ap-space-4: 16px;
+  --ap-space-6: 24px;
+
+  --ap-radius-sm: 4px;
+  --ap-radius-md: 8px;
+
+  --ap-motion-fast: 120ms;
+  --ap-motion-base: 200ms;
+
+  /* Dark is the default theme. */
+  --ap-bg: #111214;
+  --ap-surface: #1a1b1e;
+  --ap-border: #2a2b30;
+  --ap-text: #e8e8ea;
+  --ap-text-muted: #8a8b90;
+  --ap-accent: #7c9cff;
+  --ap-meter-ok: #4cc38a;
+  --ap-meter-hot: #f2c94c;
+  --ap-meter-clip: #ff5c5c;
+
+  color-scheme: dark;
+}
+
+:root[data-theme='light'] {
+  --ap-bg: #f7f7f8;
+  --ap-surface: #ffffff;
+  --ap-border: #dcdce0;
+  --ap-text: #17181b;
+  --ap-text-muted: #5f6066;
+  --ap-accent: #3457d5;
+
+  color-scheme: light;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --ap-motion-fast: 0ms;
+    --ap-motion-base: 0ms;
+  }
+}

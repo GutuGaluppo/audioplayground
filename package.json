@@ -1,0 +1,13 @@
+{
+  "name": "audio-playground-workspace",
+  "private": true,
+  "packageManager": "pnpm@11.24.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "ui:dev": "pnpm --filter @ap/ui dev",
+    "ui:build": "pnpm --filter @ap/ui build",
+    "check": "pnpm -r run typecheck && pnpm -r run lint && pnpm -r run format:check && pnpm -r run test"
+  }
+}
