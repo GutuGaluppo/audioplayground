@@ -10,6 +10,7 @@ add_executable(ap_unit_tests
     unit/MusicalTimeTests.cpp
     unit/OfflineRenderTests.cpp
     unit/ParameterTests.cpp
+    unit/ProjectModelTests.cpp
     unit/SineOscillatorTests.cpp
     unit/TransportTests.cpp)
 

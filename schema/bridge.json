@@ -40,8 +40,15 @@
         "type": "number",
         "min": -1000000,
         "max": 1000000
+      },
+      "gesture": {
+        "type": "int",
+        "min": 0,
+        "max": 2147483647
       }
-    }
+    },
+    "edit.undo": {},
+    "edit.redo": {}
   },
   "events": {
     "engine.status": {
@@ -131,6 +138,22 @@
         "type": "number",
         "min": -1000000,
         "max": 1000000
+      }
+    },
+    "history.state": {
+      "canUndo": {
+        "type": "bool"
+      },
+      "canRedo": {
+        "type": "bool"
+      },
+      "undoLabel": {
+        "type": "string",
+        "maxLength": 64
+      },
+      "redoLabel": {
+        "type": "string",
+        "maxLength": 64
       }
     }
   }

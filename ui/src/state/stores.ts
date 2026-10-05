@@ -8,6 +8,7 @@ export function createStores(bridge: Bridge) {
     transportState: createLatestEventStore(bridge, 'transport.state'),
     transportPosition: createLatestEventStore(bridge, 'transport.position'),
     parameters: createParameterStore(bridge),
+    history: createLatestEventStore(bridge, 'history.state'),
   };
 }
 

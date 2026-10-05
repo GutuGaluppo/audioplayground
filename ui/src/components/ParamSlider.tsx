@@ -1,8 +1,9 @@
-import { useId } from 'react';
+import { useId, useRef } from 'react';
 
 import { useBridge } from '../bridge/BridgeContext';
 import { PARAMETERS } from '../params/generated';
 import type { ParamId } from '../params/generated';
+import { beginGesture } from '../params/gestures';
 import { formatValue, fromNormalized, snapToStep, toNormalized } from '../params/mapping';
 import { useParameter } from '../params/parameterStore';
 import { useStores } from '../state/StoresContext';
@@ -16,9 +17,13 @@ export function ParamSlider({ id, label }: { id: ParamId; label?: string }) {
   const value = useParameter(useStores().parameters, id);
   const inputId = useId();
   const shown = value ?? descriptor.defaultValue;
+  const gesture = useRef(0);
 
   const send = (plain: number) => {
-    bridge.send({ type: 'param.set', payload: { id, value: snapToStep(descriptor, plain) } });
+    bridge.send({
+      type: 'param.set',
+      payload: { id, value: snapToStep(descriptor, plain), gesture: gesture.current },
+    });
   };
 
   return (
@@ -34,10 +39,20 @@ export function ParamSlider({ id, label }: { id: ParamId; label?: string }) {
         disabled={value === undefined}
         aria-valuetext={formatValue(descriptor, shown)}
         title="Double-click to reset"
+        onPointerDown={() => {
+          gesture.current = beginGesture();
+        }}
+        onPointerUp={() => {
+          gesture.current = 0;
+        }}
+        onPointerCancel={() => {
+          gesture.current = 0;
+        }}
         onChange={(event) => {
           send(fromNormalized(descriptor, Number(event.currentTarget.value) / SLIDER_RESOLUTION));
         }}
         onDoubleClick={() => {
+          gesture.current = 0;
           send(descriptor.defaultValue);
         }}
       />

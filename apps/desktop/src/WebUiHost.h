@@ -1,6 +1,7 @@
 #pragma once
 
 #include "AudioDeviceHost.h"
+#include "Session.h"
 #include "ap/bridge/generated/Messages.h"
 #include "ap/engine/Engine.h"
 
@@ -20,7 +21,7 @@ namespace ap::desktop
 class WebUiHost final : public juce::Component, private juce::Timer
 {
 public:
-    WebUiHost (AudioDeviceHost& host, engine::Engine& engine);
+    WebUiHost (AudioDeviceHost& host, engine::Engine& engine, Session& session);
     ~WebUiHost() override;
 
     void resized() override;
@@ -33,6 +34,8 @@ private:
     void handle (const ap::bridge::AudioOpenSettings&);
     void handle (const ap::bridge::ToneSetEnabled&);
     void handle (const ap::bridge::ParamSet&);
+    void handle (const ap::bridge::EditUndo&);
+    void handle (const ap::bridge::EditRedo&);
     void handle (const ap::bridge::TransportPlay&);
     void handle (const ap::bridge::TransportStop&);
     void handle (const ap::bridge::TransportReturnToStart&);
@@ -44,12 +47,15 @@ private:
     void sendStatus();
     void sendTransportState();
     void sendParameter (params::ParamId id);
+    void sendHistory();
+    void onProjectChanged();
     void sendTransportPosition (bool force);
     void timerCallback() override;
     void showAudioSettings();
 
     AudioDeviceHost& host;
     engine::Engine& engine;
+    Session& session;
 
     std::unique_ptr<LockedDownWebView> webView;
     ap::bridge::TransportPosition lastPosition;

@@ -81,12 +81,54 @@ export function createSimulatedBridge(): Bridge {
       payload: { id, value: params.get(id) ?? PARAMETERS[id].defaultValue },
     });
   };
+  const setParam = (id: ParamId) => (value: number) => {
+    params.set(id, value);
+    sendParam(id);
+  };
+  const setTempo = (value: number) => {
+    bpm = value;
+    sendTransportState();
+  };
   let playing = false;
   let bpm = 120;
   let countInBars = 0;
   let metronomeEnabled = false;
   let beatsElapsed = 0;
   let countInBeatsLeft = 0;
+
+  // Minimal stand-in for the native undo history (same merge rule: same gesture and target).
+  interface Edit {
+    key: string;
+    gesture: number;
+    label: string;
+    before: number;
+    after: number;
+    set: (value: number) => void;
+  }
+  const undoStack: Edit[] = [];
+  const redoStack: Edit[] = [];
+
+  const sendHistory = () => {
+    router.dispatch({
+      type: 'history.state',
+      payload: {
+        canUndo: undoStack.length > 0,
+        canRedo: redoStack.length > 0,
+        undoLabel: undoStack.at(-1)?.label ?? '',
+        redoLabel: redoStack.at(-1)?.label ?? '',
+      },
+    });
+  };
+
+  const record = (edit: Edit) => {
+    redoStack.length = 0;
+    const last = undoStack.at(-1);
+    if (edit.gesture !== 0 && last && last.gesture === edit.gesture && last.key === edit.key)
+      last.after = edit.after;
+    else undoStack.push(edit);
+    edit.set(edit.after);
+    sendHistory();
+  };
 
   const sendStatus = () => {
     router.dispatch({
@@ -144,6 +186,7 @@ export function createSimulatedBridge(): Bridge {
             sendTransportState();
             sendPosition();
             for (const id of params.keys()) sendParam(id);
+            sendHistory();
           });
           return;
         case 'audio.openSettings':
@@ -153,11 +196,20 @@ export function createSimulatedBridge(): Bridge {
           toneEnabled = intent.payload.enabled;
           break;
         case 'param.set': {
-          const { id, value } = intent.payload;
+          const { id, value, gesture } = intent.payload;
           if (!isParamId(id) || value < PARAMETERS[id].min || value > PARAMETERS[id].max) return;
-          params.set(id, value);
+          const before = params.get(id) ?? PARAMETERS[id].defaultValue;
           queueMicrotask(() => {
-            sendParam(id);
+            if (value === before) sendParam(id);
+            else
+              record({
+                key: id,
+                gesture,
+                label: PARAMETERS[id].name,
+                before,
+                after: value,
+                set: setParam(id),
+              });
           });
           return;
         }
@@ -175,9 +227,42 @@ export function createSimulatedBridge(): Bridge {
           beatsElapsed = 0;
           queueMicrotask(sendPosition);
           return;
-        case 'transport.setTempo':
-          bpm = intent.payload.bpm;
-          queueMicrotask(sendTransportState);
+        case 'transport.setTempo': {
+          const after = intent.payload.bpm;
+          if (after === bpm) {
+            queueMicrotask(sendTransportState);
+            return;
+          }
+          const before = bpm;
+          queueMicrotask(() => {
+            record({
+              key: 'tempo',
+              gesture: 0,
+              label: 'Change tempo',
+              before,
+              after,
+              set: setTempo,
+            });
+          });
+          return;
+        }
+        case 'edit.undo':
+          queueMicrotask(() => {
+            const edit = undoStack.pop();
+            if (!edit) return;
+            edit.set(edit.before);
+            redoStack.push(edit);
+            sendHistory();
+          });
+          return;
+        case 'edit.redo':
+          queueMicrotask(() => {
+            const edit = redoStack.pop();
+            if (!edit) return;
+            edit.set(edit.after);
+            undoStack.push(edit);
+            sendHistory();
+          });
           return;
         case 'transport.setCountIn':
           countInBars = intent.payload.bars;

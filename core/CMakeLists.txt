@@ -6,7 +6,10 @@ add_library(ap_core STATIC
     src/engine/Engine.cpp
     src/engine/Metronome.cpp
     src/engine/OfflineRenderer.cpp
-    src/engine/Transport.cpp)
+    src/engine/Transport.cpp
+    src/model/Commands.cpp
+    src/model/Project.cpp
+    src/model/ProjectDocument.cpp)
 add_library(ap::core ALIAS ap_core)
 
 target_include_directories(ap_core PUBLIC include)

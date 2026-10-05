@@ -232,6 +232,13 @@ kbd {
   cursor: pointer;
 }
 
+.transport__divider {
+  width: 1px;
+  height: 20px;
+  margin: 0 var(--ap-space-1);
+  background: var(--ap-border);
+}
+
 .transport__button--primary[aria-pressed='true'] {
   background: var(--ap-accent);
   border-color: var(--ap-accent);

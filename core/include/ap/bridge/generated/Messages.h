@@ -93,11 +93,28 @@ struct ParamSet
     static constexpr std::size_t idMaxLength = 64;
     static constexpr double valueMin = -1000000.0;
     static constexpr double valueMax = 1000000.0;
+    static constexpr int gestureMin = 0;
+    static constexpr int gestureMax = 2147483647;
 
     std::string id {};
     double value = 0.0;
+    int gesture = 0;
 
     bool operator== (const ParamSet&) const = default;
+};
+
+struct EditUndo
+{
+    static constexpr std::string_view type = "edit.undo";
+
+    bool operator== (const EditUndo&) const = default;
+};
+
+struct EditRedo
+{
+    static constexpr std::string_view type = "edit.redo";
+
+    bool operator== (const EditRedo&) const = default;
 };
 
 struct EngineStatus
@@ -183,7 +200,21 @@ struct ParamValue
     bool operator== (const ParamValue&) const = default;
 };
 
-using Intent = std::variant<AppReady, AudioOpenSettings, ToneSetEnabled, TransportPlay, TransportStop, TransportReturnToStart, TransportSetTempo, TransportSetCountIn, MetronomeSetEnabled, ParamSet>;
-using Event = std::variant<EngineStatus, EngineMeters, TransportState, TransportPosition, ParamValue>;
+struct HistoryState
+{
+    static constexpr std::string_view type = "history.state";
+    static constexpr std::size_t undoLabelMaxLength = 64;
+    static constexpr std::size_t redoLabelMaxLength = 64;
+
+    bool canUndo = false;
+    bool canRedo = false;
+    std::string undoLabel {};
+    std::string redoLabel {};
+
+    bool operator== (const HistoryState&) const = default;
+};
+
+using Intent = std::variant<AppReady, AudioOpenSettings, ToneSetEnabled, TransportPlay, TransportStop, TransportReturnToStart, TransportSetTempo, TransportSetCountIn, MetronomeSetEnabled, ParamSet, EditUndo, EditRedo>;
+using Event = std::variant<EngineStatus, EngineMeters, TransportState, TransportPosition, ParamValue, HistoryState>;
 
 } // namespace ap::bridge

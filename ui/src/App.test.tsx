@@ -110,6 +110,55 @@ describe('App', () => {
     expect(level.getAttribute('aria-valuetext')).toBe('-18.0 dB');
   });
 
+  it('undoes and redoes a tempo change with the buttons', async () => {
+    await renderApp();
+    const tempo = screen.getByRole<HTMLInputElement>('spinbutton', { name: /tempo/i });
+    expect(screen.getByRole('button', { name: 'Undo' })).toHaveProperty('disabled', true);
+
+    fireEvent.change(tempo, { target: { value: '90' } });
+    fireEvent.blur(tempo);
+    await flush();
+    expect(tempo.value).toBe('90');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Undo Change tempo' }));
+    await flush();
+    expect(tempo.value).toBe('120');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Redo Change tempo' }));
+    await flush();
+    expect(tempo.value).toBe('90');
+  });
+
+  it('records a whole slider drag as one undo step (keyboard shortcut)', async () => {
+    await renderApp();
+    const level = screen.getByRole('slider', { name: 'Level' });
+
+    fireEvent.pointerDown(level);
+    for (const value of ['600', '700', '800', '900']) {
+      fireEvent.change(level, { target: { value } });
+      await flush();
+    }
+    fireEvent.pointerUp(level);
+    expect(level.getAttribute('aria-valuetext')).not.toBe('-18.0 dB');
+
+    fireEvent.keyDown(window, { key: 'z', metaKey: true, ctrlKey: true });
+    await flush();
+    expect(level.getAttribute('aria-valuetext')).toBe('-18.0 dB');
+    expect(screen.getByRole('button', { name: 'Undo' })).toHaveProperty('disabled', true);
+  });
+
+  it('leaves Cmd/Ctrl+Z to text fields while typing', async () => {
+    await renderApp();
+    const tempo = screen.getByRole<HTMLInputElement>('spinbutton', { name: /tempo/i });
+    fireEvent.change(tempo, { target: { value: '90' } });
+    fireEvent.blur(tempo);
+    await flush();
+
+    fireEvent.keyDown(tempo, { key: 'z', metaKey: true, ctrlKey: true });
+    await flush();
+    expect(tempo.value).toBe('90');
+  });
+
   it('shows the bar and beat position', async () => {
     await renderApp();
     expect(screen.getByLabelText('Position').textContent).toBe('1.1');

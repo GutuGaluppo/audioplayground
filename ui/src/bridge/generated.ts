@@ -63,10 +63,21 @@ export interface ParamSet {
   readonly payload: {
     readonly id: string;
     readonly value: number;
+    readonly gesture: number;
   };
 }
 
-export type Intent = AppReady | AudioOpenSettings | ToneSetEnabled | TransportPlay | TransportStop | TransportReturnToStart | TransportSetTempo | TransportSetCountIn | MetronomeSetEnabled | ParamSet;
+export interface EditUndo {
+  readonly type: 'edit.undo';
+  readonly payload: {};
+}
+
+export interface EditRedo {
+  readonly type: 'edit.redo';
+  readonly payload: {};
+}
+
+export type Intent = AppReady | AudioOpenSettings | ToneSetEnabled | TransportPlay | TransportStop | TransportReturnToStart | TransportSetTempo | TransportSetCountIn | MetronomeSetEnabled | ParamSet | EditUndo | EditRedo;
 
 // Events: native -> UI
 export interface EngineStatus {
@@ -117,7 +128,17 @@ export interface ParamValue {
   };
 }
 
-export type NativeEvent = EngineStatus | EngineMeters | TransportState | TransportPosition | ParamValue;
+export interface HistoryState {
+  readonly type: 'history.state';
+  readonly payload: {
+    readonly canUndo: boolean;
+    readonly canRedo: boolean;
+    readonly undoLabel: string;
+    readonly redoLabel: string;
+  };
+}
+
+export type NativeEvent = EngineStatus | EngineMeters | TransportState | TransportPosition | ParamValue | HistoryState;
 export type NativeEventType = NativeEvent['type'];
 
 /** Payload type for each native event type. */
@@ -127,6 +148,7 @@ export interface NativeEventPayloads {
   'transport.state': TransportState['payload'];
   'transport.position': TransportPosition['payload'];
   'param.value': ParamValue['payload'];
+  'history.state': HistoryState['payload'];
 }
 
 type Payload = Record<string, unknown>;
@@ -169,6 +191,12 @@ const eventValidators: Record<NativeEventType, (payload: Payload) => boolean> = 
     hasOnlyKeys(payload, ['id', 'value']) &&
     typeof payload['id'] === 'string' && payload['id'].length <= 64 &&
     typeof payload['value'] === 'number' && Number.isFinite(payload['value']) && payload['value'] >= -1000000 && payload['value'] <= 1000000,
+  'history.state': (payload) =>
+    hasOnlyKeys(payload, ['canUndo', 'canRedo', 'undoLabel', 'redoLabel']) &&
+    typeof payload['canUndo'] === 'boolean' &&
+    typeof payload['canRedo'] === 'boolean' &&
+    typeof payload['undoLabel'] === 'string' && payload['undoLabel'].length <= 64 &&
+    typeof payload['redoLabel'] === 'string' && payload['redoLabel'].length <= 64,
 };
 
 /** Strictly validates a message received from native code. Returns null if it is malformed. */

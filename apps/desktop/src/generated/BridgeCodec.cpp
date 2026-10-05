@@ -183,12 +183,35 @@ std::optional<Intent> parseMetronomeSetEnabled (const juce::var& payloadVar)
 std::optional<Intent> parseParamSet (const juce::var& payloadVar)
 {
     const auto* payload = payloadVar.getDynamicObject();
-    if (payload == nullptr || !hasOnlyKeys (*payload, {"id", "value"}))
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"id", "value", "gesture"}))
         return std::nullopt;
 
     ParamSet message;
     if (!readString (*payload, "id", ParamSet::idMaxLength, message.id)) return std::nullopt;
     if (!readNumber (*payload, "value", ParamSet::valueMin, ParamSet::valueMax, message.value)) return std::nullopt;
+    if (!readInt (*payload, "gesture", ParamSet::gestureMin, ParamSet::gestureMax, message.gesture)) return std::nullopt;
+    return Intent {message};
+}
+
+std::optional<Intent> parseEditUndo (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {}))
+        return std::nullopt;
+
+    EditUndo message;
+
+    return Intent {message};
+}
+
+std::optional<Intent> parseEditRedo (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {}))
+        return std::nullopt;
+
+    EditRedo message;
+
     return Intent {message};
 }
 } // namespace
@@ -226,6 +249,10 @@ std::optional<Intent> parseIntent (const juce::var& message)
         return parseMetronomeSetEnabled (payload);
     if (typeName == ParamSet::type)
         return parseParamSet (payload);
+    if (typeName == EditUndo::type)
+        return parseEditUndo (payload);
+    if (typeName == EditRedo::type)
+        return parseEditRedo (payload);
 
     return std::nullopt;
 }
@@ -276,6 +303,15 @@ juce::var toVar (const Event& event)
                 payload->setProperty ("id", juce::String (m.id));
                 payload->setProperty ("value", m.value);
                 return envelope (ParamValue::type, payload);
+            },
+            [] (const HistoryState& m) -> juce::var
+            {
+                auto* payload = new juce::DynamicObject();
+                payload->setProperty ("canUndo", m.canUndo);
+                payload->setProperty ("canRedo", m.canRedo);
+                payload->setProperty ("undoLabel", juce::String (m.undoLabel));
+                payload->setProperty ("redoLabel", juce::String (m.redoLabel));
+                return envelope (HistoryState::type, payload);
             }},
         event);
 }

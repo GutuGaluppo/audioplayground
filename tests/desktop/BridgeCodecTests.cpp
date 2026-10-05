@@ -26,10 +26,11 @@ TEST_CASE ("parseIntent accepts well-formed intents", "[bridge]")
     CHECK (std::get<ToneSetEnabled> (*enable).enabled);
 
     const auto param
-        = parseIntent (parseJson (R"({"type":"param.set","payload":{"id":"tone.level","value":-24}})"));
+        = parseIntent (parseJson (R"({"type":"param.set","payload":{"id":"tone.level","value":-24,"gesture":3}})"));
     REQUIRE (param.has_value());
     CHECK (std::get<ParamSet> (*param).id == "tone.level");
     CHECK (std::get<ParamSet> (*param).value == -24.0);
+    CHECK (std::get<ParamSet> (*param).gesture == 3);
 }
 
 TEST_CASE ("parseIntent rejects malformed or hostile input", "[bridge][security]")
@@ -51,6 +52,9 @@ TEST_CASE ("parseIntent rejects malformed or hostile input", "[bridge][security]
         R"({"type":"tone.setEnabled","payload":{"enabled":1}})",
         R"({"type":"tone.setEnabled","payload":{"enabled":"true"}})",
         R"({"type":"param.set","payload":{"id":"tone.level"}})",
+        R"({"type":"param.set","payload":{"id":"tone.level","value":-12}})",
+        R"({"type":"param.set","payload":{"id":"tone.level","value":-12,"gesture":-1}})",
+        R"({"type":"param.set","payload":{"id":"tone.level","value":-12,"gesture":1.5}})",
         R"({"type":"param.set","payload":{"id":"tone.level","value":"-12"}})",
         R"({"type":"param.set","payload":{"id":7,"value":-12}})",
         R"({"type":"param.set","payload":{"id":"tone.level","value":1e9}})",
@@ -67,7 +71,7 @@ TEST_CASE ("parseIntent rejects malformed or hostile input", "[bridge][security]
     CHECK_FALSE (
         parseIntent (
             parseJson (
-                ("{\"type\":\"param.set\",\"payload\":{\"id\":\"" + longId + "\",\"value\":0}}").toRawUTF8()))
+                ("{\"type\":\"param.set\",\"payload\":{\"id\":\"" + longId + "\",\"value\":0,\"gesture\":0}}").toRawUTF8()))
             .has_value());
 }
 

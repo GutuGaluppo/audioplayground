@@ -1,4 +1,5 @@
 #include "AudioDeviceHost.h"
+#include "Session.h"
 #include "WebUiHost.h"
 #include "ap/engine/Engine.h"
 
@@ -26,11 +27,11 @@ juce::PropertiesFile::Options settingsOptions()
 class MainWindow final : public juce::DocumentWindow
 {
 public:
-    MainWindow (const juce::String& name, AudioDeviceHost& host, engine::Engine& engine)
+    MainWindow (const juce::String& name, AudioDeviceHost& host, engine::Engine& engine, Session& session)
         : DocumentWindow (name, juce::Colour (0xff111214), allButtons)
     {
         setUsingNativeTitleBar (true);
-        setContentOwned (new WebUiHost (host, engine), true);
+        setContentOwned (new WebUiHost (host, engine, session), true);
         setResizable (true, true);
         setResizeLimits (720, 480, 10000, 10000);
         centreWithSize (getWidth(), getHeight());
@@ -60,7 +61,8 @@ public:
         const auto savedState = settings.getUserSettings()->getXmlValue (audioDeviceStateKey);
         audioHost->initialise (savedState.get());
 
-        mainWindow = std::make_unique<MainWindow> (getApplicationName(), *audioHost, engine);
+        session = std::make_unique<Session> (engine);
+        mainWindow = std::make_unique<MainWindow> (getApplicationName(), *audioHost, engine, *session);
     }
 
     void shutdown() override
@@ -71,8 +73,9 @@ public:
 
         settings.saveIfNeeded();
 
-        // Order matters: the window references the host, the host references the engine.
+        // Order matters: the window references the session and host, which reference the engine.
         mainWindow.reset();
+        session.reset();
         audioHost.reset();
     }
 
@@ -82,6 +85,7 @@ private:
     engine::Engine engine;
     juce::ApplicationProperties settings;
     std::unique_ptr<AudioDeviceHost> audioHost;
+    std::unique_ptr<Session> session;
     std::unique_ptr<MainWindow> mainWindow;
 };
 

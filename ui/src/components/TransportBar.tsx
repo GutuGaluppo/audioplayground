@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import { useBridge } from '../bridge/BridgeContext';
+import { HistoryControls } from './HistoryControls';
 import { useLatest } from '../state/latestEvent';
 import { useStores } from '../state/StoresContext';
 
@@ -68,6 +69,8 @@ export function TransportBar() {
         >
           <span aria-hidden="true">{playing ? '■' : '▶'}</span>
         </button>
+        <span className="transport__divider" aria-hidden="true" />
+        <HistoryControls />
       </div>
 
       <output

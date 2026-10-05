@@ -111,8 +111,8 @@ private:
     juce::String developmentUrl;
 };
 
-WebUiHost::WebUiHost (AudioDeviceHost& hostToUse, engine::Engine& engineToUse)
-    : host (hostToUse), engine (engineToUse)
+WebUiHost::WebUiHost (AudioDeviceHost& hostToUse, engine::Engine& engineToUse, Session& sessionToUse)
+    : host (hostToUse), engine (engineToUse), session (sessionToUse)
 {
     const auto devUrl = developmentServerUrl();
 
@@ -137,6 +137,7 @@ WebUiHost::WebUiHost (AudioDeviceHost& hostToUse, engine::Engine& engineToUse)
     webView->goToURL (devUrl.isNotEmpty() ? devUrl : juce::WebBrowserComponent::getResourceProviderRoot());
 
     host.onStatusChanged = [this] { sendStatus(); };
+    session.onChanged = [this] { onProjectChanged(); };
     setSize (1100, 720);
     startTimerHz (meterRefreshHz);
 }
@@ -145,6 +146,7 @@ WebUiHost::~WebUiHost()
 {
     stopTimer();
     host.onStatusChanged = nullptr;
+    session.onChanged = nullptr;
 }
 
 void WebUiHost::resized()
@@ -172,6 +174,7 @@ void WebUiHost::handle (const ap::bridge::AppReady&)
 
     for (std::size_t i = 0; i < params::numParameters; ++i)
         sendParameter (static_cast<params::ParamId> (i));
+    sendHistory();
 }
 
 void WebUiHost::handle (const ap::bridge::AudioOpenSettings&)
@@ -202,14 +205,48 @@ void WebUiHost::handle (const ap::bridge::ParamSet& intent)
         return;
     }
 
-    engine.getParameters().set (*id, value);
-    sendParameter (*id);
+    // Value changes are sent back through onProjectChanged; a rejected or no-op edit still
+    // echoes the current value so a control never stays out of sync.
+    if (!session.perform (model::SetParameter{*id, value},
+                          static_cast<model::ProjectDocument::GestureId> (intent.gesture)))
+        sendParameter (*id);
+}
+
+void WebUiHost::handle (const ap::bridge::EditUndo&)
+{
+    session.undo();
+}
+
+void WebUiHost::handle (const ap::bridge::EditRedo&)
+{
+    session.redo();
+}
+
+void WebUiHost::onProjectChanged()
+{
+    sendTransportState();
+    for (std::size_t i = 0; i < params::numParameters; ++i)
+        sendParameter (static_cast<params::ParamId> (i));
+    sendHistory();
+}
+
+void WebUiHost::sendHistory()
+{
+    const auto& doc = session.document();
+    ap::bridge::HistoryState event;
+    event.canUndo = doc.canUndo();
+    event.canRedo = doc.canRedo();
+    event.undoLabel
+        = std::string (doc.undoDescription().substr (0, ap::bridge::HistoryState::undoLabelMaxLength));
+    event.redoLabel
+        = std::string (doc.redoDescription().substr (0, ap::bridge::HistoryState::redoLabelMaxLength));
+    emit (event);
 }
 
 void WebUiHost::sendParameter (params::ParamId id)
 {
     emit (ap::bridge::ParamValue{std::string (params::descriptor (id).id),
-                                 static_cast<double> (engine.getParameters().get (id))});
+                                 static_cast<double> (session.project().parameter (id))});
 }
 
 void WebUiHost::handle (const ap::bridge::TransportPlay&)
@@ -229,8 +266,8 @@ void WebUiHost::handle (const ap::bridge::TransportReturnToStart&)
 
 void WebUiHost::handle (const ap::bridge::TransportSetTempo& intent)
 {
-    engine.getTransport().setTempo (intent.bpm);
-    sendTransportState();
+    if (!session.perform (model::SetTempo{intent.bpm}))
+        sendTransportState(); // rejected or unchanged: resync the field
 }
 
 void WebUiHost::handle (const ap::bridge::TransportSetCountIn& intent)
@@ -271,13 +308,12 @@ void WebUiHost::sendStatus()
 void WebUiHost::sendTransportState()
 {
     const auto& transport = engine.getTransport();
-    const auto signature = transport.getTimeSignature();
 
     ap::bridge::TransportState event;
     event.playing = transport.getState().playing;
-    event.bpm = transport.getTempo();
-    event.numerator = signature.numerator;
-    event.denominator = signature.denominator;
+    event.bpm = session.project().tempoBpm;
+    event.numerator = session.project().timeSignature.numerator;
+    event.denominator = session.project().timeSignature.denominator;
     event.countInBars = transport.getCountInBars();
     event.metronomeEnabled = engine.getMetronome().isEnabled();
 
