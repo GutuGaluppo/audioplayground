@@ -124,6 +124,72 @@ std::optional<Intent> parseToneSetLevel (const juce::var& payloadVar)
     if (!readNumber (*payload, "db", ToneSetLevel::dbMin, ToneSetLevel::dbMax, message.db)) return std::nullopt;
     return Intent {message};
 }
+
+std::optional<Intent> parseTransportPlay (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {}))
+        return std::nullopt;
+
+    TransportPlay message;
+
+    return Intent {message};
+}
+
+std::optional<Intent> parseTransportStop (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {}))
+        return std::nullopt;
+
+    TransportStop message;
+
+    return Intent {message};
+}
+
+std::optional<Intent> parseTransportReturnToStart (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {}))
+        return std::nullopt;
+
+    TransportReturnToStart message;
+
+    return Intent {message};
+}
+
+std::optional<Intent> parseTransportSetTempo (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"bpm"}))
+        return std::nullopt;
+
+    TransportSetTempo message;
+    if (!readNumber (*payload, "bpm", TransportSetTempo::bpmMin, TransportSetTempo::bpmMax, message.bpm)) return std::nullopt;
+    return Intent {message};
+}
+
+std::optional<Intent> parseTransportSetCountIn (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"bars"}))
+        return std::nullopt;
+
+    TransportSetCountIn message;
+    if (!readInt (*payload, "bars", TransportSetCountIn::barsMin, TransportSetCountIn::barsMax, message.bars)) return std::nullopt;
+    return Intent {message};
+}
+
+std::optional<Intent> parseMetronomeSetEnabled (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"enabled"}))
+        return std::nullopt;
+
+    MetronomeSetEnabled message;
+    if (!readBool (*payload, "enabled", message.enabled)) return std::nullopt;
+    return Intent {message};
+}
 } // namespace
 
 std::optional<Intent> parseIntent (const juce::var& message)
@@ -147,6 +213,18 @@ std::optional<Intent> parseIntent (const juce::var& message)
         return parseToneSetEnabled (payload);
     if (typeName == ToneSetLevel::type)
         return parseToneSetLevel (payload);
+    if (typeName == TransportPlay::type)
+        return parseTransportPlay (payload);
+    if (typeName == TransportStop::type)
+        return parseTransportStop (payload);
+    if (typeName == TransportReturnToStart::type)
+        return parseTransportReturnToStart (payload);
+    if (typeName == TransportSetTempo::type)
+        return parseTransportSetTempo (payload);
+    if (typeName == TransportSetCountIn::type)
+        return parseTransportSetCountIn (payload);
+    if (typeName == MetronomeSetEnabled::type)
+        return parseMetronomeSetEnabled (payload);
 
     return std::nullopt;
 }
@@ -172,6 +250,25 @@ juce::var toVar (const Event& event)
                 auto* payload = new juce::DynamicObject();
                 payload->setProperty ("peak", m.peak);
                 return envelope (EngineMeters::type, payload);
+            },
+            [] (const TransportState& m) -> juce::var
+            {
+                auto* payload = new juce::DynamicObject();
+                payload->setProperty ("playing", m.playing);
+                payload->setProperty ("bpm", m.bpm);
+                payload->setProperty ("numerator", m.numerator);
+                payload->setProperty ("denominator", m.denominator);
+                payload->setProperty ("countInBars", m.countInBars);
+                payload->setProperty ("metronomeEnabled", m.metronomeEnabled);
+                return envelope (TransportState::type, payload);
+            },
+            [] (const TransportPosition& m) -> juce::var
+            {
+                auto* payload = new juce::DynamicObject();
+                payload->setProperty ("bar", m.bar);
+                payload->setProperty ("beat", m.beat);
+                payload->setProperty ("countingIn", m.countingIn);
+                return envelope (TransportPosition::type, payload);
             }},
         event);
 }

@@ -1,11 +1,11 @@
 import { parseNativeEvent, PROTOCOL_VERSION } from './generated';
-import type { Intent, NativeEvent, NativeEventType } from './generated';
+import type { Intent, NativeEventPayloads, NativeEventType } from './generated';
 
 const INTENT_EVENT_ID = 'ap.intent';
 const NATIVE_EVENT_ID = 'ap.event';
 
-type EventOf<T extends NativeEventType> = Extract<NativeEvent, { type: T }>;
-type Handler<T extends NativeEventType> = (payload: EventOf<T>['payload']) => void;
+export type PayloadOf<T extends NativeEventType> = NativeEventPayloads[T];
+type Handler<T extends NativeEventType> = (payload: PayloadOf<T>) => void;
 
 /** Transport between the UI and the native host. The UI never processes audio (ADR-002). */
 export interface Bridge {
@@ -71,6 +71,12 @@ export function createSimulatedBridge(): Bridge {
   const router = new EventRouter();
   let toneEnabled = false;
   let toneLevelDb = -18;
+  let playing = false;
+  let bpm = 120;
+  let countInBars = 0;
+  let metronomeEnabled = false;
+  let beatsElapsed = 0;
+  let countInBeatsLeft = 0;
 
   const sendStatus = () => {
     router.dispatch({
@@ -87,11 +93,36 @@ export function createSimulatedBridge(): Bridge {
     });
   };
 
+  const sendTransportState = () => {
+    router.dispatch({
+      type: 'transport.state',
+      payload: { playing, bpm, numerator: 4, denominator: 4, countInBars, metronomeEnabled },
+    });
+  };
+
+  const sendPosition = () => {
+    const countingIn = countInBeatsLeft > 0;
+    const beats = countingIn ? -countInBeatsLeft : beatsElapsed;
+    const bar = Math.floor(beats / 4) + 1;
+    const beat = (((beats % 4) + 4) % 4) + 1;
+    router.dispatch({ type: 'transport.position', payload: { bar, beat, countingIn } });
+  };
+
   if (typeof window !== 'undefined') {
     window.setInterval(() => {
       const level = toneEnabled ? Math.pow(10, toneLevelDb / 20) : 0;
       router.dispatch({ type: 'engine.meters', payload: { peak: level } });
     }, 1000 / 30);
+
+    const tick = () => {
+      if (playing) {
+        if (countInBeatsLeft > 0) countInBeatsLeft -= 1;
+        else beatsElapsed += 1;
+        sendPosition();
+      }
+      window.setTimeout(tick, 60000 / bpm);
+    };
+    window.setTimeout(tick, 60000 / bpm);
   }
 
   return {
@@ -99,7 +130,12 @@ export function createSimulatedBridge(): Bridge {
     send: (intent) => {
       switch (intent.type) {
         case 'app.ready':
-          break;
+          queueMicrotask(() => {
+            sendStatus();
+            sendTransportState();
+            sendPosition();
+          });
+          return;
         case 'audio.openSettings':
           console.info('Audio settings are only available in the desktop app');
           return;
@@ -109,6 +145,32 @@ export function createSimulatedBridge(): Bridge {
         case 'tone.setLevel':
           toneLevelDb = intent.payload.db;
           break;
+        case 'transport.play':
+          if (!playing) countInBeatsLeft = countInBars * 4;
+          playing = true;
+          queueMicrotask(sendTransportState);
+          return;
+        case 'transport.stop':
+          playing = false;
+          countInBeatsLeft = 0;
+          queueMicrotask(sendTransportState);
+          return;
+        case 'transport.returnToStart':
+          beatsElapsed = 0;
+          queueMicrotask(sendPosition);
+          return;
+        case 'transport.setTempo':
+          bpm = intent.payload.bpm;
+          queueMicrotask(sendTransportState);
+          return;
+        case 'transport.setCountIn':
+          countInBars = intent.payload.bars;
+          queueMicrotask(sendTransportState);
+          return;
+        case 'metronome.setEnabled':
+          metronomeEnabled = intent.payload.enabled;
+          queueMicrotask(sendTransportState);
+          return;
       }
       queueMicrotask(sendStatus);
     },

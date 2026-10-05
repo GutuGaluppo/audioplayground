@@ -1,21 +1,16 @@
 import { useEffect, useId } from 'react';
 
 import { useBridge } from './bridge/BridgeContext';
+import type { EngineStatus } from './bridge/generated';
 import { PeakMeter } from './components/PeakMeter';
-import type { EngineStatusStore } from './state/engineStatus';
-import { useEngineStatus } from './state/engineStatus';
+import { TransportBar } from './components/TransportBar';
+import { useLatest } from './state/latestEvent';
+import { useStores } from './state/StoresContext';
 
 const MIN_LEVEL_DB = -60;
 const MAX_LEVEL_DB = -6;
 
-function isTextEntry(target: EventTarget | null): boolean {
-  return (
-    target instanceof HTMLElement &&
-    (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(target.tagName))
-  );
-}
-
-function formatDevice(status: NonNullable<ReturnType<typeof useEngineStatus>>): string {
+function formatDevice(status: EngineStatus['payload']): string {
   if (!status.deviceName) return 'No audio output';
   return [
     status.deviceName,
@@ -25,9 +20,9 @@ function formatDevice(status: NonNullable<ReturnType<typeof useEngineStatus>>): 
   ].join(' · ');
 }
 
-export function App({ statusStore }: { statusStore: EngineStatusStore }) {
+export function App() {
   const bridge = useBridge();
-  const status = useEngineStatus(statusStore);
+  const status = useLatest(useStores().engineStatus);
   const levelId = useId();
 
   useEffect(() => {
@@ -35,40 +30,27 @@ export function App({ statusStore }: { statusStore: EngineStatusStore }) {
   }, [bridge]);
 
   const toneEnabled = status?.toneEnabled ?? false;
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.code !== 'Space' || event.repeat || isTextEntry(event.target)) return;
-      event.preventDefault();
-      bridge.send({ type: 'tone.setEnabled', payload: { enabled: !toneEnabled } });
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => {
-      window.removeEventListener('keydown', onKeyDown);
-    };
-  }, [bridge, toneEnabled]);
+  const openSettings = () => {
+    bridge.send({ type: 'audio.openSettings', payload: {} });
+  };
 
   return (
     <div className="app">
+      <h1 className="visually-hidden">Audio Playground</h1>
       {status?.error ? (
         <div className="banner" role="alert">
           <span>{status.error}</span>
-          <button
-            type="button"
-            className="button button--quiet"
-            onClick={() => {
-              bridge.send({ type: 'audio.openSettings', payload: {} });
-            }}
-          >
+          <button type="button" className="button button--quiet" onClick={openSettings}>
             Choose device
           </button>
         </div>
       ) : null}
 
-      <main className="stage">
-        <h1 className="stage__title">Audio Playground</h1>
+      <TransportBar />
 
+      <main className="stage">
         <section className="card" aria-label="Test tone">
+          <h2 className="card__title">Test tone</h2>
           <button
             type="button"
             className="play"
@@ -106,22 +88,13 @@ export function App({ statusStore }: { statusStore: EngineStatusStore }) {
           </div>
 
           <PeakMeter />
-          <p className="hint">
-            Press <kbd>Space</kbd> to toggle
-          </p>
         </section>
       </main>
 
       <footer className="statusbar">
         <span>{status ? formatDevice(status) : 'Connecting to audio engine…'}</span>
         {bridge.isNative ? (
-          <button
-            type="button"
-            className="button button--quiet"
-            onClick={() => {
-              bridge.send({ type: 'audio.openSettings', payload: {} });
-            }}
-          >
+          <button type="button" className="button button--quiet" onClick={openSettings}>
             Audio settings
           </button>
         ) : (

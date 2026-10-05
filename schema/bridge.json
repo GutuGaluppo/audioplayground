@@ -5,24 +5,123 @@
     "app.ready": {},
     "audio.openSettings": {},
     "tone.setEnabled": {
-      "enabled": { "type": "bool" }
+      "enabled": {
+        "type": "bool"
+      }
     },
     "tone.setLevel": {
-      "db": { "type": "number", "min": -60, "max": -6 }
+      "db": {
+        "type": "number",
+        "min": -60,
+        "max": -6
+      }
+    },
+    "transport.play": {},
+    "transport.stop": {},
+    "transport.returnToStart": {},
+    "transport.setTempo": {
+      "bpm": {
+        "type": "number",
+        "min": 20,
+        "max": 300
+      }
+    },
+    "transport.setCountIn": {
+      "bars": {
+        "type": "int",
+        "min": 0,
+        "max": 4
+      }
+    },
+    "metronome.setEnabled": {
+      "enabled": {
+        "type": "bool"
+      }
     }
   },
   "events": {
     "engine.status": {
-      "deviceName": { "type": "string", "maxLength": 256 },
-      "sampleRate": { "type": "number", "min": 0, "max": 768000 },
-      "bufferSize": { "type": "int", "min": 0, "max": 65536 },
-      "outputLatencyMs": { "type": "number", "min": 0, "max": 10000 },
-      "error": { "type": "string", "maxLength": 1024 },
-      "toneEnabled": { "type": "bool" },
-      "toneLevelDb": { "type": "number", "min": -60, "max": -6 }
+      "deviceName": {
+        "type": "string",
+        "maxLength": 256
+      },
+      "sampleRate": {
+        "type": "number",
+        "min": 0,
+        "max": 768000
+      },
+      "bufferSize": {
+        "type": "int",
+        "min": 0,
+        "max": 65536
+      },
+      "outputLatencyMs": {
+        "type": "number",
+        "min": 0,
+        "max": 10000
+      },
+      "error": {
+        "type": "string",
+        "maxLength": 1024
+      },
+      "toneEnabled": {
+        "type": "bool"
+      },
+      "toneLevelDb": {
+        "type": "number",
+        "min": -60,
+        "max": -6
+      }
     },
     "engine.meters": {
-      "peak": { "type": "number", "min": 0, "max": 1 }
+      "peak": {
+        "type": "number",
+        "min": 0,
+        "max": 1
+      }
+    },
+    "transport.state": {
+      "playing": {
+        "type": "bool"
+      },
+      "bpm": {
+        "type": "number",
+        "min": 20,
+        "max": 300
+      },
+      "numerator": {
+        "type": "int",
+        "min": 1,
+        "max": 32
+      },
+      "denominator": {
+        "type": "int",
+        "min": 1,
+        "max": 16
+      },
+      "countInBars": {
+        "type": "int",
+        "min": 0,
+        "max": 4
+      },
+      "metronomeEnabled": {
+        "type": "bool"
+      }
+    },
+    "transport.position": {
+      "bar": {
+        "type": "int",
+        "min": -1000,
+        "max": 100000000
+      },
+      "beat": {
+        "type": "int",
+        "min": 1,
+        "max": 32
+      },
+      "countingIn": {
+        "type": "bool"
+      }
     }
   }
 }

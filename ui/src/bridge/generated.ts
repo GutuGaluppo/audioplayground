@@ -29,7 +29,43 @@ export interface ToneSetLevel {
   };
 }
 
-export type Intent = AppReady | AudioOpenSettings | ToneSetEnabled | ToneSetLevel;
+export interface TransportPlay {
+  readonly type: 'transport.play';
+  readonly payload: {};
+}
+
+export interface TransportStop {
+  readonly type: 'transport.stop';
+  readonly payload: {};
+}
+
+export interface TransportReturnToStart {
+  readonly type: 'transport.returnToStart';
+  readonly payload: {};
+}
+
+export interface TransportSetTempo {
+  readonly type: 'transport.setTempo';
+  readonly payload: {
+    readonly bpm: number;
+  };
+}
+
+export interface TransportSetCountIn {
+  readonly type: 'transport.setCountIn';
+  readonly payload: {
+    readonly bars: number;
+  };
+}
+
+export interface MetronomeSetEnabled {
+  readonly type: 'metronome.setEnabled';
+  readonly payload: {
+    readonly enabled: boolean;
+  };
+}
+
+export type Intent = AppReady | AudioOpenSettings | ToneSetEnabled | ToneSetLevel | TransportPlay | TransportStop | TransportReturnToStart | TransportSetTempo | TransportSetCountIn | MetronomeSetEnabled;
 
 // Events: native -> UI
 export interface EngineStatus {
@@ -52,8 +88,37 @@ export interface EngineMeters {
   };
 }
 
-export type NativeEvent = EngineStatus | EngineMeters;
+export interface TransportState {
+  readonly type: 'transport.state';
+  readonly payload: {
+    readonly playing: boolean;
+    readonly bpm: number;
+    readonly numerator: number;
+    readonly denominator: number;
+    readonly countInBars: number;
+    readonly metronomeEnabled: boolean;
+  };
+}
+
+export interface TransportPosition {
+  readonly type: 'transport.position';
+  readonly payload: {
+    readonly bar: number;
+    readonly beat: number;
+    readonly countingIn: boolean;
+  };
+}
+
+export type NativeEvent = EngineStatus | EngineMeters | TransportState | TransportPosition;
 export type NativeEventType = NativeEvent['type'];
+
+/** Payload type for each native event type. */
+export interface NativeEventPayloads {
+  'engine.status': EngineStatus['payload'];
+  'engine.meters': EngineMeters['payload'];
+  'transport.state': TransportState['payload'];
+  'transport.position': TransportPosition['payload'];
+}
 
 type Payload = Record<string, unknown>;
 
@@ -79,6 +144,19 @@ const eventValidators: Record<NativeEventType, (payload: Payload) => boolean> = 
   'engine.meters': (payload) =>
     hasOnlyKeys(payload, ['peak']) &&
     typeof payload['peak'] === 'number' && Number.isFinite(payload['peak']) && payload['peak'] >= 0 && payload['peak'] <= 1,
+  'transport.state': (payload) =>
+    hasOnlyKeys(payload, ['playing', 'bpm', 'numerator', 'denominator', 'countInBars', 'metronomeEnabled']) &&
+    typeof payload['playing'] === 'boolean' &&
+    typeof payload['bpm'] === 'number' && Number.isFinite(payload['bpm']) && payload['bpm'] >= 20 && payload['bpm'] <= 300 &&
+    Number.isInteger(payload['numerator']) && (payload['numerator'] as number) >= 1 && (payload['numerator'] as number) <= 32 &&
+    Number.isInteger(payload['denominator']) && (payload['denominator'] as number) >= 1 && (payload['denominator'] as number) <= 16 &&
+    Number.isInteger(payload['countInBars']) && (payload['countInBars'] as number) >= 0 && (payload['countInBars'] as number) <= 4 &&
+    typeof payload['metronomeEnabled'] === 'boolean',
+  'transport.position': (payload) =>
+    hasOnlyKeys(payload, ['bar', 'beat', 'countingIn']) &&
+    Number.isInteger(payload['bar']) && (payload['bar'] as number) >= -1000 && (payload['bar'] as number) <= 100000000 &&
+    Number.isInteger(payload['beat']) && (payload['beat'] as number) >= 1 && (payload['beat'] as number) <= 32 &&
+    typeof payload['countingIn'] === 'boolean',
 };
 
 /** Strictly validates a message received from native code. Returns null if it is malformed. */

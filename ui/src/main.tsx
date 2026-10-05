@@ -4,7 +4,8 @@ import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import { createBridge } from './bridge/bridge';
 import { BridgeContext } from './bridge/BridgeContext';
-import { createEngineStatusStore } from './state/engineStatus';
+import { createStores } from './state/stores';
+import { StoresContext } from './state/StoresContext';
 import './styles/tokens.css';
 import './styles/base.css';
 
@@ -14,12 +15,14 @@ if (!rootElement) {
 }
 
 const bridge = createBridge();
-const statusStore = createEngineStatusStore(bridge);
+const stores = createStores(bridge);
 
 createRoot(rootElement).render(
   <StrictMode>
     <BridgeContext.Provider value={bridge}>
-      <App statusStore={statusStore} />
+      <StoresContext.Provider value={stores}>
+        <App />
+      </StoresContext.Provider>
     </BridgeContext.Provider>
   </StrictMode>,
 );

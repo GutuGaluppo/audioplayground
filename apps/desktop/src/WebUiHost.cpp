@@ -167,6 +167,8 @@ void WebUiHost::handleIntent (const juce::var& message)
 void WebUiHost::handle (const ap::bridge::AppReady&)
 {
     sendStatus();
+    sendTransportState();
+    sendTransportPosition (true);
 }
 
 void WebUiHost::handle (const ap::bridge::AudioOpenSettings&)
@@ -184,6 +186,39 @@ void WebUiHost::handle (const ap::bridge::ToneSetLevel& intent)
 {
     engine.setTestToneLevelDb (static_cast<float> (intent.db));
     sendStatus();
+}
+
+void WebUiHost::handle (const ap::bridge::TransportPlay&)
+{
+    engine.getTransport().requestPlay();
+}
+
+void WebUiHost::handle (const ap::bridge::TransportStop&)
+{
+    engine.getTransport().requestStop();
+}
+
+void WebUiHost::handle (const ap::bridge::TransportReturnToStart&)
+{
+    engine.getTransport().requestSeek (0);
+}
+
+void WebUiHost::handle (const ap::bridge::TransportSetTempo& intent)
+{
+    engine.getTransport().setTempo (intent.bpm);
+    sendTransportState();
+}
+
+void WebUiHost::handle (const ap::bridge::TransportSetCountIn& intent)
+{
+    engine.getTransport().setCountInBars (intent.bars);
+    sendTransportState();
+}
+
+void WebUiHost::handle (const ap::bridge::MetronomeSetEnabled& intent)
+{
+    engine.getMetronome().setEnabled (intent.enabled);
+    sendTransportState();
 }
 
 void WebUiHost::emit (const ap::bridge::Event& event)
@@ -210,10 +245,55 @@ void WebUiHost::sendStatus()
     emit (event);
 }
 
+void WebUiHost::sendTransportState()
+{
+    const auto& transport = engine.getTransport();
+    const auto signature = transport.getTimeSignature();
+
+    ap::bridge::TransportState event;
+    event.playing = transport.getState().playing;
+    event.bpm = transport.getTempo();
+    event.numerator = signature.numerator;
+    event.denominator = signature.denominator;
+    event.countInBars = transport.getCountInBars();
+    event.metronomeEnabled = engine.getMetronome().isEnabled();
+
+    lastPlaying = event.playing;
+    emit (event);
+}
+
+void WebUiHost::sendTransportPosition (bool force)
+{
+    const auto& transport = engine.getTransport();
+    const auto state = transport.getState();
+
+    // Bars and beats depend only on the meter; the sample rate is irrelevant for this conversion.
+    const core::TempoMap map (transport.getTempo(), transport.getTimeSignature(), 48000.0);
+    const auto position = map.toBarBeatTick (state.positionTicks);
+
+    ap::bridge::TransportPosition event;
+    event.bar = static_cast<int> (std::clamp<std::int64_t> (
+        position.bar, ap::bridge::TransportPosition::barMin, ap::bridge::TransportPosition::barMax));
+    event.beat = position.beat;
+    event.countingIn = state.countingIn;
+
+    if (force || !(event == lastPosition))
+    {
+        lastPosition = event;
+        emit (event);
+    }
+}
+
 void WebUiHost::timerCallback()
 {
     emit (
         ap::bridge::EngineMeters{juce::jlimit (0.0, 1.0, static_cast<double> (engine.consumeOutputPeak()))});
+
+    // The audio thread may change the playing state (e.g. a device restart); keep the UI in sync.
+    if (engine.getTransport().getState().playing != lastPlaying)
+        sendTransportState();
+
+    sendTransportPosition (false);
 }
 
 void WebUiHost::showAudioSettings()

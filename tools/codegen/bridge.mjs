@@ -355,6 +355,11 @@ ${schema.events.map(tsInterface).join('\n\n')}
 export type NativeEvent = ${schema.events.map((m) => m.typeName).join(' | ')};
 export type NativeEventType = NativeEvent['type'];
 
+/** Payload type for each native event type. */
+export interface NativeEventPayloads {
+${schema.events.map((m) => `  '${m.name}': ${m.typeName}['payload'];`).join('\n')}
+}
+
 type Payload = Record<string, unknown>;
 
 function isPayload(value: unknown): value is Payload {

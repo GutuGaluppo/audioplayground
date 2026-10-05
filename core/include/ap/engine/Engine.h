@@ -4,6 +4,8 @@
 #include "ap/core/RealtimeSafety.h"
 #include "ap/dsp/LinearSmoothedValue.h"
 #include "ap/dsp/SineOscillator.h"
+#include "ap/engine/Metronome.h"
+#include "ap/engine/Transport.h"
 
 #include <atomic>
 
@@ -33,6 +35,12 @@ public:
     void setTestToneFrequency (float hz) noexcept;
     void setTestToneLevelDb (float db) noexcept;
 
+    // Thread-safe controls; see Transport and Metronome for details.
+    [[nodiscard]] Transport& getTransport() noexcept { return transport; }
+    [[nodiscard]] const Transport& getTransport() const noexcept { return transport; }
+    [[nodiscard]] Metronome& getMetronome() noexcept { return metronome; }
+    [[nodiscard]] const Metronome& getMetronome() const noexcept { return metronome; }
+
     [[nodiscard]] bool isTestToneEnabled() const noexcept;
     [[nodiscard]] float getTestToneLevelDb() const noexcept;
 
@@ -43,10 +51,15 @@ public:
     [[nodiscard]] int getNonFiniteSampleCount() const noexcept;
 
 private:
+    void renderTestTone (core::AudioBlock output) noexcept AP_NONBLOCKING;
+    void finaliseOutput (core::AudioBlock output) noexcept AP_NONBLOCKING;
     void updatePeak (float blockPeak) noexcept AP_NONBLOCKING;
 
     double sampleRate = 48000.0;
     bool prepared = false;
+
+    Transport transport;
+    Metronome metronome;
 
     dsp::SineOscillator toneOscillator;
     dsp::LinearSmoothedValue toneGain;

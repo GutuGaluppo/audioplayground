@@ -46,6 +46,58 @@ struct ToneSetLevel
     bool operator== (const ToneSetLevel&) const = default;
 };
 
+struct TransportPlay
+{
+    static constexpr std::string_view type = "transport.play";
+
+    bool operator== (const TransportPlay&) const = default;
+};
+
+struct TransportStop
+{
+    static constexpr std::string_view type = "transport.stop";
+
+    bool operator== (const TransportStop&) const = default;
+};
+
+struct TransportReturnToStart
+{
+    static constexpr std::string_view type = "transport.returnToStart";
+
+    bool operator== (const TransportReturnToStart&) const = default;
+};
+
+struct TransportSetTempo
+{
+    static constexpr std::string_view type = "transport.setTempo";
+    static constexpr double bpmMin = 20.0;
+    static constexpr double bpmMax = 300.0;
+
+    double bpm = 0.0;
+
+    bool operator== (const TransportSetTempo&) const = default;
+};
+
+struct TransportSetCountIn
+{
+    static constexpr std::string_view type = "transport.setCountIn";
+    static constexpr int barsMin = 0;
+    static constexpr int barsMax = 4;
+
+    int bars = 0;
+
+    bool operator== (const TransportSetCountIn&) const = default;
+};
+
+struct MetronomeSetEnabled
+{
+    static constexpr std::string_view type = "metronome.setEnabled";
+
+    bool enabled = false;
+
+    bool operator== (const MetronomeSetEnabled&) const = default;
+};
+
 struct EngineStatus
 {
     static constexpr std::string_view type = "engine.status";
@@ -82,7 +134,44 @@ struct EngineMeters
     bool operator== (const EngineMeters&) const = default;
 };
 
-using Intent = std::variant<AppReady, AudioOpenSettings, ToneSetEnabled, ToneSetLevel>;
-using Event = std::variant<EngineStatus, EngineMeters>;
+struct TransportState
+{
+    static constexpr std::string_view type = "transport.state";
+    static constexpr double bpmMin = 20.0;
+    static constexpr double bpmMax = 300.0;
+    static constexpr int numeratorMin = 1;
+    static constexpr int numeratorMax = 32;
+    static constexpr int denominatorMin = 1;
+    static constexpr int denominatorMax = 16;
+    static constexpr int countInBarsMin = 0;
+    static constexpr int countInBarsMax = 4;
+
+    bool playing = false;
+    double bpm = 0.0;
+    int numerator = 0;
+    int denominator = 0;
+    int countInBars = 0;
+    bool metronomeEnabled = false;
+
+    bool operator== (const TransportState&) const = default;
+};
+
+struct TransportPosition
+{
+    static constexpr std::string_view type = "transport.position";
+    static constexpr int barMin = -1000;
+    static constexpr int barMax = 100000000;
+    static constexpr int beatMin = 1;
+    static constexpr int beatMax = 32;
+
+    int bar = 0;
+    int beat = 0;
+    bool countingIn = false;
+
+    bool operator== (const TransportPosition&) const = default;
+};
+
+using Intent = std::variant<AppReady, AudioOpenSettings, ToneSetEnabled, ToneSetLevel, TransportPlay, TransportStop, TransportReturnToStart, TransportSetTempo, TransportSetCountIn, MetronomeSetEnabled>;
+using Event = std::variant<EngineStatus, EngineMeters, TransportState, TransportPosition>;
 
 } // namespace ap::bridge

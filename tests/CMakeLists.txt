@@ -6,8 +6,11 @@ add_executable(ap_unit_tests
     unit/BuildInfoTests.cpp
     unit/EngineTests.cpp
     unit/LinearSmoothedValueTests.cpp
+    unit/MetronomeTests.cpp
+    unit/MusicalTimeTests.cpp
     unit/OfflineRenderTests.cpp
-    unit/SineOscillatorTests.cpp)
+    unit/SineOscillatorTests.cpp
+    unit/TransportTests.cpp)
 
 target_include_directories(ap_unit_tests PRIVATE support)
 target_compile_definitions(ap_unit_tests PRIVATE AP_GOLDEN_DIR="${CMAKE_CURRENT_SOURCE_DIR}/golden")

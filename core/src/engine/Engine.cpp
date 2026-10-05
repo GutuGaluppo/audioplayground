@@ -25,6 +25,9 @@ void Engine::prepare (double newSampleRate, int /*maxBlockSize*/)
 {
     sampleRate = newSampleRate > 0.0 ? newSampleRate : 48000.0;
 
+    transport.prepare (sampleRate);
+    metronome.prepare (sampleRate);
+
     toneOscillator.prepare (sampleRate);
     toneGain.reset (sampleRate, gainRampSeconds);
     toneFrequency.reset (sampleRate, frequencyRampSeconds);
@@ -48,18 +51,25 @@ void Engine::process (core::AudioBlock output) noexcept AP_NONBLOCKING
 
     const core::ScopedNoDenormals noDenormals;
 
-    const auto clearOutput = [&output]() noexcept AP_NONBLOCKING
-    {
-        for (int ch = 0; ch < output.numChannels; ++ch)
-            std::fill_n (output.channels[ch], output.numSamples, 0.0f);
-    };
+    for (int ch = 0; ch < output.numChannels; ++ch)
+        std::fill_n (output.channels[ch], output.numSamples, 0.0f);
 
     if (!prepared)
-    {
-        clearOutput();
         return;
-    }
 
+    transport.advance (output.numSamples,
+                       [this, output] (int offset, int length, core::Samples start) noexcept
+                       { metronome.render (output, offset, length, start, transport.getTempoMap()); });
+
+    if (!transport.isPlayingOnAudioThread())
+        metronome.renderTail (output);
+
+    renderTestTone (output);
+    finaliseOutput (output);
+}
+
+void Engine::renderTestTone (core::AudioBlock output) noexcept AP_NONBLOCKING
+{
     const bool enabled = toneEnabled.load (std::memory_order_relaxed);
     const float levelGain = decibelsToGain (toneLevelDb.load (std::memory_order_relaxed));
     toneGain.setTarget (enabled ? levelGain : 0.0f);
@@ -68,34 +78,39 @@ void Engine::process (core::AudioBlock output) noexcept AP_NONBLOCKING
     if (!toneGain.isSmoothing() && toneGain.getCurrent() == 0.0f)
     {
         toneOscillator.reset();
-        clearOutput();
         return;
     }
 
-    float* const first = output.channels[0];
     for (int i = 0; i < output.numSamples; ++i)
     {
         toneOscillator.setFrequency (static_cast<double> (toneFrequency.next()));
-        first[i] = toneOscillator.next() * toneGain.next();
+        const float sample = toneOscillator.next() * toneGain.next();
+        for (int ch = 0; ch < output.numChannels; ++ch)
+            output.channels[ch][i] += sample;
     }
+}
 
+void Engine::finaliseOutput (core::AudioBlock output) noexcept AP_NONBLOCKING
+{
     float blockPeak = 0.0f;
     int nonFinite = 0;
-    for (int i = 0; i < output.numSamples; ++i)
-    {
-        float sample = first[i];
-        if (!std::isfinite (sample))
-        {
-            sample = 0.0f;
-            ++nonFinite;
-        }
-        sample = std::clamp (sample, -outputCeiling, outputCeiling);
-        first[i] = sample;
-        blockPeak = std::max (blockPeak, std::abs (sample));
-    }
 
-    for (int ch = 1; ch < output.numChannels; ++ch)
-        std::copy_n (first, output.numSamples, output.channels[ch]);
+    for (int ch = 0; ch < output.numChannels; ++ch)
+    {
+        float* const samples = output.channels[ch];
+        for (int i = 0; i < output.numSamples; ++i)
+        {
+            float sample = samples[i];
+            if (!std::isfinite (sample))
+            {
+                sample = 0.0f;
+                ++nonFinite;
+            }
+            sample = std::clamp (sample, -outputCeiling, outputCeiling);
+            samples[i] = sample;
+            blockPeak = std::max (blockPeak, std::abs (sample));
+        }
+    }
 
     if (nonFinite > 0)
         nonFiniteSamples.fetch_add (nonFinite, std::memory_order_relaxed);
