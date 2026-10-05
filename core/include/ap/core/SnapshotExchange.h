@@ -55,6 +55,20 @@ public:
 
     // --- Audio thread ---------------------------------------------------------------------
 
+    // Low-level API for owners that must keep an old snapshot alive while it is still in use
+    // (e.g. a sampler whose voices still read the previous sample). The caller then owns the
+    // returned snapshot and must hand it back with retire() when done.
+    [[nodiscard]] T* takePending() noexcept AP_NONBLOCKING
+    {
+        return pending.exchange (nullptr, std::memory_order_acq_rel);
+    }
+
+    // Hands a snapshot back for destruction on the message thread. Returns false if the queue is
+    // full; the caller keeps ownership and retries on a later block.
+    [[nodiscard]] bool retire (T* snapshot) noexcept AP_NONBLOCKING { return retired.push (snapshot); }
+
+    [[nodiscard]] bool canRetire() const noexcept AP_NONBLOCKING { return !retired.isFull(); }
+
     // Returns the newest published snapshot, or nullptr if none has been published.
     [[nodiscard]] const T* acquire() noexcept AP_NONBLOCKING
     {

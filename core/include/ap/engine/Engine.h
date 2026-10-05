@@ -9,6 +9,7 @@
 #include "ap/engine/Metronome.h"
 #include "ap/engine/RenderGraph.h"
 #include "ap/engine/Transport.h"
+#include "ap/instruments/Sampler.h"
 #include "ap/instruments/Synth.h"
 #include "ap/params/Parameters.h"
 
@@ -48,7 +49,30 @@ public:
 
     [[nodiscard]] bool isTestToneEnabled() const noexcept;
 
-    // Live notes for the synth. Each source has its own single-producer queue: call
+    // Which instrument live notes (keyboard, MIDI) play. Switching releases the notes held on the
+    // previous instrument, so nothing can get stuck.
+    enum class LiveInstrument : std::uint8_t
+    {
+        synth = 0,
+        sampler = 1
+    };
+    void setLiveInstrument (LiveInstrument instrument) noexcept
+    {
+        liveInstrument.store (instrument, std::memory_order_relaxed);
+    }
+    [[nodiscard]] LiveInstrument getLiveInstrument() const noexcept
+    {
+        return liveInstrument.load (std::memory_order_relaxed);
+    }
+
+    // Message thread: replaces the sampler's sample (lock-free; see Sampler).
+    void loadSamplerSample (std::unique_ptr<instruments::SampleBuffer> buffer) noexcept
+    {
+        sampler.loadSample (std::move (buffer));
+    }
+    [[nodiscard]] std::uint64_t getSamplerAssetId() const noexcept { return sampler.loadedAssetId(); }
+
+    // Live notes for the current instrument. Each source has its own single-producer queue: call
     // sendNoteFromUi only from the message thread and sendNoteFromMidi only from the MIDI
     // callback thread. Returns false if the queue is full (the note is dropped, never blocks).
     bool sendNoteFromUi (const instruments::NoteEvent& event) noexcept { return uiNotes.push (event); }
@@ -60,7 +84,7 @@ public:
     {
         graphs.publish (std::move (next));
     }
-    std::size_t collectGarbage() noexcept { return graphs.collectGarbage(); }
+    std::size_t collectGarbage() noexcept { return graphs.collectGarbage() + sampler.collectGarbage(); }
 
     // Project version of the graph the audio thread is currently rendering (0 = none yet).
     [[nodiscard]] std::uint64_t getRenderedGraphVersion() const noexcept
@@ -89,6 +113,9 @@ private:
     Transport transport;
     Metronome metronome;
     instruments::Synth synth;
+    instruments::Sampler sampler;
+    std::atomic<LiveInstrument> liveInstrument {LiveInstrument::synth};
+    LiveInstrument routedInstrument = LiveInstrument::synth; // audio thread
     core::SpscQueue<instruments::NoteEvent, 256> uiNotes;
     core::SpscQueue<instruments::NoteEvent, 256> midiNotes;
 

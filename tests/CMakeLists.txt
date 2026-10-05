@@ -14,6 +14,8 @@ add_executable(ap_unit_tests
     unit/ProjectFileTests.cpp
     unit/ProjectModelTests.cpp
     unit/RenderGraphTests.cpp
+    unit/ResamplerTests.cpp
+    unit/SamplerTests.cpp
     unit/SineOscillatorTests.cpp
     unit/SynthDspTests.cpp
     unit/SynthTests.cpp

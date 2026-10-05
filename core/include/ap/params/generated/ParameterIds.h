@@ -42,9 +42,14 @@ enum class ParamId : std::uint16_t
     synthSustain,
     synthRelease,
     synthVolume,
+    samplerStart,
+    samplerEnd,
+    samplerPitch,
+    samplerGain,
+    samplerMode,
 };
 
-inline constexpr std::size_t numParameters = 12;
+inline constexpr std::size_t numParameters = 17;
 
 inline constexpr std::array<ParameterDescriptor, numParameters> descriptors {{
     {"tone.level", "Test tone level", "dB", -60.0f, -6.0f, -18.0f, 0.5f, Curve::linear},
@@ -59,6 +64,11 @@ inline constexpr std::array<ParameterDescriptor, numParameters> descriptors {{
     {"synth.sustain", "Sustain", "", 0.0f, 1.0f, 0.6f, 0.01f, Curve::linear},
     {"synth.release", "Release", "s", 0.001f, 10.0f, 0.4f, 0.001f, Curve::logarithmic},
     {"synth.volume", "Volume", "dB", -60.0f, 0.0f, -12.0f, 0.5f, Curve::linear},
+    {"sampler.start", "Start", "%", 0.0f, 100.0f, 0.0f, 0.1f, Curve::linear},
+    {"sampler.end", "End", "%", 0.0f, 100.0f, 100.0f, 0.1f, Curve::linear},
+    {"sampler.pitch", "Pitch", "st", -24.0f, 24.0f, 0.0f, 1.0f, Curve::linear},
+    {"sampler.gain", "Gain", "dB", -60.0f, 12.0f, 0.0f, 0.5f, Curve::linear},
+    {"sampler.mode", "Mode", "", 0.0f, 1.0f, 0.0f, 1.0f, Curve::linear},
 }};
 
 } // namespace ap::params

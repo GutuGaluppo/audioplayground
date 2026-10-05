@@ -3,12 +3,14 @@
 
 add_library(ap_core STATIC
     src/BuildInfo.cpp
+    src/dsp/Resampler.cpp
     src/io/ProjectFiles.cpp
     src/engine/Engine.cpp
     src/engine/Metronome.cpp
     src/engine/OfflineRenderer.cpp
     src/engine/RenderGraph.cpp
     src/engine/Transport.cpp
+    src/instruments/Sampler.cpp
     src/instruments/Synth.cpp
     src/model/Commands.cpp
     src/model/Project.cpp
