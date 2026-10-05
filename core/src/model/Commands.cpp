@@ -54,7 +54,7 @@ std::optional<float> finiteClamped (float value, float min, float max)
 ApplyResult apply (Command& command, Project& project)
 {
     return std::visit (
-        Overloaded{
+        Overloaded {
             [&project] (SetTempo& c) -> ApplyResult
             {
                 if (!core::isValidTempo (c.bpm))
@@ -104,7 +104,7 @@ ApplyResult apply (Command& command, Project& project)
                     return ApplyResult::rejected;
 
                 Track track;
-                track.id = TrackId{project.nextTrackId};
+                track.id = TrackId {project.nextTrackId};
                 track.kind = c.kind;
                 track.name = std::move (name);
 
@@ -190,7 +190,7 @@ ApplyResult apply (Command& command, Project& project)
 void revert (const Command& command, Project& project)
 {
     std::visit (
-        Overloaded{
+        Overloaded {
             [&project] (const SetTempo& c) { project.tempoBpm = c.previous; },
             [&project] (const SetTimeSignature& c) { project.timeSignature = c.previous; },
             [&project] (const RenameProject& c) { project.name = c.previous; },
@@ -250,7 +250,7 @@ void revert (const Command& command, Project& project)
 std::string_view describe (const Command& command) noexcept
 {
     return std::visit (
-        Overloaded{
+        Overloaded {
             [] (const SetTempo&) { return std::string_view ("Change tempo"); },
             [] (const SetTimeSignature&) { return std::string_view ("Change time signature"); },
             [] (const RenameProject&) { return std::string_view ("Rename project"); },

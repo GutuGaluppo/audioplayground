@@ -25,7 +25,7 @@ TEST_CASE ("Offline render of the reference tone matches the golden file", "[ren
     Engine engine;
     configureReferenceTone (engine);
 
-    const RenderSettings settings{48000.0, 2, 12000, 512}; // 250 ms
+    const RenderSettings settings {48000.0, 2, 12000, 512}; // 250 ms
     const auto audio = renderOffline (engine, settings);
 
     const auto result = ap::test::compareWithGolden ("tone_1k_-12dB_48k", {settings.sampleRate, audio});
@@ -35,7 +35,7 @@ TEST_CASE ("Offline render of the reference tone matches the golden file", "[ren
 
 TEST_CASE ("Offline render is bit-identical across runs", "[render][determinism]")
 {
-    const RenderSettings settings{44100.0, 2, 22050, 256};
+    const RenderSettings settings {44100.0, 2, 22050, 256};
 
     Engine first;
     configureReferenceTone (first);

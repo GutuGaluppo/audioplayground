@@ -13,7 +13,7 @@ namespace
 {
 TrackId addTrack (ProjectDocument& doc, TrackKind kind = TrackKind::audio, std::string name = {})
 {
-    REQUIRE (doc.perform (AddTrack{kind, std::move (name)}));
+    REQUIRE (doc.perform (AddTrack {kind, std::move (name)}));
     return doc.project().tracks.back().id;
 }
 } // namespace
@@ -23,7 +23,7 @@ TEST_CASE ("A new project has sensible defaults", "[model]")
     const Project project;
     CHECK (project.name == "Untitled");
     CHECK (project.tempoBpm == 120.0);
-    CHECK (project.timeSignature == ap::core::TimeSignature{4, 4});
+    CHECK (project.timeSignature == ap::core::TimeSignature {4, 4});
     CHECK (project.tracks.empty());
     CHECK (project.parameter (ParamId::toneLevel)
            == ap::params::descriptor (ParamId::toneLevel).defaultValue);
@@ -34,7 +34,7 @@ TEST_CASE ("Commands apply, undo and redo exactly", "[model][undo]")
     ProjectDocument doc;
     const auto initial = doc.project();
 
-    CHECK (doc.perform (SetTempo{96.0}));
+    CHECK (doc.perform (SetTempo {96.0}));
     CHECK (doc.project().tempoBpm == 96.0);
     CHECK (doc.undoDescription() == "Change tempo");
 
@@ -52,18 +52,18 @@ TEST_CASE ("Invalid and no-op commands change nothing and are not recorded", "[m
     ProjectDocument doc;
     const auto version = doc.version();
 
-    CHECK_FALSE (doc.perform (SetTempo{0.0}));
-    CHECK_FALSE (doc.perform (SetTempo{std::numeric_limits<double>::quiet_NaN()}));
-    CHECK_FALSE (doc.perform (SetTempo{120.0})); // unchanged
-    CHECK_FALSE (doc.perform (SetTimeSignature{ap::core::TimeSignature{5, 3}}));
-    CHECK_FALSE (doc.perform (RenameProject{"   \n\t "}));
-    CHECK_FALSE (doc.perform (RemoveTrack{TrackId{42}}));
-    CHECK_FALSE (doc.perform (SetTrackVolume{TrackId{42}, -6.0f}));
-    CHECK_FALSE (doc.perform (SetParameter{ParamId::toneLevel, std::numeric_limits<float>::infinity()}));
+    CHECK_FALSE (doc.perform (SetTempo {0.0}));
+    CHECK_FALSE (doc.perform (SetTempo {std::numeric_limits<double>::quiet_NaN()}));
+    CHECK_FALSE (doc.perform (SetTempo {120.0})); // unchanged
+    CHECK_FALSE (doc.perform (SetTimeSignature {ap::core::TimeSignature {5, 3}}));
+    CHECK_FALSE (doc.perform (RenameProject {"   \n\t "}));
+    CHECK_FALSE (doc.perform (RemoveTrack {TrackId {42}}));
+    CHECK_FALSE (doc.perform (SetTrackVolume {TrackId {42}, -6.0f}));
+    CHECK_FALSE (doc.perform (SetParameter {ParamId::toneLevel, std::numeric_limits<float>::infinity()}));
 
     CHECK_FALSE (doc.canUndo());
     CHECK (doc.version() == version);
-    CHECK (doc.project() == Project{});
+    CHECK (doc.project() == Project {});
 }
 
 TEST_CASE ("Track IDs are unique and never reused", "[model]")
@@ -73,7 +73,7 @@ TEST_CASE ("Track IDs are unique and never reused", "[model]")
     const auto b = addTrack (doc);
     CHECK (a != b);
 
-    REQUIRE (doc.perform (RemoveTrack{b}));
+    REQUIRE (doc.perform (RemoveTrack {b}));
     const auto c = addTrack (doc);
     CHECK (c != b);
     CHECK (c.value > b.value);
@@ -113,13 +113,13 @@ TEST_CASE ("Track values are clamped, and removing restores the track in place",
     const auto second = addTrack (doc);
     addTrack (doc);
 
-    REQUIRE (doc.perform (SetTrackVolume{second, 99.0f}));
+    REQUIRE (doc.perform (SetTrackVolume {second, 99.0f}));
     CHECK (doc.project().findTrack (second)->volumeDb == Track::maxVolumeDb);
-    REQUIRE (doc.perform (SetTrackPan{second, -3.0f}));
+    REQUIRE (doc.perform (SetTrackPan {second, -3.0f}));
     CHECK (doc.project().findTrack (second)->pan == -1.0f);
 
     const auto before = doc.project();
-    REQUIRE (doc.perform (RemoveTrack{second}));
+    REQUIRE (doc.perform (RemoveTrack {second}));
     CHECK (doc.project().tracks.size() == 2);
     REQUIRE (doc.undo());
     CHECK (doc.project() == before);
@@ -134,7 +134,7 @@ TEST_CASE ("A continuous gesture is one undo step", "[model][undo]")
     const auto before = doc.project();
 
     for (float db = -1.0f; db >= -12.0f; db -= 1.0f)
-        REQUIRE (doc.perform (SetTrackVolume{track, db}, 7));
+        REQUIRE (doc.perform (SetTrackVolume {track, db}, 7));
 
     CHECK (doc.project().findTrack (track)->volumeDb == -12.0f);
 
@@ -150,10 +150,10 @@ TEST_CASE ("Gestures do not merge across targets, kinds or gesture IDs", "[model
     const auto a = addTrack (doc);
     const auto b = addTrack (doc);
 
-    REQUIRE (doc.perform (SetTrackVolume{a, -3.0f}, 1));
-    REQUIRE (doc.perform (SetTrackVolume{b, -3.0f}, 1)); // other track
-    REQUIRE (doc.perform (SetTrackPan{b, 0.5f}, 1));     // other kind
-    REQUIRE (doc.perform (SetTrackPan{b, 0.6f}, 2));     // new gesture
+    REQUIRE (doc.perform (SetTrackVolume {a, -3.0f}, 1));
+    REQUIRE (doc.perform (SetTrackVolume {b, -3.0f}, 1)); // other track
+    REQUIRE (doc.perform (SetTrackPan {b, 0.5f}, 1));     // other kind
+    REQUIRE (doc.perform (SetTrackPan {b, 0.6f}, 2));     // new gesture
 
     int steps = 0;
     while (doc.undo())
@@ -164,10 +164,10 @@ TEST_CASE ("Gestures do not merge across targets, kinds or gesture IDs", "[model
 TEST_CASE ("A new edit clears the redo history", "[model][undo]")
 {
     ProjectDocument doc;
-    REQUIRE (doc.perform (SetTempo{100.0}));
+    REQUIRE (doc.perform (SetTempo {100.0}));
     REQUIRE (doc.undo());
     REQUIRE (doc.canRedo());
-    REQUIRE (doc.perform (SetTempo{90.0}));
+    REQUIRE (doc.perform (SetTempo {90.0}));
     CHECK_FALSE (doc.canRedo());
 }
 
@@ -175,7 +175,7 @@ TEST_CASE ("Undo history is bounded", "[model][undo]")
 {
     ProjectDocument doc;
     for (std::size_t i = 0; i < ProjectDocument::maxUndoSteps + 50; ++i)
-        REQUIRE (doc.perform (SetTempo{i % 2 == 0 ? 100.0 : 101.0}));
+        REQUIRE (doc.perform (SetTempo {i % 2 == 0 ? 100.0 : 101.0}));
 
     std::size_t steps = 0;
     while (doc.undo())
@@ -196,46 +196,46 @@ TEST_CASE ("Random edit sequences undo to the start and redo to the end", "[mode
     {
         const auto& tracks = doc.project().tracks;
         if (tracks.empty() || random() % 8 == 0)
-            return TrackId{9999}; // sometimes target a missing track (must be rejected)
+            return TrackId {9999}; // sometimes target a missing track (must be rejected)
         return tracks[random() % tracks.size()].id;
     };
 
     for (int step = 0; step < 400; ++step)
     {
-        const auto gesture = random() % 3 == 0 ? std::uint64_t{random() % 4 + 1} : std::uint64_t{0};
+        const auto gesture = random() % 3 == 0 ? std::uint64_t {random() % 4 + 1} : std::uint64_t {0};
         switch (random() % 11)
         {
         case 0:
-            (void)doc.perform (AddTrack{random() % 2 ? TrackKind::audio : TrackKind::instrument});
+            (void)doc.perform (AddTrack {random() % 2 ? TrackKind::audio : TrackKind::instrument});
             break;
         case 1:
-            (void)doc.perform (RemoveTrack{pickTrack()});
+            (void)doc.perform (RemoveTrack {pickTrack()});
             break;
         case 2:
-            (void)doc.perform (MoveTrack{pickTrack(), random() % 6});
+            (void)doc.perform (MoveTrack {pickTrack(), random() % 6});
             break;
         case 3:
-            (void)doc.perform (SetTrackVolume{pickTrack(), static_cast<float> (random() % 80) - 70.0f},
+            (void)doc.perform (SetTrackVolume {pickTrack(), static_cast<float> (random() % 80) - 70.0f},
                                gesture);
             break;
         case 4:
-            (void)doc.perform (SetTrackPan{pickTrack(), static_cast<float> (random() % 21) / 10.0f - 1.0f},
+            (void)doc.perform (SetTrackPan {pickTrack(), static_cast<float> (random() % 21) / 10.0f - 1.0f},
                                gesture);
             break;
         case 5:
-            (void)doc.perform (SetTrackMute{pickTrack(), random() % 2 == 0});
+            (void)doc.perform (SetTrackMute {pickTrack(), random() % 2 == 0});
             break;
         case 6:
-            (void)doc.perform (SetTrackSolo{pickTrack(), random() % 2 == 0});
+            (void)doc.perform (SetTrackSolo {pickTrack(), random() % 2 == 0});
             break;
         case 7:
-            (void)doc.perform (RenameTrack{pickTrack(), "T" + std::to_string (random() % 5)}, gesture);
+            (void)doc.perform (RenameTrack {pickTrack(), "T" + std::to_string (random() % 5)}, gesture);
             break;
         case 8:
-            (void)doc.perform (SetTempo{60.0 + static_cast<double> (random() % 120)}, gesture);
+            (void)doc.perform (SetTempo {60.0 + static_cast<double> (random() % 120)}, gesture);
             break;
         case 9:
-            (void)doc.perform (SetParameter{ParamId::metronomeLevel, -static_cast<float> (random() % 60)},
+            (void)doc.perform (SetParameter {ParamId::metronomeLevel, -static_cast<float> (random() % 60)},
                                gesture);
             break;
         default:

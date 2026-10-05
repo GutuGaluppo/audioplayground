@@ -4,16 +4,18 @@
 #include "ap/model/ProjectDocument.h"
 
 #include <functional>
+#include <juce_events/juce_events.h>
 
 namespace ap::desktop
 {
 
 // The open project and its history, kept in sync with the engine. Message thread only.
 // All project changes go through perform/undo/redo (ADR-003).
-class Session
+class Session final : private juce::Timer
 {
 public:
     explicit Session (engine::Engine& engine);
+    ~Session() override;
 
     bool perform (model::Command command, model::ProjectDocument::GestureId gesture = 0);
     bool undo();
@@ -27,6 +29,7 @@ public:
 
 private:
     void syncEngine();
+    void timerCallback() override;
     bool afterChange (bool changed);
 
     engine::Engine& engine;

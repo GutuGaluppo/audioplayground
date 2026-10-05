@@ -103,7 +103,7 @@ TEST_CASE ("Metronome is silent when disabled, except during the count-in", "[me
     const auto clicks = onsets (audio[0]);
 
     // Four count-in clicks, then nothing once playback reaches bar 1.
-    CHECK (clicks == std::vector<std::size_t>{0, 24000, 48000, 72000});
+    CHECK (clicks == std::vector<std::size_t> {0, 24000, 48000, 72000});
 }
 
 TEST_CASE ("Metronome follows the loop", "[metronome][loop]")
@@ -114,7 +114,7 @@ TEST_CASE ("Metronome follows the loop", "[metronome][loop]")
     engine.getTransport().requestSeek (2 * ticksPerQuarterNote);
 
     const auto audio = renderOffline (playingEngine (engine), {48000.0, 1, 3 * 48000, 512});
-    CHECK (onsets (audio[0]) == std::vector<std::size_t>{0, 24000, 48000, 72000, 96000, 120000});
+    CHECK (onsets (audio[0]) == std::vector<std::size_t> {0, 24000, 48000, 72000, 96000, 120000});
 }
 
 TEST_CASE ("Metronome click is free of discontinuities and bounded", "[metronome]")

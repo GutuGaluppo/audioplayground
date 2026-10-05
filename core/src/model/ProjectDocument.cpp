@@ -5,7 +5,10 @@
 namespace ap::model
 {
 
-ProjectDocument::ProjectDocument (Project initial) : current (std::move (initial)) {}
+ProjectDocument::ProjectDocument (Project initial)
+    : current (std::move (initial))
+{
+}
 
 bool ProjectDocument::perform (Command command, GestureId gesture)
 {
@@ -67,12 +70,12 @@ bool ProjectDocument::redo()
 
 std::string_view ProjectDocument::undoDescription() const noexcept
 {
-    return undoStack.empty() ? std::string_view{} : describe (undoStack.back().command);
+    return undoStack.empty() ? std::string_view {} : describe (undoStack.back().command);
 }
 
 std::string_view ProjectDocument::redoDescription() const noexcept
 {
-    return redoStack.empty() ? std::string_view{} : describe (redoStack.back().command);
+    return redoStack.empty() ? std::string_view {} : describe (redoStack.back().command);
 }
 
 void ProjectDocument::reset (Project project)

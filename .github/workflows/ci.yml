@@ -20,6 +20,7 @@ jobs:
       matrix:
         os: [macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -38,6 +39,7 @@ jobs:
   sanitizers:
     name: C++ tests (ASan + UBSan)
     runs-on: ubuntu-24.04
+    timeout-minutes: 45
     env:
       CC: clang
       CXX: clang++
@@ -49,9 +51,25 @@ jobs:
       - run: cmake --build --preset asan --parallel
       - run: ctest --preset asan
 
+  thread-sanitizer:
+    name: C++ tests (ThreadSanitizer)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      CC: clang
+      CXX: clang++
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: cmake --preset tsan
+      - run: cmake --build --preset tsan --parallel
+      - run: ctest --preset tsan
+
   realtime-sanitizer:
     name: C++ tests (RealtimeSanitizer)
     runs-on: ubuntu-24.04
+    timeout-minutes: 45
     env:
       CC: clang-20
       CXX: clang++-20
@@ -72,6 +90,7 @@ jobs:
   cpp-format:
     name: clang-format
     runs-on: ubuntu-24.04
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -81,6 +100,7 @@ jobs:
   ui:
     name: UI typecheck, lint, format, test, build
     runs-on: ubuntu-24.04
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

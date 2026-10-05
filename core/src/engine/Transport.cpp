@@ -70,8 +70,8 @@ TransportState Transport::getState() const noexcept
 void Transport::syncParameters() noexcept AP_NONBLOCKING
 {
     const double bpm = tempoBpm.load (std::memory_order_relaxed);
-    const core::TimeSignature meter{numerator.load (std::memory_order_relaxed),
-                                    denominator.load (std::memory_order_relaxed)};
+    const core::TimeSignature meter {numerator.load (std::memory_order_relaxed),
+                                     denominator.load (std::memory_order_relaxed)};
 
     if (bpm != tempoMap.getTempo() || !(meter == tempoMap.getTimeSignature()))
     {

@@ -36,7 +36,7 @@ private:
     void renderVoice (core::AudioBlock output, int from, int to) noexcept AP_NONBLOCKING;
 
     dsp::ClickVoice click;
-    std::atomic<bool> enabledFlag{false};
+    std::atomic<bool> enabledFlag {false};
 };
 
 } // namespace ap::engine

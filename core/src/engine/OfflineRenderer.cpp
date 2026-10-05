@@ -29,7 +29,7 @@ RenderedAudio renderOffline (Engine& engine, const RenderSettings& settings)
         for (std::size_t ch = 0; ch < output.size(); ++ch)
             channelPointers[ch] = output[ch].data() + start;
 
-        engine.process (core::AudioBlock{channelPointers.data(), settings.numChannels, length});
+        engine.process (core::AudioBlock {channelPointers.data(), settings.numChannels, length});
     }
 
     engine.releaseResources();

@@ -165,5 +165,5 @@ TEST_CASE ("Transport seeks and ignores invalid parameters", "[transport]")
     REQUIRE (segments.size() == 1);
     CHECK (segments[0].start == -4 * 96000 + 24000); // count-in clamped to 4 bars, from beat 2
     CHECK (transport.getTempo() == 120.0);
-    CHECK (transport.getTimeSignature() == TimeSignature{4, 4});
+    CHECK (transport.getTimeSignature() == TimeSignature {4, 4});
 }

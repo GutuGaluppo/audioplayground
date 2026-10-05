@@ -2,13 +2,16 @@
 
 #include "ap/core/AudioBlock.h"
 #include "ap/core/RealtimeSafety.h"
+#include "ap/core/SnapshotExchange.h"
 #include "ap/dsp/LinearSmoothedValue.h"
 #include "ap/dsp/SineOscillator.h"
 #include "ap/engine/Metronome.h"
+#include "ap/engine/RenderGraph.h"
 #include "ap/engine/Transport.h"
 #include "ap/params/Parameters.h"
 
 #include <atomic>
+#include <memory>
 
 namespace ap::engine
 {
@@ -43,6 +46,20 @@ public:
 
     [[nodiscard]] bool isTestToneEnabled() const noexcept;
 
+    // Render structure (message thread). Snapshots are swapped in at the next block boundary;
+    // retired ones are freed by collectGarbage(), which must be called periodically.
+    void publishRenderGraph (std::unique_ptr<RenderGraph> next) noexcept
+    {
+        graphs.publish (std::move (next));
+    }
+    std::size_t collectGarbage() noexcept { return graphs.collectGarbage(); }
+
+    // Project version of the graph the audio thread is currently rendering (0 = none yet).
+    [[nodiscard]] std::uint64_t getRenderedGraphVersion() const noexcept
+    {
+        return renderedGraphVersion.load (std::memory_order_acquire);
+    }
+
     // Highest absolute output sample since the last call. Resets the meter.
     [[nodiscard]] float consumeOutputPeak() noexcept;
 
@@ -58,6 +75,9 @@ private:
     bool prepared = false;
 
     params::ParameterStore parameters;
+    core::SnapshotExchange<RenderGraph> graphs;
+    const RenderGraph* currentGraph = nullptr; // audio thread
+    std::atomic<std::uint64_t> renderedGraphVersion {0};
     Transport transport;
     Metronome metronome;
 
@@ -65,11 +85,11 @@ private:
     dsp::LinearSmoothedValue toneGain;
     dsp::LinearSmoothedValue toneFrequency;
 
-    std::atomic<bool> toneEnabled{false};
-    std::atomic<float> toneFrequencyHz{440.0f};
+    std::atomic<bool> toneEnabled {false};
+    std::atomic<float> toneFrequencyHz {440.0f};
 
-    std::atomic<float> outputPeak{0.0f};
-    std::atomic<int> nonFiniteSamples{0};
+    std::atomic<float> outputPeak {0.0f};
+    std::atomic<int> nonFiniteSamples {0};
 };
 
 } // namespace ap::engine

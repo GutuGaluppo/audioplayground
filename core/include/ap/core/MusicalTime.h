@@ -64,10 +64,10 @@ public:
     constexpr TempoMap() noexcept = default;
 
     TempoMap (double bpm, TimeSignature signature, double sampleRate) noexcept
-        : tempoBpm (isValidTempo (bpm) ? bpm : 120.0),
-          meter (signature.isValid() ? signature : TimeSignature{}),
-          rate (sampleRate > 0.0 && std::isfinite (sampleRate) ? sampleRate : 48000.0),
-          samplesPerTick (60.0 * rate / (tempoBpm * static_cast<double> (ticksPerQuarterNote)))
+        : tempoBpm (isValidTempo (bpm) ? bpm : 120.0)
+        , meter (signature.isValid() ? signature : TimeSignature {})
+        , rate (sampleRate > 0.0 && std::isfinite (sampleRate) ? sampleRate : 48000.0)
+        , samplesPerTick (60.0 * rate / (tempoBpm * static_cast<double> (ticksPerQuarterNote)))
     {
     }
 
@@ -114,7 +114,7 @@ public:
 
 private:
     double tempoBpm = 120.0;
-    TimeSignature meter{};
+    TimeSignature meter {};
     double rate = 48000.0;
     double samplesPerTick = 60.0 * 48000.0 / (120.0 * static_cast<double> (ticksPerQuarterNote));
 };

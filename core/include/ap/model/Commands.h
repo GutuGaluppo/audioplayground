@@ -18,7 +18,10 @@ namespace ap::model
 
 struct SetTempo
 {
-    explicit SetTempo (double newBpm) noexcept : bpm (newBpm) {}
+    explicit SetTempo (double newBpm) noexcept
+        : bpm (newBpm)
+    {
+    }
 
     double bpm = 120.0;
     double previous = 0.0;
@@ -26,15 +29,21 @@ struct SetTempo
 
 struct SetTimeSignature
 {
-    explicit SetTimeSignature (core::TimeSignature newSignature) noexcept : signature (newSignature) {}
+    explicit SetTimeSignature (core::TimeSignature newSignature) noexcept
+        : signature (newSignature)
+    {
+    }
 
-    core::TimeSignature signature{};
-    core::TimeSignature previous{};
+    core::TimeSignature signature {};
+    core::TimeSignature previous {};
 };
 
 struct RenameProject
 {
-    explicit RenameProject (std::string newName) : name (std::move (newName)) {}
+    explicit RenameProject (std::string newName)
+        : name (std::move (newName))
+    {
+    }
 
     std::string name;
     std::string previous;
@@ -43,7 +52,9 @@ struct RenameProject
 struct AddTrack
 {
     explicit AddTrack (TrackKind trackKind, std::string trackName = {}, std::optional<std::size_t> at = {})
-        : kind (trackKind), name (std::move (trackName)), index (at)
+        : kind (trackKind)
+        , name (std::move (trackName))
+        , index (at)
     {
     }
 
@@ -56,7 +67,10 @@ struct AddTrack
 
 struct RemoveTrack
 {
-    explicit RemoveTrack (TrackId track) noexcept : id (track) {}
+    explicit RemoveTrack (TrackId track) noexcept
+        : id (track)
+    {
+    }
 
     TrackId id;
     Track removed; // captured
@@ -65,7 +79,11 @@ struct RemoveTrack
 
 struct MoveTrack
 {
-    MoveTrack (TrackId track, std::size_t to) noexcept : id (track), toIndex (to) {}
+    MoveTrack (TrackId track, std::size_t to) noexcept
+        : id (track)
+        , toIndex (to)
+    {
+    }
 
     TrackId id;
     std::size_t toIndex = 0;
@@ -74,7 +92,11 @@ struct MoveTrack
 
 struct RenameTrack
 {
-    RenameTrack (TrackId track, std::string newName) : id (track), name (std::move (newName)) {}
+    RenameTrack (TrackId track, std::string newName)
+        : id (track)
+        , name (std::move (newName))
+    {
+    }
 
     TrackId id;
     std::string name;
@@ -83,7 +105,11 @@ struct RenameTrack
 
 struct SetTrackVolume
 {
-    SetTrackVolume (TrackId track, float db) noexcept : id (track), volumeDb (db) {}
+    SetTrackVolume (TrackId track, float db) noexcept
+        : id (track)
+        , volumeDb (db)
+    {
+    }
 
     TrackId id;
     float volumeDb = 0.0f;
@@ -92,7 +118,11 @@ struct SetTrackVolume
 
 struct SetTrackPan
 {
-    SetTrackPan (TrackId track, float newPan) noexcept : id (track), pan (newPan) {}
+    SetTrackPan (TrackId track, float newPan) noexcept
+        : id (track)
+        , pan (newPan)
+    {
+    }
 
     TrackId id;
     float pan = 0.0f;
@@ -101,7 +131,11 @@ struct SetTrackPan
 
 struct SetTrackMute
 {
-    SetTrackMute (TrackId track, bool mute) noexcept : id (track), muted (mute) {}
+    SetTrackMute (TrackId track, bool mute) noexcept
+        : id (track)
+        , muted (mute)
+    {
+    }
 
     TrackId id;
     bool muted = false;
@@ -110,7 +144,11 @@ struct SetTrackMute
 
 struct SetTrackSolo
 {
-    SetTrackSolo (TrackId track, bool solo) noexcept : id (track), soloed (solo) {}
+    SetTrackSolo (TrackId track, bool solo) noexcept
+        : id (track)
+        , soloed (solo)
+    {
+    }
 
     TrackId id;
     bool soloed = false;
@@ -119,9 +157,13 @@ struct SetTrackSolo
 
 struct SetParameter
 {
-    SetParameter (params::ParamId parameter, float newValue) noexcept : id (parameter), value (newValue) {}
+    SetParameter (params::ParamId parameter, float newValue) noexcept
+        : id (parameter)
+        , value (newValue)
+    {
+    }
 
-    params::ParamId id{};
+    params::ParamId id {};
     float value = 0.0f;
     float previous = 0.0f;
 };

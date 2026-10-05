@@ -3,9 +3,28 @@
 namespace ap::desktop
 {
 
-Session::Session (engine::Engine& engineToUse) : engine (engineToUse)
+namespace
+{
+constexpr int garbageCollectionHz = 10;
+} // namespace
+
+Session::Session (engine::Engine& engineToUse)
+    : engine (engineToUse)
 {
     syncEngine();
+    startTimerHz (garbageCollectionHz);
+}
+
+Session::~Session()
+{
+    stopTimer();
+    engine.collectGarbage();
+}
+
+void Session::timerCallback()
+{
+    // Frees render graphs the audio thread has retired (never freed on the audio thread).
+    engine.collectGarbage();
 }
 
 bool Session::perform (model::Command command, model::ProjectDocument::GestureId gesture)
@@ -43,6 +62,9 @@ void Session::syncEngine()
 
     for (std::size_t i = 0; i < params::numParameters; ++i)
         engine.getParameters().set (static_cast<params::ParamId> (i), project.parameters[i]);
+
+    engine.publishRenderGraph (
+        std::make_unique<engine::RenderGraph> (engine::buildRenderGraph (project, doc.version())));
 }
 
 } // namespace ap::desktop

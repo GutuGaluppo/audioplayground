@@ -44,7 +44,7 @@ public:
 
 private:
 #if defined(__aarch64__)
-    static constexpr std::uint64_t flushToZeroBit = std::uint64_t{1} << 24;
+    static constexpr std::uint64_t flushToZeroBit = std::uint64_t {1} << 24;
 #elif defined(__SSE__) || defined(_M_X64) || defined(_M_IX86)
     static constexpr unsigned int flushToZeroAndDenormalsAreZero = 0x8040u;
 #endif

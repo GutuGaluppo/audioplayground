@@ -37,7 +37,7 @@ TEST_CASE ("findParamId rejects unknown IDs", "[params]")
 
 TEST_CASE ("Linear normalisation maps the range onto [0, 1] and back", "[params]")
 {
-    const ParameterDescriptor d{"t.linear", "Linear", "dB", -60.0f, 0.0f, -12.0f, 0.5f, Curve::linear};
+    const ParameterDescriptor d {"t.linear", "Linear", "dB", -60.0f, 0.0f, -12.0f, 0.5f, Curve::linear};
 
     CHECK (toNormalized (d, -60.0f) == 0.0f);
     CHECK (toNormalized (d, 0.0f) == 1.0f);
@@ -52,8 +52,8 @@ TEST_CASE ("Linear normalisation maps the range onto [0, 1] and back", "[params]
 
 TEST_CASE ("Logarithmic normalisation gives equal travel per octave", "[params]")
 {
-    const ParameterDescriptor d{"t.freq", "Frequency", "Hz", 20.0f,
-                                20480.0f, 1000.0f,     1.0f, Curve::logarithmic};
+    const ParameterDescriptor d {"t.freq", "Frequency", "Hz", 20.0f,
+                                 20480.0f, 1000.0f,     1.0f, Curve::logarithmic};
 
     CHECK_THAT (fromNormalized (d, 0.0f), WithinRel (20.0f, 1.0e-6f));
     CHECK_THAT (fromNormalized (d, 1.0f), WithinRel (20480.0f, 1.0e-6f));

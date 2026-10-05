@@ -15,3 +15,6 @@ IncludeBlocks: Regroup
 SortIncludes: CaseSensitive
 BreakBeforeBinaryOperators: All
 AlignOperands: AlignAfterOperator
+BreakConstructorInitializers: BeforeComma
+PackConstructorInitializers: Never
+SpaceBeforeCpp11BracedList: true

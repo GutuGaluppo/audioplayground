@@ -54,16 +54,16 @@ struct Project
     static constexpr std::size_t maxTracks = 64;
 
     std::string name = "Untitled";
-    double tempoBpm = 120.0;             // fixed per project in the MVP (decision D4)
-    core::TimeSignature timeSignature{}; // fixed per project in the MVP (decision D4)
-    double exportSampleRate = 48000.0;   // default export rate only (ADR-006)
+    double tempoBpm = 120.0;              // fixed per project in the MVP (decision D4)
+    core::TimeSignature timeSignature {}; // fixed per project in the MVP (decision D4)
+    double exportSampleRate = 48000.0;    // default export rate only (ADR-006)
     std::vector<Track> tracks;
     std::array<float, params::numParameters> parameters = defaultParameterValues();
     std::uint64_t nextTrackId = 1;
 
     [[nodiscard]] static std::array<float, params::numParameters> defaultParameterValues() noexcept
     {
-        std::array<float, params::numParameters> values{};
+        std::array<float, params::numParameters> values {};
         for (std::size_t i = 0; i < params::numParameters; ++i)
             values[i] = params::descriptors[i].defaultValue;
         return values;

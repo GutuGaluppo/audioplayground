@@ -15,7 +15,7 @@ constexpr std::uint16_t bitsPerSample = 32;
 
 template <typename T> void writeLE (std::ostream& out, T value)
 {
-    std::array<char, sizeof (T)> bytes{};
+    std::array<char, sizeof (T)> bytes {};
     std::memcpy (bytes.data(), &value,
                  sizeof (T)); // fixture hosts (macOS/Windows/Linux CI) are little-endian
     out.write (bytes.data(), static_cast<std::streamsize> (bytes.size()));
@@ -23,7 +23,7 @@ template <typename T> void writeLE (std::ostream& out, T value)
 
 template <typename T> bool readLE (std::istream& in, T& value)
 {
-    std::array<char, sizeof (T)> bytes{};
+    std::array<char, sizeof (T)> bytes {};
     if (!in.read (bytes.data(), static_cast<std::streamsize> (bytes.size())))
         return false;
     std::memcpy (&value, bytes.data(), sizeof (T));
@@ -34,7 +34,7 @@ template <typename T> bool readLE (std::istream& in, T& value)
 void writeFloatWav (const std::filesystem::path& path, const WavData& data)
 {
     const auto numChannels = static_cast<std::uint16_t> (data.channels.size());
-    const auto numFrames = data.channels.empty() ? std::size_t{0} : data.channels.front().size();
+    const auto numFrames = data.channels.empty() ? std::size_t {0} : data.channels.front().size();
     const auto sampleRate = static_cast<std::uint32_t> (data.sampleRate);
     const auto blockAlign = static_cast<std::uint16_t> (numChannels * bitsPerSample / 8);
     const auto dataBytes = static_cast<std::uint32_t> (numFrames * blockAlign);
@@ -69,7 +69,7 @@ std::optional<WavData> readFloatWav (const std::filesystem::path& path)
     if (!in)
         return std::nullopt;
 
-    std::array<char, 4> id{};
+    std::array<char, 4> id {};
     std::uint32_t size = 0;
     if (!in.read (id.data(), 4) || std::memcmp (id.data(), "RIFF", 4) != 0 || !readLE (in, size)
         || !in.read (id.data(), 4) || std::memcmp (id.data(), "WAVE", 4) != 0)

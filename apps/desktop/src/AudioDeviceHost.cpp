@@ -10,7 +10,8 @@ constexpr int numInputChannels = 0;
 constexpr int numOutputChannels = 2;
 } // namespace
 
-AudioDeviceHost::AudioDeviceHost (engine::Engine& engineToUse) : engine (engineToUse)
+AudioDeviceHost::AudioDeviceHost (engine::Engine& engineToUse)
+    : engine (engineToUse)
 {
     deviceManager.addChangeListener (this);
 }
@@ -64,7 +65,7 @@ void AudioDeviceHost::audioDeviceIOCallbackWithContext (const float* const*, int
                                                         int numOutputChannelsInUse, int numSamples,
                                                         const juce::AudioIODeviceCallbackContext&)
 {
-    engine.process (core::AudioBlock{outputChannelData, numOutputChannelsInUse, numSamples});
+    engine.process (core::AudioBlock {outputChannelData, numOutputChannelsInUse, numSamples});
 }
 
 void AudioDeviceHost::audioDeviceAboutToStart (juce::AudioIODevice* device)

@@ -6,6 +6,7 @@ add_library(ap_core STATIC
     src/engine/Engine.cpp
     src/engine/Metronome.cpp
     src/engine/OfflineRenderer.cpp
+    src/engine/RenderGraph.cpp
     src/engine/Transport.cpp
     src/model/Commands.cpp
     src/model/Project.cpp

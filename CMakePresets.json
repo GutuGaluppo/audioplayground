@@ -46,6 +46,16 @@
         "AP_BUILD_DESKTOP": "OFF",
         "AP_SANITIZERS": "realtime"
       }
+    },
+    {
+      "name": "tsan",
+      "displayName": "Debug + ThreadSanitizer (tests only)",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "AP_BUILD_DESKTOP": "OFF",
+        "AP_SANITIZERS": "thread"
+      }
     }
   ],
   "buildPresets": [
@@ -67,6 +77,11 @@
     {
       "name": "rtsan",
       "configurePreset": "rtsan",
+      "configuration": "Debug"
+    },
+    {
+      "name": "tsan",
+      "configurePreset": "tsan",
       "configuration": "Debug"
     }
   ],
@@ -110,6 +125,15 @@
       "configuration": "Debug",
       "environment": {
         "RTSAN_OPTIONS": "halt_on_error=1"
+      }
+    },
+    {
+      "name": "tsan",
+      "inherits": "base",
+      "configurePreset": "tsan",
+      "configuration": "Debug",
+      "environment": {
+        "TSAN_OPTIONS": "halt_on_error=1:second_deadlock_stack=1"
       }
     }
   ]

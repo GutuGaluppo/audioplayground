@@ -57,6 +57,10 @@ void Engine::process (core::AudioBlock output) noexcept AP_NONBLOCKING
     if (!prepared)
         return;
 
+    currentGraph = graphs.acquire();
+    if (currentGraph != nullptr)
+        renderedGraphVersion.store (currentGraph->projectVersion, std::memory_order_release);
+
     const float metronomeGain = decibelsToGain (parameters.get (params::ParamId::metronomeLevel));
     transport.advance (
         output.numSamples,

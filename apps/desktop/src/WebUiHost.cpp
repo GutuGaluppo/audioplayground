@@ -9,7 +9,7 @@ namespace ap::desktop
 {
 namespace
 {
-const juce::Colour background{0xff111214};
+const juce::Colour background {0xff111214};
 constexpr int meterRefreshHz = 30;
 constexpr auto intentEventId = "ap.intent";
 constexpr auto nativeEventId = "ap.event";
@@ -86,7 +86,8 @@ class WebUiHost::LockedDownWebView final : public juce::WebBrowserComponent
 {
 public:
     LockedDownWebView (const Options& options, juce::String devUrl)
-        : WebBrowserComponent (options), developmentUrl (std::move (devUrl))
+        : WebBrowserComponent (options)
+        , developmentUrl (std::move (devUrl))
     {
     }
 
@@ -112,13 +113,15 @@ private:
 };
 
 WebUiHost::WebUiHost (AudioDeviceHost& hostToUse, engine::Engine& engineToUse, Session& sessionToUse)
-    : host (hostToUse), engine (engineToUse), session (sessionToUse)
+    : host (hostToUse)
+    , engine (engineToUse)
+    , session (sessionToUse)
 {
     const auto devUrl = developmentServerUrl();
 
-    auto options = juce::WebBrowserComponent::Options{}
+    auto options = juce::WebBrowserComponent::Options {}
                        .withBackend (juce::WebBrowserComponent::Options::Backend::webview2)
-                       .withWinWebView2Options (juce::WebBrowserComponent::Options::WinWebView2{}
+                       .withWinWebView2Options (juce::WebBrowserComponent::Options::WinWebView2 {}
                                                     .withUserDataFolder (webViewDataFolder())
                                                     .withStatusBarDisabled()
                                                     .withBuiltInErrorPageDisabled()
@@ -207,7 +210,7 @@ void WebUiHost::handle (const ap::bridge::ParamSet& intent)
 
     // Value changes are sent back through onProjectChanged; a rejected or no-op edit still
     // echoes the current value so a control never stays out of sync.
-    if (!session.perform (model::SetParameter{*id, value},
+    if (!session.perform (model::SetParameter {*id, value},
                           static_cast<model::ProjectDocument::GestureId> (intent.gesture)))
         sendParameter (*id);
 }
@@ -245,8 +248,8 @@ void WebUiHost::sendHistory()
 
 void WebUiHost::sendParameter (params::ParamId id)
 {
-    emit (ap::bridge::ParamValue{std::string (params::descriptor (id).id),
-                                 static_cast<double> (session.project().parameter (id))});
+    emit (ap::bridge::ParamValue {std::string (params::descriptor (id).id),
+                                  static_cast<double> (session.project().parameter (id))});
 }
 
 void WebUiHost::handle (const ap::bridge::TransportPlay&)
@@ -266,7 +269,7 @@ void WebUiHost::handle (const ap::bridge::TransportReturnToStart&)
 
 void WebUiHost::handle (const ap::bridge::TransportSetTempo& intent)
 {
-    if (!session.perform (model::SetTempo{intent.bpm}))
+    if (!session.perform (model::SetTempo {intent.bpm}))
         sendTransportState(); // rejected or unchanged: resync the field
 }
 
@@ -346,7 +349,7 @@ void WebUiHost::sendTransportPosition (bool force)
 void WebUiHost::timerCallback()
 {
     emit (
-        ap::bridge::EngineMeters{juce::jlimit (0.0, 1.0, static_cast<double> (engine.consumeOutputPeak()))});
+        ap::bridge::EngineMeters {juce::jlimit (0.0, 1.0, static_cast<double> (engine.consumeOutputPeak()))});
 
     // The audio thread may change the playing state (e.g. a device restart); keep the UI in sync.
     if (engine.getTransport().getState().playing != lastPlaying)

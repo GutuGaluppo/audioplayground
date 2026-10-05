@@ -62,25 +62,25 @@ private:
     void publish() noexcept AP_NONBLOCKING;
 
     // Requests and parameters (written by any thread).
-    std::atomic<bool> wantPlaying{false};
-    std::atomic<bool> seekPending{false};
-    std::atomic<core::Ticks> seekTicks{0};
-    std::atomic<double> tempoBpm{120.0};
-    std::atomic<int> numerator{4};
-    std::atomic<int> denominator{4};
-    std::atomic<int> countInBars{0};
-    std::atomic<bool> loopEnabled{false};
-    std::atomic<core::Ticks> loopStartTicks{0};
-    std::atomic<core::Ticks> loopEndTicks{0};
+    std::atomic<bool> wantPlaying {false};
+    std::atomic<bool> seekPending {false};
+    std::atomic<core::Ticks> seekTicks {0};
+    std::atomic<double> tempoBpm {120.0};
+    std::atomic<int> numerator {4};
+    std::atomic<int> denominator {4};
+    std::atomic<int> countInBars {0};
+    std::atomic<bool> loopEnabled {false};
+    std::atomic<core::Ticks> loopStartTicks {0};
+    std::atomic<core::Ticks> loopEndTicks {0};
 
     // Published state (written by the audio thread).
-    std::atomic<bool> publishedPlaying{false};
-    std::atomic<core::Samples> publishedPosition{0};
-    std::atomic<double> publishedSampleRate{48000.0};
+    std::atomic<bool> publishedPlaying {false};
+    std::atomic<core::Samples> publishedPosition {0};
+    std::atomic<double> publishedSampleRate {48000.0};
 
     // Audio-thread state.
     double sampleRate = 48000.0;
-    core::TempoMap tempoMap{120.0, {}, 48000.0};
+    core::TempoMap tempoMap {120.0, {}, 48000.0};
     bool playing = false;
     core::Samples position = 0;
     core::Ticks playStartTicks = 0;

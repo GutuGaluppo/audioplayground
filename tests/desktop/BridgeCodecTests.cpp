@@ -25,8 +25,8 @@ TEST_CASE ("parseIntent accepts well-formed intents", "[bridge]")
     REQUIRE (enable.has_value());
     CHECK (std::get<ToneSetEnabled> (*enable).enabled);
 
-    const auto param
-        = parseIntent (parseJson (R"({"type":"param.set","payload":{"id":"tone.level","value":-24,"gesture":3}})"));
+    const auto param = parseIntent (
+        parseJson (R"({"type":"param.set","payload":{"id":"tone.level","value":-24,"gesture":3}})"));
     REQUIRE (param.has_value());
     CHECK (std::get<ParamSet> (*param).id == "tone.level");
     CHECK (std::get<ParamSet> (*param).value == -24.0);
@@ -68,11 +68,10 @@ TEST_CASE ("parseIntent rejects malformed or hostile input", "[bridge][security]
     }
 
     const auto longId = juce::String::repeatedString ("a", 65);
-    CHECK_FALSE (
-        parseIntent (
-            parseJson (
-                ("{\"type\":\"param.set\",\"payload\":{\"id\":\"" + longId + "\",\"value\":0,\"gesture\":0}}").toRawUTF8()))
-            .has_value());
+    CHECK_FALSE (parseIntent (parseJson (("{\"type\":\"param.set\",\"payload\":{\"id\":\"" + longId
+                                          + "\",\"value\":0,\"gesture\":0}}")
+                                             .toRawUTF8()))
+                     .has_value());
 }
 
 TEST_CASE ("parseIntent rejects non-finite numbers", "[bridge][security]")
@@ -99,7 +98,7 @@ TEST_CASE ("toVar serialises events into the documented envelope", "[bridge]")
     status.bufferSize = 256;
     status.toneEnabled = true;
 
-    const auto json = juce::JSON::toString (toVar (Event{status}), true);
+    const auto json = juce::JSON::toString (toVar (Event {status}), true);
     const auto parsed = juce::JSON::parse (json);
 
     CHECK (parsed["type"].toString() == "engine.status");

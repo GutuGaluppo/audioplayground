@@ -4,6 +4,7 @@ add_executable(ap_unit_tests
     support/Golden.cpp
     support/WavFile.cpp
     unit/BuildInfoTests.cpp
+    unit/ConcurrencyTests.cpp
     unit/EngineTests.cpp
     unit/LinearSmoothedValueTests.cpp
     unit/MetronomeTests.cpp
@@ -11,6 +12,7 @@ add_executable(ap_unit_tests
     unit/OfflineRenderTests.cpp
     unit/ParameterTests.cpp
     unit/ProjectModelTests.cpp
+    unit/RenderGraphTests.cpp
     unit/SineOscillatorTests.cpp
     unit/TransportTests.cpp)
 

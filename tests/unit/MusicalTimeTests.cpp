@@ -58,30 +58,30 @@ TEST_CASE ("TempoMap reports bars and beats", "[time]")
     SECTION ("4/4")
     {
         const TempoMap map (120.0, {4, 4}, 48000.0);
-        CHECK (map.toBarBeatTick (0) == BarBeatTick{1, 1, 0});
-        CHECK (map.toBarBeatTick (quarter) == BarBeatTick{1, 2, 0});
-        CHECK (map.toBarBeatTick (4 * quarter + 10) == BarBeatTick{2, 1, 10});
+        CHECK (map.toBarBeatTick (0) == BarBeatTick {1, 1, 0});
+        CHECK (map.toBarBeatTick (quarter) == BarBeatTick {1, 2, 0});
+        CHECK (map.toBarBeatTick (4 * quarter + 10) == BarBeatTick {2, 1, 10});
     }
 
     SECTION ("3/4")
     {
         const TempoMap map (90.0, {3, 4}, 48000.0);
-        CHECK (map.toBarBeatTick (3 * quarter) == BarBeatTick{2, 1, 0});
+        CHECK (map.toBarBeatTick (3 * quarter) == BarBeatTick {2, 1, 0});
     }
 
     SECTION ("6/8 beats are eighth notes")
     {
         const TempoMap map (90.0, {6, 8}, 48000.0);
-        CHECK (map.toBarBeatTick (quarter / 2) == BarBeatTick{1, 2, 0});
-        CHECK (map.toBarBeatTick (3 * quarter) == BarBeatTick{2, 1, 0});
+        CHECK (map.toBarBeatTick (quarter / 2) == BarBeatTick {1, 2, 0});
+        CHECK (map.toBarBeatTick (3 * quarter) == BarBeatTick {2, 1, 0});
     }
 
     SECTION ("count-in positions are bar 0 and below")
     {
         const TempoMap map (120.0, {4, 4}, 48000.0);
-        CHECK (map.toBarBeatTick (-quarter) == BarBeatTick{0, 4, 0});
-        CHECK (map.toBarBeatTick (-4 * quarter) == BarBeatTick{0, 1, 0});
-        CHECK (map.toBarBeatTick (-4 * quarter - 1) == BarBeatTick{-1, 4, quarter - 1});
+        CHECK (map.toBarBeatTick (-quarter) == BarBeatTick {0, 4, 0});
+        CHECK (map.toBarBeatTick (-4 * quarter) == BarBeatTick {0, 1, 0});
+        CHECK (map.toBarBeatTick (-4 * quarter - 1) == BarBeatTick {-1, 4, quarter - 1});
     }
 }
 
@@ -89,11 +89,11 @@ TEST_CASE ("TempoMap falls back to safe defaults for invalid input", "[time]")
 {
     const TempoMap map (0.0, {0, 3}, -1.0);
     CHECK (map.getTempo() == 120.0);
-    CHECK (map.getTimeSignature() == TimeSignature{4, 4});
+    CHECK (map.getTimeSignature() == TimeSignature {4, 4});
     CHECK (map.getSampleRate() == 48000.0);
 
     CHECK_FALSE (isValidTempo (19.9));
     CHECK_FALSE (isValidTempo (300.1));
-    CHECK_FALSE (TimeSignature{5, 6}.isValid());
-    CHECK (TimeSignature{7, 8}.isValid());
+    CHECK_FALSE (TimeSignature {5, 6}.isValid());
+    CHECK (TimeSignature {7, 8}.isValid());
 }
