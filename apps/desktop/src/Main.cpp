@@ -1,4 +1,6 @@
+#include "AppPaths.h"
 #include "AudioDeviceHost.h"
+#include "ProjectActions.h"
 #include "Session.h"
 #include "WebUiHost.h"
 #include "ap/engine/Engine.h"
@@ -22,16 +24,38 @@ juce::PropertiesFile::Options settingsOptions()
     options.storageFormat = juce::PropertiesFile::storeAsXML;
     return options;
 }
+
+// Present while the app runs; still present at launch means the last session did not exit
+// cleanly, so autosaves may hold work that was never saved.
+class SessionLock
+{
+public:
+    explicit SessionLock (juce::File lockFile)
+        : file (std::move (lockFile))
+        , previousSessionCrashed (file.existsAsFile())
+    {
+        file.getParentDirectory().createDirectory();
+        file.replaceWithText ("running");
+    }
+
+    ~SessionLock() { file.deleteFile(); }
+
+    SessionLock (const SessionLock&) = delete;
+    SessionLock& operator= (const SessionLock&) = delete;
+
+    const juce::File file;
+    const bool previousSessionCrashed;
+};
 } // namespace
 
 class MainWindow final : public juce::DocumentWindow
 {
 public:
-    MainWindow (const juce::String& name, AudioDeviceHost& host, engine::Engine& engine, Session& session)
+    MainWindow (const juce::String& name, WebUiHost* content)
         : DocumentWindow (name, juce::Colour (0xff111214), allButtons)
     {
         setUsingNativeTitleBar (true);
-        setContentOwned (new WebUiHost (host, engine, session), true);
+        setContentOwned (content, true);
         setResizable (true, true);
         setResizeLimits (720, 480, 10000, 10000);
         centreWithSize (getWidth(), getHeight());
@@ -56,13 +80,22 @@ public:
     void initialise (const juce::String&) override
     {
         settings.setStorageParameters (settingsOptions());
+        lock = std::make_unique<SessionLock> (appDataDirectory().getChildFile ("session.lock"));
 
         audioHost = std::make_unique<AudioDeviceHost> (engine);
         const auto savedState = settings.getUserSettings()->getXmlValue (audioDeviceStateKey);
         audioHost->initialise (savedState.get());
 
-        session = std::make_unique<Session> (engine);
-        mainWindow = std::make_unique<MainWindow> (getApplicationName(), *audioHost, engine, *session);
+        session = std::make_unique<Session> (
+            engine, io::ProjectFolder {toPath (appDataDirectory().getChildFile ("Unsaved"))});
+        actions = std::make_unique<ProjectActions> (*session, *settings.getUserSettings());
+
+        auto* ui = new WebUiHost (*audioHost, engine, *session, *actions);
+        actions->onNotice = [ui] (ProjectActions::NoticeLevel level, const std::string& message)
+        { ui->showNotice (level, message); };
+        mainWindow = std::make_unique<MainWindow> (getApplicationName(), ui);
+
+        actions->restoreLastSession (lock->previousSessionCrashed);
     }
 
     void shutdown() override
@@ -73,19 +106,33 @@ public:
 
         settings.saveIfNeeded();
 
-        // Order matters: the window references the session and host, which reference the engine.
+        // Order matters: the window references the actions, session and host, which reference
+        // the engine.
         mainWindow.reset();
+        actions.reset();
         session.reset();
         audioHost.reset();
+        lock.reset(); // clean exit: no recovery next time
     }
 
-    void systemRequestedQuit() override { quit(); }
+    void systemRequestedQuit() override
+    {
+        if (actions == nullptr)
+        {
+            quit();
+            return;
+        }
+
+        actions->confirmClose ([] { juce::JUCEApplication::getInstance()->quit(); });
+    }
 
 private:
     engine::Engine engine;
     juce::ApplicationProperties settings;
+    std::unique_ptr<SessionLock> lock;
     std::unique_ptr<AudioDeviceHost> audioHost;
     std::unique_ptr<Session> session;
+    std::unique_ptr<ProjectActions> actions;
     std::unique_ptr<MainWindow> mainWindow;
 };
 

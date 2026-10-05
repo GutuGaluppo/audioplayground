@@ -77,7 +77,34 @@ export interface EditRedo {
   readonly payload: {};
 }
 
-export type Intent = AppReady | AudioOpenSettings | ToneSetEnabled | TransportPlay | TransportStop | TransportReturnToStart | TransportSetTempo | TransportSetCountIn | MetronomeSetEnabled | ParamSet | EditUndo | EditRedo;
+export interface ProjectNew {
+  readonly type: 'project.new';
+  readonly payload: {};
+}
+
+export interface ProjectOpen {
+  readonly type: 'project.open';
+  readonly payload: {};
+}
+
+export interface ProjectSave {
+  readonly type: 'project.save';
+  readonly payload: {};
+}
+
+export interface ProjectSaveAs {
+  readonly type: 'project.saveAs';
+  readonly payload: {};
+}
+
+export interface ProjectRename {
+  readonly type: 'project.rename';
+  readonly payload: {
+    readonly name: string;
+  };
+}
+
+export type Intent = AppReady | AudioOpenSettings | ToneSetEnabled | TransportPlay | TransportStop | TransportReturnToStart | TransportSetTempo | TransportSetCountIn | MetronomeSetEnabled | ParamSet | EditUndo | EditRedo | ProjectNew | ProjectOpen | ProjectSave | ProjectSaveAs | ProjectRename;
 
 // Events: native -> UI
 export interface EngineStatus {
@@ -138,7 +165,24 @@ export interface HistoryState {
   };
 }
 
-export type NativeEvent = EngineStatus | EngineMeters | TransportState | TransportPosition | ParamValue | HistoryState;
+export interface ProjectState {
+  readonly type: 'project.state';
+  readonly payload: {
+    readonly name: string;
+    readonly dirty: boolean;
+    readonly hasLocation: boolean;
+  };
+}
+
+export interface AppNotice {
+  readonly type: 'app.notice';
+  readonly payload: {
+    readonly level: number;
+    readonly message: string;
+  };
+}
+
+export type NativeEvent = EngineStatus | EngineMeters | TransportState | TransportPosition | ParamValue | HistoryState | ProjectState | AppNotice;
 export type NativeEventType = NativeEvent['type'];
 
 /** Payload type for each native event type. */
@@ -149,6 +193,8 @@ export interface NativeEventPayloads {
   'transport.position': TransportPosition['payload'];
   'param.value': ParamValue['payload'];
   'history.state': HistoryState['payload'];
+  'project.state': ProjectState['payload'];
+  'app.notice': AppNotice['payload'];
 }
 
 type Payload = Record<string, unknown>;
@@ -197,6 +243,15 @@ const eventValidators: Record<NativeEventType, (payload: Payload) => boolean> = 
     typeof payload['canRedo'] === 'boolean' &&
     typeof payload['undoLabel'] === 'string' && payload['undoLabel'].length <= 64 &&
     typeof payload['redoLabel'] === 'string' && payload['redoLabel'].length <= 64,
+  'project.state': (payload) =>
+    hasOnlyKeys(payload, ['name', 'dirty', 'hasLocation']) &&
+    typeof payload['name'] === 'string' && payload['name'].length <= 512 &&
+    typeof payload['dirty'] === 'boolean' &&
+    typeof payload['hasLocation'] === 'boolean',
+  'app.notice': (payload) =>
+    hasOnlyKeys(payload, ['level', 'message']) &&
+    Number.isInteger(payload['level']) && (payload['level'] as number) >= 0 && (payload['level'] as number) <= 2 &&
+    typeof payload['message'] === 'string' && payload['message'].length <= 1024,
 };
 
 /** Strictly validates a message received from native code. Returns null if it is malformed. */

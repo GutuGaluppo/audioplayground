@@ -60,6 +60,7 @@ add_custom_command(
 set(AP_DESKTOP_SOURCES
     src/AudioDeviceHost.cpp
     src/Main.cpp
+    src/ProjectActions.cpp
     src/Session.cpp
     src/WebUiHost.cpp
     src/generated/BridgeCodec.cpp)

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 
 import { useBridge } from '../bridge/BridgeContext';
 import { HistoryControls } from './HistoryControls';
+import { ProjectHeader } from './ProjectHeader';
 import { useLatest } from '../state/latestEvent';
 import { useStores } from '../state/StoresContext';
 
@@ -44,6 +45,8 @@ export function TransportBar() {
   return (
     <header className="transport" aria-label="Transport">
       <div className="transport__group">
+        <ProjectHeader />
+        <span className="transport__divider" aria-hidden="true" />
         <button
           type="button"
           className="transport__button"

@@ -105,6 +105,16 @@ export function createSimulatedBridge(): Bridge {
     after: number;
     set: (value: number) => void;
   }
+  let projectName = 'Untitled';
+  let dirty = false;
+  let hasLocation = false;
+  const sendProject = () => {
+    router.dispatch({ type: 'project.state', payload: { name: projectName, dirty, hasLocation } });
+  };
+  const notice = (message: string) => {
+    router.dispatch({ type: 'app.notice', payload: { level: 0, message } });
+  };
+
   const undoStack: Edit[] = [];
   const redoStack: Edit[] = [];
 
@@ -127,7 +137,9 @@ export function createSimulatedBridge(): Bridge {
       last.after = edit.after;
     else undoStack.push(edit);
     edit.set(edit.after);
+    dirty = true;
     sendHistory();
+    sendProject();
   };
 
   const sendStatus = () => {
@@ -187,6 +199,7 @@ export function createSimulatedBridge(): Bridge {
             sendPosition();
             for (const id of params.keys()) sendParam(id);
             sendHistory();
+            sendProject();
           });
           return;
         case 'audio.openSettings':
@@ -246,13 +259,40 @@ export function createSimulatedBridge(): Bridge {
           });
           return;
         }
+        case 'project.new':
+        case 'project.open':
+          queueMicrotask(() => {
+            notice('Opening and creating projects needs the desktop app.');
+          });
+          return;
+        case 'project.save':
+        case 'project.saveAs':
+          queueMicrotask(() => {
+            dirty = false;
+            hasLocation = true;
+            sendProject();
+            notice('Saved (simulated).');
+          });
+          return;
+        case 'project.rename':
+          queueMicrotask(() => {
+            const name = intent.payload.name.trim();
+            if (name) {
+              projectName = name;
+              dirty = true;
+            }
+            sendProject();
+          });
+          return;
         case 'edit.undo':
           queueMicrotask(() => {
             const edit = undoStack.pop();
             if (!edit) return;
             edit.set(edit.before);
             redoStack.push(edit);
+            dirty = true;
             sendHistory();
+            sendProject();
           });
           return;
         case 'edit.redo':
@@ -261,7 +301,9 @@ export function createSimulatedBridge(): Bridge {
             if (!edit) return;
             edit.set(edit.after);
             undoStack.push(edit);
+            dirty = true;
             sendHistory();
+            sendProject();
           });
           return;
         case 'transport.setCountIn':

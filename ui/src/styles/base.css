@@ -325,3 +325,95 @@ kbd {
   font-weight: 600;
   color: var(--ap-text-muted);
 }
+
+/* Project ----------------------------------------------------------------------------------- */
+
+.project {
+  display: flex;
+  align-items: center;
+  gap: var(--ap-space-2);
+  min-width: 0;
+}
+
+.project__name {
+  max-width: 22ch;
+  overflow: hidden;
+  padding: var(--ap-space-1) var(--ap-space-2);
+  border: 1px solid transparent;
+  border-radius: var(--ap-radius-sm);
+  background: transparent;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: text;
+}
+
+.project__name:hover {
+  border-color: var(--ap-border);
+}
+
+.project__name-input {
+  width: 22ch;
+  padding: var(--ap-space-1) var(--ap-space-2);
+  border: 1px solid var(--ap-accent);
+  border-radius: var(--ap-radius-sm);
+  background: var(--ap-bg);
+  color: var(--ap-text);
+  font: inherit;
+  font-weight: 600;
+  user-select: text;
+}
+
+.project__dirty {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--ap-meter-hot);
+}
+
+.project__actions {
+  display: flex;
+  gap: var(--ap-space-1);
+}
+
+/* Notices ----------------------------------------------------------------------------------- */
+
+.notices {
+  position: fixed;
+  right: var(--ap-space-4);
+  bottom: 48px;
+  display: grid;
+  gap: var(--ap-space-2);
+  max-width: min(420px, calc(100vw - 2 * var(--ap-space-4)));
+}
+
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ap-space-3);
+  padding: var(--ap-space-3) var(--ap-space-4);
+  border: 1px solid var(--ap-border);
+  border-left: 3px solid var(--ap-accent);
+  border-radius: var(--ap-radius-md);
+  background: var(--ap-surface);
+  font-size: var(--ap-text-sm);
+  box-shadow: 0 6px 24px rgb(0 0 0 / 35%);
+}
+
+.notice[data-level='1'] {
+  border-left-color: var(--ap-meter-hot);
+}
+
+.notice[data-level='2'] {
+  border-left-color: var(--ap-meter-clip);
+}
+
+.notice__close {
+  margin-left: auto;
+  padding: 0 var(--ap-space-1);
+  border: 0;
+  background: transparent;
+  color: var(--ap-text-muted);
+  cursor: pointer;
+}

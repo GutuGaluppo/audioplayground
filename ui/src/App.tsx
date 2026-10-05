@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 
 import { useBridge } from './bridge/BridgeContext';
 import type { EngineStatus } from './bridge/generated';
+import { Notices } from './components/Notices';
 import { ParamSlider } from './components/ParamSlider';
 import { PeakMeter } from './components/PeakMeter';
 import { TransportBar } from './components/TransportBar';
@@ -68,6 +69,8 @@ export function App() {
           <PeakMeter />
         </section>
       </main>
+
+      <Notices />
 
       <footer className="statusbar">
         <span>{status ? formatDevice(status) : 'Connecting to audio engine…'}</span>

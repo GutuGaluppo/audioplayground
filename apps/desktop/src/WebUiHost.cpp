@@ -1,5 +1,6 @@
 #include "WebUiHost.h"
 
+#include "AppPaths.h"
 #include "EmbeddedResources.h"
 #include "generated/BridgeCodec.h"
 
@@ -76,9 +77,7 @@ juce::String developmentServerUrl()
 
 juce::File webViewDataFolder()
 {
-    return juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
-        .getChildFile ("Audio Playground")
-        .getChildFile ("WebView");
+    return appDataDirectory().getChildFile ("WebView");
 }
 } // namespace
 
@@ -112,10 +111,12 @@ private:
     juce::String developmentUrl;
 };
 
-WebUiHost::WebUiHost (AudioDeviceHost& hostToUse, engine::Engine& engineToUse, Session& sessionToUse)
+WebUiHost::WebUiHost (AudioDeviceHost& hostToUse, engine::Engine& engineToUse, Session& sessionToUse,
+                      ProjectActions& actionsToUse)
     : host (hostToUse)
     , engine (engineToUse)
     , session (sessionToUse)
+    , actions (actionsToUse)
 {
     const auto devUrl = developmentServerUrl();
 
@@ -178,6 +179,7 @@ void WebUiHost::handle (const ap::bridge::AppReady&)
     for (std::size_t i = 0; i < params::numParameters; ++i)
         sendParameter (static_cast<params::ParamId> (i));
     sendHistory();
+    sendProjectState();
 }
 
 void WebUiHost::handle (const ap::bridge::AudioOpenSettings&)
@@ -225,8 +227,52 @@ void WebUiHost::handle (const ap::bridge::EditRedo&)
     session.redo();
 }
 
+void WebUiHost::handle (const ap::bridge::ProjectNew&)
+{
+    actions.newProject();
+}
+
+void WebUiHost::handle (const ap::bridge::ProjectOpen&)
+{
+    actions.openProject();
+}
+
+void WebUiHost::handle (const ap::bridge::ProjectSave&)
+{
+    actions.save();
+}
+
+void WebUiHost::handle (const ap::bridge::ProjectSaveAs&)
+{
+    actions.saveAs();
+}
+
+void WebUiHost::handle (const ap::bridge::ProjectRename& intent)
+{
+    if (!session.perform (model::RenameProject {intent.name}))
+        sendProjectState(); // rejected (e.g. empty): restore the shown name
+}
+
+void WebUiHost::sendProjectState()
+{
+    ap::bridge::ProjectState event;
+    event.name = session.project().name;
+    event.dirty = session.isDirty();
+    event.hasLocation = session.location().has_value();
+    emit (event);
+}
+
+void WebUiHost::showNotice (ProjectActions::NoticeLevel level, const std::string& message)
+{
+    ap::bridge::AppNotice event;
+    event.level = static_cast<int> (level);
+    event.message = model::sanitiseName (message, ap::bridge::AppNotice::messageMaxLength).value_or ("");
+    emit (event);
+}
+
 void WebUiHost::onProjectChanged()
 {
+    sendProjectState();
     sendTransportState();
     for (std::size_t i = 0; i < params::numParameters; ++i)
         sendParameter (static_cast<params::ParamId> (i));

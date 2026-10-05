@@ -117,6 +117,44 @@ struct EditRedo
     bool operator== (const EditRedo&) const = default;
 };
 
+struct ProjectNew
+{
+    static constexpr std::string_view type = "project.new";
+
+    bool operator== (const ProjectNew&) const = default;
+};
+
+struct ProjectOpen
+{
+    static constexpr std::string_view type = "project.open";
+
+    bool operator== (const ProjectOpen&) const = default;
+};
+
+struct ProjectSave
+{
+    static constexpr std::string_view type = "project.save";
+
+    bool operator== (const ProjectSave&) const = default;
+};
+
+struct ProjectSaveAs
+{
+    static constexpr std::string_view type = "project.saveAs";
+
+    bool operator== (const ProjectSaveAs&) const = default;
+};
+
+struct ProjectRename
+{
+    static constexpr std::string_view type = "project.rename";
+    static constexpr std::size_t nameMaxLength = 512;
+
+    std::string name {};
+
+    bool operator== (const ProjectRename&) const = default;
+};
+
 struct EngineStatus
 {
     static constexpr std::string_view type = "engine.status";
@@ -214,7 +252,32 @@ struct HistoryState
     bool operator== (const HistoryState&) const = default;
 };
 
-using Intent = std::variant<AppReady, AudioOpenSettings, ToneSetEnabled, TransportPlay, TransportStop, TransportReturnToStart, TransportSetTempo, TransportSetCountIn, MetronomeSetEnabled, ParamSet, EditUndo, EditRedo>;
-using Event = std::variant<EngineStatus, EngineMeters, TransportState, TransportPosition, ParamValue, HistoryState>;
+struct ProjectState
+{
+    static constexpr std::string_view type = "project.state";
+    static constexpr std::size_t nameMaxLength = 512;
+
+    std::string name {};
+    bool dirty = false;
+    bool hasLocation = false;
+
+    bool operator== (const ProjectState&) const = default;
+};
+
+struct AppNotice
+{
+    static constexpr std::string_view type = "app.notice";
+    static constexpr int levelMin = 0;
+    static constexpr int levelMax = 2;
+    static constexpr std::size_t messageMaxLength = 1024;
+
+    int level = 0;
+    std::string message {};
+
+    bool operator== (const AppNotice&) const = default;
+};
+
+using Intent = std::variant<AppReady, AudioOpenSettings, ToneSetEnabled, TransportPlay, TransportStop, TransportReturnToStart, TransportSetTempo, TransportSetCountIn, MetronomeSetEnabled, ParamSet, EditUndo, EditRedo, ProjectNew, ProjectOpen, ProjectSave, ProjectSaveAs, ProjectRename>;
+using Event = std::variant<EngineStatus, EngineMeters, TransportState, TransportPosition, ParamValue, HistoryState, ProjectState, AppNotice>;
 
 } // namespace ap::bridge

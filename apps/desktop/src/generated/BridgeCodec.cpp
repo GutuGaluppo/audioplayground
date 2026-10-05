@@ -214,6 +214,61 @@ std::optional<Intent> parseEditRedo (const juce::var& payloadVar)
 
     return Intent {message};
 }
+
+std::optional<Intent> parseProjectNew (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {}))
+        return std::nullopt;
+
+    ProjectNew message;
+
+    return Intent {message};
+}
+
+std::optional<Intent> parseProjectOpen (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {}))
+        return std::nullopt;
+
+    ProjectOpen message;
+
+    return Intent {message};
+}
+
+std::optional<Intent> parseProjectSave (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {}))
+        return std::nullopt;
+
+    ProjectSave message;
+
+    return Intent {message};
+}
+
+std::optional<Intent> parseProjectSaveAs (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {}))
+        return std::nullopt;
+
+    ProjectSaveAs message;
+
+    return Intent {message};
+}
+
+std::optional<Intent> parseProjectRename (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"name"}))
+        return std::nullopt;
+
+    ProjectRename message;
+    if (!readString (*payload, "name", ProjectRename::nameMaxLength, message.name)) return std::nullopt;
+    return Intent {message};
+}
 } // namespace
 
 std::optional<Intent> parseIntent (const juce::var& message)
@@ -253,6 +308,16 @@ std::optional<Intent> parseIntent (const juce::var& message)
         return parseEditUndo (payload);
     if (typeName == EditRedo::type)
         return parseEditRedo (payload);
+    if (typeName == ProjectNew::type)
+        return parseProjectNew (payload);
+    if (typeName == ProjectOpen::type)
+        return parseProjectOpen (payload);
+    if (typeName == ProjectSave::type)
+        return parseProjectSave (payload);
+    if (typeName == ProjectSaveAs::type)
+        return parseProjectSaveAs (payload);
+    if (typeName == ProjectRename::type)
+        return parseProjectRename (payload);
 
     return std::nullopt;
 }
@@ -312,6 +377,21 @@ juce::var toVar (const Event& event)
                 payload->setProperty ("undoLabel", juce::String (m.undoLabel));
                 payload->setProperty ("redoLabel", juce::String (m.redoLabel));
                 return envelope (HistoryState::type, payload);
+            },
+            [] (const ProjectState& m) -> juce::var
+            {
+                auto* payload = new juce::DynamicObject();
+                payload->setProperty ("name", juce::String (m.name));
+                payload->setProperty ("dirty", m.dirty);
+                payload->setProperty ("hasLocation", m.hasLocation);
+                return envelope (ProjectState::type, payload);
+            },
+            [] (const AppNotice& m) -> juce::var
+            {
+                auto* payload = new juce::DynamicObject();
+                payload->setProperty ("level", m.level);
+                payload->setProperty ("message", juce::String (m.message));
+                return envelope (AppNotice::type, payload);
             }},
         event);
 }

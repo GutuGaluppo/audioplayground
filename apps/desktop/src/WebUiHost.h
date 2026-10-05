@@ -1,6 +1,7 @@
 #pragma once
 
 #include "AudioDeviceHost.h"
+#include "ProjectActions.h"
 #include "Session.h"
 #include "ap/bridge/generated/Messages.h"
 #include "ap/engine/Engine.h"
@@ -21,7 +22,10 @@ namespace ap::desktop
 class WebUiHost final : public juce::Component, private juce::Timer
 {
 public:
-    WebUiHost (AudioDeviceHost& host, engine::Engine& engine, Session& session);
+    WebUiHost (AudioDeviceHost& host, engine::Engine& engine, Session& session, ProjectActions& actions);
+
+    // Shows a transient message in the UI.
+    void showNotice (ProjectActions::NoticeLevel level, const std::string& message);
     ~WebUiHost() override;
 
     void resized() override;
@@ -36,6 +40,11 @@ private:
     void handle (const ap::bridge::ParamSet&);
     void handle (const ap::bridge::EditUndo&);
     void handle (const ap::bridge::EditRedo&);
+    void handle (const ap::bridge::ProjectNew&);
+    void handle (const ap::bridge::ProjectOpen&);
+    void handle (const ap::bridge::ProjectSave&);
+    void handle (const ap::bridge::ProjectSaveAs&);
+    void handle (const ap::bridge::ProjectRename&);
     void handle (const ap::bridge::TransportPlay&);
     void handle (const ap::bridge::TransportStop&);
     void handle (const ap::bridge::TransportReturnToStart&);
@@ -48,6 +57,7 @@ private:
     void sendTransportState();
     void sendParameter (params::ParamId id);
     void sendHistory();
+    void sendProjectState();
     void onProjectChanged();
     void sendTransportPosition (bool force);
     void timerCallback() override;
@@ -56,6 +66,7 @@ private:
     AudioDeviceHost& host;
     engine::Engine& engine;
     Session& session;
+    ProjectActions& actions;
 
     std::unique_ptr<LockedDownWebView> webView;
     ap::bridge::TransportPosition lastPosition;

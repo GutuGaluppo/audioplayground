@@ -1,20 +1,24 @@
 #pragma once
 
 #include "ap/engine/Engine.h"
+#include "ap/io/ProjectFiles.h"
 #include "ap/model/ProjectDocument.h"
 
 #include <functional>
 #include <juce_events/juce_events.h>
+#include <optional>
+#include <string>
 
 namespace ap::desktop
 {
 
-// The open project and its history, kept in sync with the engine. Message thread only.
-// All project changes go through perform/undo/redo (ADR-003).
+// The open project, its history and where it lives on disk, kept in sync with the engine.
+// Message thread only. All project changes go through perform/undo/redo (ADR-003).
 class Session final : private juce::Timer
 {
 public:
-    explicit Session (engine::Engine& engine);
+    // scratchFolder holds autosaves of projects that have never been saved.
+    Session (engine::Engine& engine, io::ProjectFolder scratchFolder);
     ~Session() override;
 
     bool perform (model::Command command, model::ProjectDocument::GestureId gesture = 0);
@@ -24,16 +28,43 @@ public:
     [[nodiscard]] const model::ProjectDocument& document() const noexcept { return doc; }
     [[nodiscard]] const model::Project& project() const noexcept { return doc.project(); }
 
-    // Called after every change (perform, undo, redo).
+    // --- Persistence -----------------------------------------------------------------------
+    [[nodiscard]] bool isDirty() const noexcept { return doc.version() != savedVersion; }
+    [[nodiscard]] const std::optional<io::ProjectFolder>& location() const noexcept { return folder; }
+
+    void newProject();
+    [[nodiscard]] std::optional<std::string> save(); // needs a location
+    [[nodiscard]] std::optional<std::string> saveAs (const io::ProjectFolder& target);
+    [[nodiscard]] std::optional<std::string> open (const io::ProjectFolder& source);
+
+    // Restores the newest autosave if it is newer than the last save of that project (or if the
+    // project was never saved). Returns a message for the user when something was recovered.
+    std::optional<std::string> recoverFromAutosave (std::optional<io::ProjectFolder> lastProject);
+
+    // Removes autosaves of the never-saved project (after "Don't Save" or a successful save).
+    void discardScratchAutosaves();
+
+    // Writes an autosave now if there are unsaved changes since the last one.
+    void autosaveIfNeeded();
+
+    // Called after every change to the project or its saved state.
     std::function<void()> onChanged;
 
 private:
     void syncEngine();
-    void timerCallback() override;
     bool afterChange (bool changed);
+    void notify();
+    void timerCallback() override;
+    void loadInto (model::LoadedProject loaded, std::optional<io::ProjectFolder> location, bool markDirty);
 
     engine::Engine& engine;
+    io::ProjectFolder scratch;
     model::ProjectDocument doc;
+    model::ProjectMetadata metadata;
+    std::optional<io::ProjectFolder> folder;
+    std::uint64_t savedVersion = 0;
+    std::uint64_t autosavedVersion = 0;
+    int ticksSinceAutosave = 0;
 };
 
 } // namespace ap::desktop

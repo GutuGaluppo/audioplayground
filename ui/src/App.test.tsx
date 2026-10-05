@@ -159,6 +159,34 @@ describe('App', () => {
     expect(tempo.value).toBe('90');
   });
 
+  it('marks the project dirty after an edit and clean after saving', async () => {
+    await renderApp();
+    expect(screen.queryByLabelText('Unsaved changes')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Click' }));
+    const tempo = screen.getByRole<HTMLInputElement>('spinbutton', { name: /tempo/i });
+    fireEvent.change(tempo, { target: { value: '100' } });
+    fireEvent.blur(tempo);
+    await flush();
+    expect(screen.getByLabelText('Unsaved changes')).toBeTruthy();
+
+    fireEvent.keyDown(window, { key: 's', metaKey: true, ctrlKey: true });
+    await flush();
+    expect(screen.queryByLabelText('Unsaved changes')).toBeNull();
+    expect(screen.getByText('Saved (simulated).')).toBeTruthy();
+  });
+
+  it('renames the project inline', async () => {
+    await renderApp();
+    fireEvent.click(screen.getByRole('button', { name: 'Untitled' }));
+    const input = screen.getByRole<HTMLInputElement>('textbox', { name: 'Project name' });
+    fireEvent.change(input, { target: { value: 'Night Drive' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    fireEvent.blur(input);
+    await flush();
+    expect(screen.getByRole('button', { name: 'Night Drive' })).toBeTruthy();
+  });
+
   it('shows the bar and beat position', async () => {
     await renderApp();
     expect(screen.getByLabelText('Position').textContent).toBe('1.1');

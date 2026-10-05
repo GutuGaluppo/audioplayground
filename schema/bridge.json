@@ -48,7 +48,17 @@
       }
     },
     "edit.undo": {},
-    "edit.redo": {}
+    "edit.redo": {},
+    "project.new": {},
+    "project.open": {},
+    "project.save": {},
+    "project.saveAs": {},
+    "project.rename": {
+      "name": {
+        "type": "string",
+        "maxLength": 512
+      }
+    }
   },
   "events": {
     "engine.status": {
@@ -154,6 +164,29 @@
       "redoLabel": {
         "type": "string",
         "maxLength": 64
+      }
+    },
+    "project.state": {
+      "name": {
+        "type": "string",
+        "maxLength": 512
+      },
+      "dirty": {
+        "type": "bool"
+      },
+      "hasLocation": {
+        "type": "bool"
+      }
+    },
+    "app.notice": {
+      "level": {
+        "type": "int",
+        "min": 0,
+        "max": 2
+      },
+      "message": {
+        "type": "string",
+        "maxLength": 1024
       }
     }
   }
