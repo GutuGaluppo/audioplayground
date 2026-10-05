@@ -25,6 +25,14 @@ set(AP_EMBEDDED_UI_SOURCE "${CMAKE_CURRENT_BINARY_DIR}/generated/EmbeddedUi.cpp"
 
 find_program(AP_PNPM pnpm REQUIRED)
 
+# On Windows pnpm is a .cmd script; invoking it directly from MSBuild's generated batch file would
+# end that batch file after pnpm returns, silently skipping the commands that follow.
+if(WIN32)
+    set(AP_PNPM_COMMAND cmd /c "${AP_PNPM}")
+else()
+    set(AP_PNPM_COMMAND "${AP_PNPM}")
+endif()
+
 file(GLOB_RECURSE AP_UI_INPUTS CONFIGURE_DEPENDS
     "${AP_UI_DIR}/src/*"
     "${AP_UI_DIR}/public/*")
@@ -37,7 +45,7 @@ list(APPEND AP_UI_INPUTS
 
 add_custom_command(
     OUTPUT "${AP_UI_STAMP}"
-    COMMAND "${AP_PNPM}" --dir "${AP_UI_DIR}" run build
+    COMMAND ${AP_PNPM_COMMAND} --dir "${AP_UI_DIR}" run build
     COMMAND "${CMAKE_COMMAND}" -E touch "${AP_UI_STAMP}"
     DEPENDS ${AP_UI_INPUTS}
     WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
