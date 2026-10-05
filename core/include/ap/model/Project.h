@@ -8,6 +8,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace ap::model
@@ -60,6 +61,10 @@ struct Project
     std::vector<Track> tracks;
     std::array<float, params::numParameters> parameters = defaultParameterValues();
     std::uint64_t nextTrackId = 1;
+
+    // Parameters this build does not know (written by a newer version with the same schema).
+    // Kept verbatim and written back so opening and saving never loses them (guide §11).
+    std::vector<std::pair<std::string, double>> preservedParameters;
 
     [[nodiscard]] static std::array<float, params::numParameters> defaultParameterValues() noexcept
     {

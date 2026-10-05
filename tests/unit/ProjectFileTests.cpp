@@ -1,0 +1,268 @@
+#include "TempDirectory.h"
+#include "ap/io/ProjectFiles.h"
+#include "ap/model/ProjectDocument.h"
+#include "ap/model/ProjectSerialization.h"
+
+#include <catch2/catch_test_macros.hpp>
+#include <fstream>
+#include <nlohmann/json.hpp>
+#include <thread>
+
+using namespace ap::model;
+using namespace ap::io;
+using ap::test::TempDirectory;
+
+namespace
+{
+Project sampleProject()
+{
+    ProjectDocument doc;
+    REQUIRE (doc.perform (RenameProject {"Night Drive \xC3\xA9"}));
+    REQUIRE (doc.perform (SetTempo {93.5}));
+    REQUIRE (doc.perform (SetTimeSignature {ap::core::TimeSignature {6, 8}}));
+    REQUIRE (doc.perform (AddTrack {TrackKind::audio, "Vocals"}));
+    REQUIRE (doc.perform (AddTrack {TrackKind::instrument}));
+    REQUIRE (doc.perform (SetTrackVolume {doc.project().tracks[0].id, -4.5f}));
+    REQUIRE (doc.perform (SetTrackPan {doc.project().tracks[1].id, 0.25f}));
+    REQUIRE (doc.perform (SetTrackMute {doc.project().tracks[1].id, true}));
+    REQUIRE (doc.perform (SetParameter {ap::params::ParamId::toneLevel, -30.0f}));
+    return doc.project();
+}
+
+const ProjectMetadata metadata {"2026-10-05T19:00:00Z", "2026-10-05T19:30:00Z"};
+
+const LoadError& errorOf (const LoadResult& result)
+{
+    REQUIRE (std::holds_alternative<LoadError> (result));
+    return std::get<LoadError> (result);
+}
+
+std::string mutate (const std::function<void (nlohmann::json&)>& change)
+{
+    auto json = nlohmann::json::parse (serialiseProject (sampleProject(), metadata));
+    change (json);
+    return json.dump();
+}
+} // namespace
+
+TEST_CASE ("A project round-trips through JSON exactly and byte-stably", "[persistence]")
+{
+    const auto project = sampleProject();
+    const auto text = serialiseProject (project, metadata);
+
+    const auto loaded = parseProject (text);
+    REQUIRE (std::holds_alternative<LoadedProject> (loaded));
+    CHECK (std::get<LoadedProject> (loaded).project == project);
+    CHECK (std::get<LoadedProject> (loaded).metadata == metadata);
+
+    // save -> load -> save produces identical bytes
+    CHECK (serialiseProject (std::get<LoadedProject> (loaded).project, metadata) == text);
+}
+
+TEST_CASE ("Parameters unknown to this build are preserved", "[persistence]")
+{
+    const auto text = mutate ([] (nlohmann::json& j) { j["parameters"]["reverb.size"] = 0.75; });
+    const auto loaded = parseProject (text);
+    REQUIRE (std::holds_alternative<LoadedProject> (loaded));
+
+    const auto& project = std::get<LoadedProject> (loaded).project;
+    REQUIRE (project.preservedParameters.size() == 1);
+    CHECK (project.preservedParameters[0].first == "reverb.size");
+
+    const auto resaved = nlohmann::json::parse (serialiseProject (project, metadata));
+    CHECK (resaved["parameters"]["reverb.size"] == 0.75);
+}
+
+TEST_CASE ("Missing known parameters fall back to their defaults", "[persistence]")
+{
+    const auto text = mutate ([] (nlohmann::json& j) { j["parameters"] = nlohmann::json::object(); });
+    const auto loaded = parseProject (text);
+    REQUIRE (std::holds_alternative<LoadedProject> (loaded));
+    CHECK (std::get<LoadedProject> (loaded).project.parameters == Project::defaultParameterValues());
+}
+
+TEST_CASE ("Projects from a newer version are refused, not partially loaded", "[persistence]")
+{
+    const auto text = mutate ([] (nlohmann::json& j) { j["schemaVersion"] = currentSchemaVersion + 1; });
+    CHECK (errorOf (parseProject (text)).code == LoadError::Code::newerVersion);
+}
+
+TEST_CASE ("Malformed and hostile project files are rejected", "[persistence][security]")
+{
+    using Change = std::function<void (nlohmann::json&)>;
+    const std::vector<std::pair<const char*, Change>> cases {
+        {"wrong format tag", [] (auto& j) { j["format"] = "something"; }},
+        {"unknown top-level key", [] (auto& j) { j["extra"] = 1; }},
+        {"missing tracks", [] (auto& j) { j.erase ("tracks"); }},
+        {"tempo too high", [] (auto& j) { j["tempo"] = 999; }},
+        {"tempo as text", [] (auto& j) { j["tempo"] = "120"; }},
+        {"bad time signature", [] (auto& j) { j["timeSignature"] = {5, 3}; }},
+        {"time signature not a pair", [] (auto& j) { j["timeSignature"] = {4}; }},
+        {"absurd export rate", [] (auto& j) { j["exportSampleRate"] = 1; }},
+        {"negative track id", [] (auto& j) { j["tracks"][0]["id"] = -1; }},
+        {"fractional track id", [] (auto& j) { j["tracks"][0]["id"] = 1.5; }},
+        {"duplicate track ids", [] (auto& j) { j["tracks"][1]["id"] = j["tracks"][0]["id"]; }},
+        {"nextTrackId not above ids", [] (auto& j) { j["nextTrackId"] = 1; }},
+        {"unknown track kind", [] (auto& j) { j["tracks"][0]["kind"] = "midi"; }},
+        {"empty track name", [] (auto& j) { j["tracks"][0]["name"] = "  "; }},
+        {"huge track name", [] (auto& j) { j["tracks"][0]["name"] = std::string (10000, 'x'); }},
+        {"volume out of range", [] (auto& j) { j["tracks"][0]["volumeDb"] = 50; }},
+        {"pan out of range", [] (auto& j) { j["tracks"][0]["pan"] = 2; }},
+        {"mute as number", [] (auto& j) { j["tracks"][0]["muted"] = 1; }},
+        {"extra track key", [] (auto& j) { j["tracks"][0]["path"] = "/etc/passwd"; }},
+        {"known parameter out of range", [] (auto& j) { j["parameters"]["tone.level"] = 100; }},
+        {"malformed parameter id", [] (auto& j) { j["parameters"]["../../x"] = 1; }},
+        {"bad timestamp", [] (auto& j) { j["createdAt"] = "yesterday<script>"; }},
+        {"too many tracks",
+         [] (auto& j)
+         {
+             for (int i = 0; i < 70; ++i)
+             {
+                 auto t = j["tracks"][0];
+                 t["id"] = 100 + i;
+                 j["tracks"].push_back (t);
+             }
+             j["nextTrackId"] = 1000;
+         }},
+    };
+
+    for (const auto& [label, change] : cases)
+    {
+        INFO (label);
+        const auto result = parseProject (mutate (change));
+        REQUIRE (std::holds_alternative<LoadError> (result));
+        CHECK (std::get<LoadError> (result).code == LoadError::Code::invalid);
+    }
+}
+
+TEST_CASE ("Non-JSON, oversized and deeply nested input is rejected safely", "[persistence][security]")
+{
+    CHECK (errorOf (parseProject ("")).code == LoadError::Code::notJson);
+    CHECK (errorOf (parseProject ("{\"format\":")).code == LoadError::Code::notJson);
+    CHECK (errorOf (parseProject ("[]")).code == LoadError::Code::invalid);
+    CHECK (errorOf (parseProject ("\xFF\xFE garbage")).code == LoadError::Code::notJson);
+
+    const std::string deep = std::string (100000, '[') + std::string (100000, ']');
+    CHECK (errorOf (parseProject (deep)).code == LoadError::Code::tooDeeplyNested);
+
+    // Brackets inside strings do not count towards nesting.
+    const auto text = mutate ([] (nlohmann::json& j) { j["name"] = std::string (60, '['); });
+    CHECK (std::holds_alternative<LoadedProject> (parseProject (text)));
+
+    const std::string huge (maxProjectFileBytes + 1, ' ');
+    CHECK (errorOf (parseProject (huge)).code == LoadError::Code::tooLarge);
+}
+
+TEST_CASE ("Error messages never echo file contents", "[persistence][security]")
+{
+    const auto text = mutate ([] (nlohmann::json& j) { j["tracks"][0]["kind"] = "SECRET-CONTENT"; });
+    CHECK (errorOf (parseProject (text)).message.find ("SECRET") == std::string::npos);
+}
+
+TEST_CASE ("Saving creates the folder layout, keeps a backup and loads back", "[persistence][io]")
+{
+    TempDirectory temp;
+    const ProjectFolder folder {temp.path() / "Song.playground"};
+    const auto project = sampleProject();
+
+    REQUIRE_FALSE (saveProject (folder, project, metadata).has_value());
+    CHECK (std::filesystem::is_directory (folder.audioDirectory()));
+    CHECK (std::filesystem::is_directory (folder.autosaveDirectory()));
+    CHECK_FALSE (std::filesystem::exists (folder.backupFile()));
+
+    auto changed = project;
+    changed.tempoBpm = 140.0;
+    REQUIRE_FALSE (saveProject (folder, changed, metadata).has_value());
+
+    const auto current = loadProject (folder);
+    REQUIRE (std::holds_alternative<LoadedProject> (current));
+    CHECK (std::get<LoadedProject> (current).project.tempoBpm == 140.0);
+
+    const auto backup = loadBackup (folder);
+    REQUIRE (std::holds_alternative<LoadedProject> (backup));
+    CHECK (std::get<LoadedProject> (backup).project == project);
+
+    // No temporary files are left behind.
+    for (const auto& entry : std::filesystem::directory_iterator (folder.root))
+        CHECK (entry.path().filename().string().find (".tmp-") == std::string::npos);
+}
+
+TEST_CASE ("Loading reports a missing project without touching the disk", "[persistence][io]")
+{
+    TempDirectory temp;
+    const ProjectFolder folder {temp.path() / "Missing.playground"};
+    const auto result = loadProject (folder);
+    REQUIRE (std::holds_alternative<LoadError> (result));
+    CHECK_FALSE (std::filesystem::exists (folder.root));
+}
+
+TEST_CASE ("Autosaves rotate and never touch project.json", "[persistence][io]")
+{
+    TempDirectory temp;
+    const ProjectFolder folder {temp.path() / "Song.playground"};
+    REQUIRE_FALSE (saveProject (folder, sampleProject(), metadata).has_value());
+    const auto saved = readFileLimited (folder.projectFile(), maxProjectFileBytes);
+
+    auto project = sampleProject();
+    for (int i = 0; i < 8; ++i)
+    {
+        project.tempoBpm = 100.0 + i;
+        REQUIRE_FALSE (writeAutosave (folder, project, metadata).has_value());
+    }
+
+    const auto autosaves = listAutosaves (folder);
+    REQUIRE (autosaves.size() == maxAutosaves);
+
+    const auto newest = readFileLimited (autosaves.front(), maxProjectFileBytes);
+    const auto loaded = parseProject (std::get<std::string> (newest));
+    REQUIRE (std::holds_alternative<LoadedProject> (loaded));
+    CHECK (std::get<LoadedProject> (loaded).project.tempoBpm == 107.0);
+
+    CHECK (readFileLimited (folder.projectFile(), maxProjectFileBytes) == saved);
+}
+
+TEST_CASE ("readFileLimited refuses files over the limit", "[persistence][io]")
+{
+    TempDirectory temp;
+    const auto path = temp.path() / "big.json";
+    std::ofstream (path) << std::string (1000, 'x');
+    CHECK (std::holds_alternative<IoError> (readFileLimited (path, 999)));
+    CHECK (std::get<std::string> (readFileLimited (path, 1000)).size() == 1000);
+}
+
+TEST_CASE ("Asset paths cannot escape the project folder", "[persistence][security]")
+{
+    TempDirectory temp;
+    const ProjectFolder folder {temp.path() / "Song.playground"};
+    std::filesystem::create_directories (folder.audioDirectory());
+
+    const auto ok = resolveAssetPath (folder, "audio/take-1.wav");
+    REQUIRE (ok.has_value());
+    CHECK (ok->filename() == "take-1.wav");
+
+    for (const char* bad :
+         {"", "/etc/passwd", "../outside.wav", "audio/../../outside.wav", "audio/./x.wav", "audio//x.wav",
+          "C:\\Windows\\win.ini", "audio\\..\\x.wav", "audio/x?.wav", "\x01.wav", ".", ".."})
+    {
+        INFO (bad);
+        CHECK_FALSE (resolveAssetPath (folder, bad).has_value());
+    }
+
+#if !defined(_WIN32)
+    // A symbolic link inside the project that points outside it is refused.
+    TempDirectory outside;
+    std::filesystem::create_directory_symlink (outside.path(), folder.audioDirectory() / "link");
+    CHECK_FALSE (resolveAssetPath (folder, "audio/link/secret.wav").has_value());
+#endif
+}
+
+TEST_CASE ("Fuzz seed corpus files are valid projects", "[persistence]")
+{
+    for (const auto& entry : std::filesystem::directory_iterator (AP_FUZZ_CORPUS_DIR))
+    {
+        INFO (entry.path().filename().string());
+        const auto text = readFileLimited (entry.path(), maxProjectFileBytes);
+        REQUIRE (std::holds_alternative<std::string> (text));
+        CHECK (std::holds_alternative<LoadedProject> (parseProject (std::get<std::string> (text))));
+    }
+}

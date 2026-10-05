@@ -56,6 +56,17 @@
         "AP_BUILD_DESKTOP": "OFF",
         "AP_SANITIZERS": "thread"
       }
+    },
+    {
+      "name": "fuzz",
+      "displayName": "Fuzz targets (Clang + libFuzzer + ASan/UBSan, Linux)",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "AP_BUILD_DESKTOP": "OFF",
+        "AP_BUILD_FUZZERS": "ON",
+        "AP_SANITIZERS": "address;undefined"
+      }
     }
   ],
   "buildPresets": [
@@ -83,6 +94,13 @@
       "name": "tsan",
       "configurePreset": "tsan",
       "configuration": "Debug"
+    },
+    {
+      "name": "fuzz",
+      "configurePreset": "fuzz",
+      "targets": [
+        "ap_fuzz_project_loader"
+      ]
     }
   ],
   "testPresets": [

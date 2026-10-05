@@ -17,6 +17,15 @@ if(AP_BUILD_DESKTOP)
     FetchContent_MakeAvailable(JUCE)
 endif()
 
+# JSON for the project file format (untrusted input: parsed with size and depth limits, ADR-006).
+FetchContent_Declare(nlohmann_json
+    URL      "https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz"
+    URL_HASH SHA256=42f6e95cad6ec532fd372391373363b62a14af6d771056dbfc86160e6dfff7aa
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    SYSTEM)
+set(JSON_Install OFF CACHE INTERNAL "")
+FetchContent_MakeAvailable(nlohmann_json)
+
 if(AP_BUILD_TESTS)
     FetchContent_Declare(Catch2
         URL      "https://github.com/catchorg/Catch2/archive/refs/tags/v3.9.1.tar.gz"

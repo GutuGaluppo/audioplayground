@@ -87,6 +87,25 @@ jobs:
       - run: cmake --build --preset rtsan --parallel
       - run: ctest --preset rtsan
 
+  fuzz:
+    name: Fuzz project loader (60 s)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      CC: clang
+      CXX: clang++
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: cmake --preset fuzz
+      - run: cmake --build --preset fuzz --parallel
+      - name: Fuzz
+        run: |
+          mkdir -p fuzz-corpus
+          cp tests/fuzz/corpus/project/* fuzz-corpus/
+          ./build/fuzz/tests/ap_fuzz_project_loader fuzz-corpus -max_total_time=60 -max_len=65536 -timeout=10 -rss_limit_mb=2048
+
   cpp-format:
     name: clang-format
     runs-on: ubuntu-24.04

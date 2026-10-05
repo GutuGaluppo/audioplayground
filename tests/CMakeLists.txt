@@ -11,14 +11,17 @@ add_executable(ap_unit_tests
     unit/MusicalTimeTests.cpp
     unit/OfflineRenderTests.cpp
     unit/ParameterTests.cpp
+    unit/ProjectFileTests.cpp
     unit/ProjectModelTests.cpp
     unit/RenderGraphTests.cpp
     unit/SineOscillatorTests.cpp
     unit/TransportTests.cpp)
 
 target_include_directories(ap_unit_tests PRIVATE support)
-target_compile_definitions(ap_unit_tests PRIVATE AP_GOLDEN_DIR="${CMAKE_CURRENT_SOURCE_DIR}/golden")
-target_link_libraries(ap_unit_tests PRIVATE ap::core ap::project_options Catch2::Catch2WithMain)
+target_compile_definitions(ap_unit_tests PRIVATE
+    AP_GOLDEN_DIR="${CMAKE_CURRENT_SOURCE_DIR}/golden"
+    AP_FUZZ_CORPUS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fuzz/corpus/project")
+target_link_libraries(ap_unit_tests PRIVATE ap::core ap::project_options nlohmann_json::nlohmann_json Catch2::Catch2WithMain)
 
 catch_discover_tests(ap_unit_tests)
 
@@ -48,4 +51,13 @@ if(AP_BUILD_DESKTOP)
     get_target_property(_ap_test_opts ap_project_options INTERFACE_COMPILE_OPTIONS)
     set_source_files_properties(desktop/BridgeCodecTests.cpp PROPERTIES COMPILE_OPTIONS "${_ap_test_opts}")
     catch_discover_tests(ap_desktop_tests)
+endif()
+
+# Fuzz targets (Clang with libFuzzer; see the "fuzz" preset and CI job).
+option(AP_BUILD_FUZZERS "Build libFuzzer targets" OFF)
+if(AP_BUILD_FUZZERS)
+    add_executable(ap_fuzz_project_loader fuzz/ProjectLoaderFuzz.cpp)
+    target_link_libraries(ap_fuzz_project_loader PRIVATE ap::core ap::project_options)
+    target_compile_options(ap_fuzz_project_loader PRIVATE -fsanitize=fuzzer)
+    target_link_options(ap_fuzz_project_loader PRIVATE -fsanitize=fuzzer)
 endif()

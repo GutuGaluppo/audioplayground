@@ -3,6 +3,7 @@
 
 add_library(ap_core STATIC
     src/BuildInfo.cpp
+    src/io/ProjectFiles.cpp
     src/engine/Engine.cpp
     src/engine/Metronome.cpp
     src/engine/OfflineRenderer.cpp
@@ -10,11 +11,12 @@ add_library(ap_core STATIC
     src/engine/Transport.cpp
     src/model/Commands.cpp
     src/model/Project.cpp
-    src/model/ProjectDocument.cpp)
+    src/model/ProjectDocument.cpp
+    src/model/ProjectSerialization.cpp)
 add_library(ap::core ALIAS ap_core)
 
 target_include_directories(ap_core PUBLIC include)
-target_link_libraries(ap_core PRIVATE ap::project_options)
+target_link_libraries(ap_core PRIVATE ap::project_options nlohmann_json::nlohmann_json)
 
 set_source_files_properties(src/BuildInfo.cpp PROPERTIES COMPILE_DEFINITIONS
     "AP_VERSION_MAJOR=${PROJECT_VERSION_MAJOR};AP_VERSION_MINOR=${PROJECT_VERSION_MINOR};AP_VERSION_PATCH=${PROJECT_VERSION_PATCH};AP_VERSION_STRING=\"${PROJECT_VERSION}\"")

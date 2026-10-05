@@ -7,6 +7,8 @@ Every third-party library, algorithm, sample, impulse response, preset source an
 | Component | Version | Licence | Pinned by | Notes |
 |---|---|---|---|---|
 | JUCE | 9.0.3 | JUCE 9 EULA, Starter tier (free, revenue-capped). Dual-licensed AGPLv3, not used | SHA-256 in `cmake/Dependencies.cmake` | See ADR-001. JUCE's own vendored deps: `JUCE.spdx.json` in the JUCE source |
+| nlohmann/json | 3.12.0 | MIT | SHA-256 in `cmake/Dependencies.cmake` | Project file parsing (fuzzed upstream on OSS-Fuzz and here) |
+| Microsoft Edge WebView2 SDK (Windows) | 1.0.3485.44 | BSD-3-Clause | SHA-256 in `cmake/Dependencies.cmake` | Static loader linked into the Windows app |
 | React / React DOM | 19.3.0 | MIT | `ui/package.json` + `pnpm-lock.yaml` | |
 
 ## Development and test only (not shipped)
