@@ -8,13 +8,29 @@
 
 namespace ap::test
 {
+namespace
+{
+bool updateRequested()
+{
+#ifdef _MSC_VER
+    char* value = nullptr;
+    std::size_t length = 0;
+    const bool set = _dupenv_s (&value, &length, "AP_UPDATE_GOLDENS") == 0 && value != nullptr
+                  && std::string (value) == "1";
+    std::free (value);
+    return set;
+#else
+    const char* value = std::getenv ("AP_UPDATE_GOLDENS");
+    return value != nullptr && std::string (value) == "1";
+#endif
+}
+} // namespace
 
 GoldenResult compareWithGolden (const std::string& name, const WavData& rendered, float maxAbsoluteError)
 {
     const auto path = std::filesystem::path (AP_GOLDEN_DIR) / (name + ".wav");
 
-    if (const char* update = std::getenv ("AP_UPDATE_GOLDENS");
-        update != nullptr && std::string (update) == "1")
+    if (updateRequested())
     {
         writeFloatWav (path, rendered);
         return {true, "updated " + path.string()};

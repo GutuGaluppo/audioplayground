@@ -20,7 +20,7 @@ if("realtime" IN_LIST AP_SANITIZERS)
     target_compile_options(ap_rtsan_smoke PRIVATE -fsanitize=realtime)
     target_link_options(ap_rtsan_smoke PRIVATE -fsanitize=realtime)
     add_test(NAME rtsan_catches_allocation COMMAND ap_rtsan_smoke)
-    set_tests_properties(rtsan_catches_allocation PROPERTIES WILL_FAIL TRUE)
+    set_tests_properties(rtsan_catches_allocation PROPERTIES PASS_REGULAR_EXPRESSION "RealtimeSanitizer")
 endif()
 
 # Desktop adapter tests (JUCE-based bridge codec). Only built with the desktop app.
