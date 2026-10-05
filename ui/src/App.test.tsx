@@ -234,6 +234,40 @@ describe('App', () => {
     expect(screen.getByText('1.50 s')).toBeTruthy();
   });
 
+  it('paints drum steps in one stroke and plays pads from the keyboard', async () => {
+    const bridge = await renderApp();
+    fireEvent.click(screen.getByRole('tab', { name: 'Drums' }));
+    await flush();
+
+    const sent: string[] = [];
+    const original = bridge.send.bind(bridge);
+    bridge.send = (intent) => {
+      if (intent.type === 'drums.setStep')
+        sent.push(
+          `${String(intent.payload.step)}:${String(intent.payload.on)}:${String(intent.payload.gesture > 0)}`,
+        );
+      if (intent.type === 'drums.trigger') sent.push(`pad ${String(intent.payload.pad)}`);
+      original(intent);
+    };
+
+    const step = (n: number) => screen.getByRole('button', { name: `Kick step ${String(n)}` });
+    fireEvent.pointerDown(step(1));
+    fireEvent.pointerEnter(step(2));
+    fireEvent.pointerEnter(step(3));
+    fireEvent.pointerUp(window);
+    fireEvent.pointerEnter(step(4)); // stroke ended: no change
+    await flush();
+
+    expect(sent).toEqual(['0:true:true', '1:true:true', '2:true:true']);
+    expect(step(1).getAttribute('aria-pressed')).toBe('true');
+    expect(step(4).getAttribute('aria-pressed')).toBe('false');
+
+    fireEvent.keyDown(window, { code: 'KeyZ' });
+    fireEvent.keyDown(window, { code: 'Digit4' });
+    expect(sent.slice(-2)).toEqual(['pad 0', 'pad 15']);
+    expect(screen.queryByRole('region', { name: 'Keyboard' })).toBeNull(); // piano hidden for drums
+  });
+
   it('shows the bar and beat position', async () => {
     await renderApp();
     expect(screen.getByLabelText('Position').textContent).toBe('1.1');

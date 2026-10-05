@@ -192,7 +192,7 @@ struct InstrumentSelect
 {
     static constexpr std::string_view type = "instrument.select";
     static constexpr int instrumentMin = 0;
-    static constexpr int instrumentMax = 1;
+    static constexpr int instrumentMax = 2;
 
     int instrument = 0;
 
@@ -204,6 +204,88 @@ struct SamplerLoad
     static constexpr std::string_view type = "sampler.load";
 
     bool operator== (const SamplerLoad&) const = default;
+};
+
+struct DrumsSetStep
+{
+    static constexpr std::string_view type = "drums.setStep";
+    static constexpr int padMin = 0;
+    static constexpr int padMax = 15;
+    static constexpr int stepMin = 0;
+    static constexpr int stepMax = 15;
+    static constexpr int gestureMin = 0;
+    static constexpr int gestureMax = 2147483647;
+
+    int pad = 0;
+    int step = 0;
+    bool on = false;
+    int gesture = 0;
+
+    bool operator== (const DrumsSetStep&) const = default;
+};
+
+struct DrumsClear
+{
+    static constexpr std::string_view type = "drums.clear";
+
+    bool operator== (const DrumsClear&) const = default;
+};
+
+struct DrumsTrigger
+{
+    static constexpr std::string_view type = "drums.trigger";
+    static constexpr int padMin = 0;
+    static constexpr int padMax = 15;
+    static constexpr double velocityMin = 0.0;
+    static constexpr double velocityMax = 1.0;
+
+    int pad = 0;
+    double velocity = 0.0;
+
+    bool operator== (const DrumsTrigger&) const = default;
+};
+
+struct DrumsSetPad
+{
+    static constexpr std::string_view type = "drums.setPad";
+    static constexpr int padMin = 0;
+    static constexpr int padMax = 15;
+    static constexpr double volumeDbMin = -60.0;
+    static constexpr double volumeDbMax = 6.0;
+    static constexpr double pitchMin = -24.0;
+    static constexpr double pitchMax = 24.0;
+    static constexpr int gestureMin = 0;
+    static constexpr int gestureMax = 2147483647;
+
+    int pad = 0;
+    double volumeDb = 0.0;
+    double pitch = 0.0;
+    bool muted = false;
+    int gesture = 0;
+
+    bool operator== (const DrumsSetPad&) const = default;
+};
+
+struct DrumsLoadPad
+{
+    static constexpr std::string_view type = "drums.loadPad";
+    static constexpr int padMin = 0;
+    static constexpr int padMax = 15;
+
+    int pad = 0;
+
+    bool operator== (const DrumsLoadPad&) const = default;
+};
+
+struct DrumsResetPad
+{
+    static constexpr std::string_view type = "drums.resetPad";
+    static constexpr int padMin = 0;
+    static constexpr int padMax = 15;
+
+    int pad = 0;
+
+    bool operator== (const DrumsResetPad&) const = default;
 };
 
 struct EngineStatus
@@ -268,10 +350,13 @@ struct TransportPosition
     static constexpr int barMax = 100000000;
     static constexpr int beatMin = 1;
     static constexpr int beatMax = 32;
+    static constexpr int stepMin = 0;
+    static constexpr int stepMax = 15;
 
     int bar = 0;
     int beat = 0;
     bool countingIn = false;
+    int step = 0;
 
     bool operator== (const TransportPosition&) const = default;
 };
@@ -332,7 +417,7 @@ struct InstrumentState
 {
     static constexpr std::string_view type = "instrument.state";
     static constexpr int instrumentMin = 0;
-    static constexpr int instrumentMax = 1;
+    static constexpr int instrumentMax = 2;
 
     int instrument = 0;
 
@@ -359,7 +444,41 @@ struct SamplerState
     bool operator== (const SamplerState&) const = default;
 };
 
-using Intent = std::variant<AppReady, AudioOpenSettings, ToneSetEnabled, TransportPlay, TransportStop, TransportReturnToStart, TransportSetTempo, TransportSetCountIn, MetronomeSetEnabled, ParamSet, EditUndo, EditRedo, ProjectNew, ProjectOpen, ProjectSave, ProjectSaveAs, ProjectRename, NoteOn, NoteOff, NoteAllOff, InstrumentSelect, SamplerLoad>;
-using Event = std::variant<EngineStatus, EngineMeters, TransportState, TransportPosition, ParamValue, HistoryState, ProjectState, AppNotice, InstrumentState, SamplerState>;
+struct DrumsPattern
+{
+    static constexpr std::string_view type = "drums.pattern";
+    static constexpr float stepsMin = 0.0f;
+    static constexpr float stepsMax = 65535.0f;
+    static constexpr std::size_t stepsMaxItems = 16;
+
+    std::vector<float> steps {};
+
+    bool operator== (const DrumsPattern&) const = default;
+};
+
+struct DrumsPad
+{
+    static constexpr std::string_view type = "drums.pad";
+    static constexpr int padMin = 0;
+    static constexpr int padMax = 15;
+    static constexpr std::size_t nameMaxLength = 256;
+    static constexpr double volumeDbMin = -60.0;
+    static constexpr double volumeDbMax = 6.0;
+    static constexpr double pitchMin = -24.0;
+    static constexpr double pitchMax = 24.0;
+
+    int pad = 0;
+    std::string name {};
+    double volumeDb = 0.0;
+    double pitch = 0.0;
+    bool muted = false;
+    bool custom = false;
+    bool missing = false;
+
+    bool operator== (const DrumsPad&) const = default;
+};
+
+using Intent = std::variant<AppReady, AudioOpenSettings, ToneSetEnabled, TransportPlay, TransportStop, TransportReturnToStart, TransportSetTempo, TransportSetCountIn, MetronomeSetEnabled, ParamSet, EditUndo, EditRedo, ProjectNew, ProjectOpen, ProjectSave, ProjectSaveAs, ProjectRename, NoteOn, NoteOff, NoteAllOff, InstrumentSelect, SamplerLoad, DrumsSetStep, DrumsClear, DrumsTrigger, DrumsSetPad, DrumsLoadPad, DrumsResetPad>;
+using Event = std::variant<EngineStatus, EngineMeters, TransportState, TransportPosition, ParamValue, HistoryState, ProjectState, AppNotice, InstrumentState, SamplerState, DrumsPattern, DrumsPad>;
 
 } // namespace ap::bridge

@@ -3,6 +3,7 @@
 #include "Session.h"
 #include "ap/engine/Engine.h"
 
+#include <array>
 #include <functional>
 #include <juce_audio_formats/juce_audio_formats.h>
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -13,13 +14,18 @@
 namespace ap::desktop
 {
 
-// Imports audio files into the project and keeps the sampler loaded with the project's sample.
-// Decoding, copying and resampling run on a background thread; results are applied on the
-// message thread. Imported files are untrusted input: format, size, length and channel count are
-// checked before anything is decoded.
+// Imports audio files into the project and keeps every sample-playing slot (the sampler and the
+// 16 drum pads) loaded with the samples the project points at. Decoding, copying and resampling
+// run on a background thread; results are applied on the message thread. Imported files are
+// untrusted input: format, size, length and channel count are checked before anything is decoded.
 class SampleLoader
 {
 public:
+    // Slot 0 is the sampler; slots 1..16 are drum pads 0..15.
+    static constexpr std::size_t samplerSlot = 0;
+    static constexpr std::size_t numSlots = 1 + model::DrumKit::numPads;
+    [[nodiscard]] static constexpr std::size_t padSlot (std::size_t pad) noexcept { return 1 + pad; }
+
     struct State
     {
         std::string name;
@@ -27,7 +33,7 @@ public:
         bool missing = false;
         bool loading = false;
         double durationSeconds = 0.0;
-        std::vector<float> overview; // peak per segment, 0..1
+        std::vector<float> overview; // peak per segment, 0..1 (sampler only)
     };
 
     static constexpr std::int64_t maxFileBytes = 1024LL * 1024 * 1024;
@@ -37,22 +43,38 @@ public:
     SampleLoader (Session& session, engine::Engine& engine);
     ~SampleLoader();
 
-    // Asks for a file, copies it into the project and loads it into the sampler.
-    void chooseAndImport();
+    // Asks for a file, copies it into the project and assigns it to the slot.
+    void chooseAndImport (std::size_t slot);
 
     // Call when the project changes (open, undo...) or the device sample rate changes.
     void sync (double engineSampleRate);
 
-    [[nodiscard]] const State& getState() const noexcept { return state; }
+    [[nodiscard]] const State& getState (std::size_t slot = samplerSlot) const noexcept
+    {
+        return slots[slot].state;
+    }
 
-    std::function<void()> onStateChanged;
+    std::function<void (std::size_t slot)> onStateChanged;
     std::function<void (const std::string&)> onError;
 
 private:
     struct Decoded;
-    void startLoad (model::AssetId asset, juce::File file, std::string name);
-    void apply (std::uint64_t generation, std::shared_ptr<Decoded> result);
-    void setState (State next);
+    struct Slot
+    {
+        model::AssetId requested;
+        double loadedRate = 0.0;
+        std::uint64_t generation = 0;
+        State state;
+    };
+
+    [[nodiscard]] model::AssetId wantedAsset (std::size_t slot) const;
+    void assign (std::size_t slot, model::AssetId asset);
+    void syncSlot (std::size_t slot);
+    void startLoad (std::size_t slot, model::AssetId asset, juce::File file, std::string name);
+    void apply (std::size_t slot, std::uint64_t generation, std::shared_ptr<Decoded> result);
+    void publish (std::size_t slot, std::unique_ptr<instruments::SampleBuffer> buffer);
+    void setState (std::size_t slot, State next);
+    void error (const std::string& message);
 
     Session& session;
     engine::Engine& engine;
@@ -61,11 +83,8 @@ private:
     std::unique_ptr<juce::FileChooser> chooser;
     std::shared_ptr<bool> alive = std::make_shared<bool> (true);
 
-    std::uint64_t generation = 0;
-    model::AssetId requestedAsset;
-    double loadedRate = 0.0;
+    std::array<Slot, numSlots> slots;
     double engineRate = 48000.0;
-    State state;
 };
 
 } // namespace ap::desktop

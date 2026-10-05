@@ -2,6 +2,7 @@
 
 #include "ap/model/Project.h"
 
+#include <array>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -194,9 +195,36 @@ struct SetSamplerAsset
     AssetId previous;
 };
 
+// Replaces the whole pattern (it is only 32 bytes). Painting several steps in one drag is one
+// gesture, so it merges into a single undo step.
+struct SetDrumSteps
+{
+    explicit SetDrumSteps (std::array<std::uint16_t, DrumKit::numPads> newSteps) noexcept
+        : steps (newSteps)
+    {
+    }
+
+    std::array<std::uint16_t, DrumKit::numPads> steps {};
+    std::array<std::uint16_t, DrumKit::numPads> previous {};
+};
+
+// Replaces one pad's settings (volume, pitch, mute, sample).
+struct SetDrumPad
+{
+    SetDrumPad (std::size_t padIndex, DrumPad settings) noexcept
+        : pad (padIndex)
+        , value (settings)
+    {
+    }
+
+    std::size_t pad = 0;
+    DrumPad value;
+    DrumPad previous;
+};
+
 using Command = std::variant<SetTempo, SetTimeSignature, RenameProject, AddTrack, RemoveTrack, MoveTrack,
                              RenameTrack, SetTrackVolume, SetTrackPan, SetTrackMute, SetTrackSolo,
-                             SetParameter, AddAsset, SetSamplerAsset>;
+                             SetParameter, AddAsset, SetSamplerAsset, SetDrumSteps, SetDrumPad>;
 
 enum class ApplyResult
 {

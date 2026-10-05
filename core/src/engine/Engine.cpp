@@ -29,6 +29,7 @@ void Engine::prepare (double newSampleRate, int /*maxBlockSize*/)
     metronome.prepare (sampleRate);
     synth.prepare (sampleRate);
     sampler.prepare (sampleRate);
+    drums.prepare (sampleRate);
 
     toneOscillator.prepare (sampleRate);
     toneGain.reset (sampleRate, gainRampSeconds);
@@ -63,38 +64,47 @@ void Engine::process (core::AudioBlock output) noexcept AP_NONBLOCKING
     if (currentGraph != nullptr)
         renderedGraphVersion.store (currentGraph->projectVersion, std::memory_order_release);
 
+    const auto route = [this] (const instruments::NoteEvent& note) noexcept AP_NONBLOCKING
+    {
+        switch (routedInstrument)
+        {
+        case LiveInstrument::synth:
+            synth.handle (note);
+            break;
+        case LiveInstrument::sampler:
+            sampler.handle (note);
+            break;
+        case LiveInstrument::drums:
+            drums.handle (note);
+            break;
+        }
+    };
+
     const auto target = liveInstrument.load (std::memory_order_relaxed);
     if (target != routedInstrument)
     {
-        const instruments::NoteEvent release {instruments::NoteEvent::Type::allNotesOff, 0, 0.0f};
-        if (routedInstrument == LiveInstrument::synth)
-            synth.handle (release);
-        else
-            sampler.handle (release);
+        route ({instruments::NoteEvent::Type::allNotesOff, 0, 0.0f});
         routedInstrument = target;
     }
 
-    const auto route = [this] (const instruments::NoteEvent& note) noexcept AP_NONBLOCKING
-    {
-        if (routedInstrument == LiveInstrument::synth)
-            synth.handle (note);
-        else
-            sampler.handle (note);
-    };
     while (const auto note = uiNotes.pop())
         route (*note);
     while (const auto note = midiNotes.pop())
         route (*note);
 
-    // Both always render so released notes ring out after switching instruments.
+    // All instruments always render so released notes ring out after switching.
     synth.render (output, parameters);
     sampler.render (output, parameters);
 
     const float metronomeGain = decibelsToGain (parameters.get (params::ParamId::metronomeLevel));
-    transport.advance (
-        output.numSamples,
-        [this, output, metronomeGain] (int offset, int length, core::Samples start) noexcept
-        { metronome.render (output, offset, length, start, transport.getTempoMap(), metronomeGain); });
+    transport.advance (output.numSamples,
+                       [this, output, metronomeGain] (int offset, int length, core::Samples start) noexcept
+                       {
+                           drums.sequence (offset, length, start, transport.getTempoMap());
+                           metronome.render (output, offset, length, start, transport.getTempoMap(),
+                                             metronomeGain);
+                       });
+    drums.render (output);
 
     if (!transport.isPlayingOnAudioThread())
         metronome.renderTail (output);

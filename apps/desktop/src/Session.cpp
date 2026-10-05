@@ -76,6 +76,14 @@ void Session::syncEngine()
     for (std::size_t i = 0; i < params::numParameters; ++i)
         engine.getParameters().set (static_cast<params::ParamId> (i), project.parameters[i]);
 
+    auto& drums = engine.getDrums();
+    for (std::size_t pad = 0; pad < model::DrumKit::numPads; ++pad)
+    {
+        const auto& settings = project.drums.pads[pad];
+        drums.setStepMask (static_cast<int> (pad), project.drums.steps[pad]);
+        drums.setPad (static_cast<int> (pad), settings.volumeDb, settings.pitch, settings.muted);
+    }
+
     engine.publishRenderGraph (
         std::make_unique<engine::RenderGraph> (engine::buildRenderGraph (project, doc.version())));
 }

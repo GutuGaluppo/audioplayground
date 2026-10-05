@@ -1,10 +1,11 @@
 import { useBridge } from '../bridge/BridgeContext';
 import { useLatest } from '../state/latestEvent';
 import { useStores } from '../state/StoresContext';
+import { DrumPanel } from './DrumPanel';
 import { SamplerPanel } from './SamplerPanel';
 import { SynthPanel } from './SynthPanel';
 
-const INSTRUMENTS = ['Synth', 'Sampler'] as const;
+const INSTRUMENTS = ['Synth', 'Sampler', 'Drums'] as const;
 
 /** Chooses what the keyboard plays and shows that instrument's controls. */
 export function InstrumentArea() {
@@ -30,7 +31,7 @@ export function InstrumentArea() {
         ))}
       </div>
       <div role="tabpanel" aria-label={INSTRUMENTS[selected]}>
-        {selected === 1 ? <SamplerPanel /> : <SynthPanel />}
+        {selected === 2 ? <DrumPanel /> : selected === 1 ? <SamplerPanel /> : <SynthPanel />}
       </div>
     </div>
   );

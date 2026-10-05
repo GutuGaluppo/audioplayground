@@ -87,38 +87,67 @@ SampleLoader::~SampleLoader()
     pool.removeAllJobs (true, 10000);
 }
 
-void SampleLoader::setState (State next)
+void SampleLoader::error (const std::string& message)
 {
-    state = std::move (next);
-    if (onStateChanged)
-        onStateChanged();
+    if (onError)
+        onError (message);
 }
 
-void SampleLoader::chooseAndImport()
+void SampleLoader::setState (std::size_t slot, State next)
 {
+    slots[slot].state = std::move (next);
+    if (onStateChanged)
+        onStateChanged (slot);
+}
+
+model::AssetId SampleLoader::wantedAsset (std::size_t slot) const
+{
+    const auto& project = session.project();
+    return slot == samplerSlot ? project.samplerAsset : project.drums.pads[slot - 1].sample;
+}
+
+void SampleLoader::assign (std::size_t slot, model::AssetId asset)
+{
+    if (slot == samplerSlot)
+    {
+        session.perform (model::SetSamplerAsset {asset});
+        return;
+    }
+    auto pad = session.project().drums.pads[slot - 1];
+    pad.sample = asset;
+    session.perform (model::SetDrumPad {slot - 1, pad});
+}
+
+void SampleLoader::publish (std::size_t slot, std::unique_ptr<instruments::SampleBuffer> buffer)
+{
+    if (slot == samplerSlot)
+        engine.loadSamplerSample (buffer != nullptr ? std::move (buffer)
+                                                    : std::make_unique<instruments::SampleBuffer>());
+    else
+        engine.getDrums().loadPadSample (static_cast<int> (slot - 1),
+                                         std::move (buffer)); // nullptr: factory sound
+}
+
+void SampleLoader::chooseAndImport (std::size_t slot)
+{
+    if (slot >= numSlots)
+        return;
+
     chooser = std::make_unique<juce::FileChooser> (
         "Choose a sample", juce::File::getSpecialLocation (juce::File::userMusicDirectory), supportedPattern);
 
     chooser->launchAsync (
         juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
-        [this] (const juce::FileChooser& fc)
+        [this, slot] (const juce::FileChooser& fc)
         {
             const auto source = fc.getResult();
             if (source == juce::File())
                 return; // cancelled
 
             if (!hasSupportedExtension (source))
-            {
-                if (onError)
-                    onError ("That file type is not supported. Use WAV, AIFF or FLAC.");
-                return;
-            }
+                return error ("That file type is not supported. Use WAV, AIFF or FLAC.");
             if (source.getSize() > maxFileBytes)
-            {
-                if (onError)
-                    onError ("That file is too large to import.");
-                return;
-            }
+                return error ("That file is too large to import.");
 
             // Copy into the project's audio folder under a safe, unique name.
             const auto audioDir = juce::File (toJuceString (session.assetRoot().audioDirectory()));
@@ -133,9 +162,7 @@ void SampleLoader::chooseAndImport()
             if (!source.copyFileTo (temporary) || !temporary.moveFileTo (target))
             {
                 temporary.deleteFile();
-                if (onError)
-                    onError ("Could not copy the file into the project.");
-                return;
+                return error ("Could not copy the file into the project.");
             }
 
             const auto relative = "audio/" + target.getFileName().toStdString();
@@ -143,12 +170,10 @@ void SampleLoader::chooseAndImport()
             if (!session.perform (model::AddAsset {relative, displayName}))
             {
                 target.deleteFile();
-                if (onError)
-                    onError ("Could not add the file to the project.");
-                return;
+                return error ("Could not add the file to the project.");
             }
-            // sync() (via onChanged) loads it once the sampler points at it.
-            session.perform (model::SetSamplerAsset {session.project().assets.back().id});
+            // sync() (via the session's onChanged) loads it once the slot points at it.
+            assign (slot, session.project().assets.back().id);
         });
 }
 
@@ -157,26 +182,34 @@ void SampleLoader::sync (double engineSampleRate)
     if (engineSampleRate > 0.0)
         engineRate = engineSampleRate;
 
-    const auto& project = session.project();
-    const auto wanted = project.samplerAsset;
+    for (std::size_t slot = 0; slot < numSlots; ++slot)
+        syncSlot (slot);
+}
 
-    if (wanted == requestedAsset
-        && (!wanted.isValid() || loadedRate == engineRate || state.loading || state.missing))
+void SampleLoader::syncSlot (std::size_t slot)
+{
+    auto& s = slots[slot];
+    const auto wanted = wantedAsset (slot);
+    const bool upToDate
+        = wanted == s.requested
+       && (!wanted.isValid() || s.loadedRate == engineRate || s.state.loading || s.state.missing);
+    if (upToDate)
         return;
 
-    requestedAsset = wanted;
-    ++generation;
+    const bool assetChanged = wanted != s.requested;
+    s.requested = wanted;
+    ++s.generation;
 
     if (!wanted.isValid())
     {
-        engine.loadSamplerSample (
-            std::make_unique<instruments::SampleBuffer>()); // empty: silences the sampler
-        loadedRate = engineRate;
-        setState ({});
+        if (assetChanged)
+            publish (slot, nullptr);
+        s.loadedRate = engineRate;
+        setState (slot, {});
         return;
     }
 
-    const auto* asset = project.findAsset (wanted);
+    const auto* asset = session.project().findAsset (wanted);
     const auto path
         = asset != nullptr ? io::resolveAssetPath (session.assetRoot(), asset->relativePath) : std::nullopt;
     const auto name = asset != nullptr ? asset->name : std::string ("Sample");
@@ -184,30 +217,31 @@ void SampleLoader::sync (double engineSampleRate)
 
     if (!path || !file.existsAsFile())
     {
+        publish (slot, nullptr); // drum pads fall back to the factory sound; the sampler goes silent
         State missing;
         missing.name = name;
         missing.missing = true;
-        setState (std::move (missing));
-        if (onError)
-            onError ("The sample \"" + name + "\" is missing from the project folder.");
+        setState (slot, std::move (missing));
+        error ("The sample \"" + name + "\" is missing from the project folder.");
         return;
     }
 
-    startLoad (wanted, file, name);
+    startLoad (slot, wanted, file, name);
 }
 
-void SampleLoader::startLoad (model::AssetId asset, juce::File file, std::string name)
+void SampleLoader::startLoad (std::size_t slot, model::AssetId asset, juce::File file, std::string name)
 {
-    State loading = state;
+    State loading = slots[slot].state;
     loading.name = name;
     loading.loading = true;
     loading.missing = false;
-    setState (std::move (loading));
+    setState (slot, std::move (loading));
 
-    const auto jobGeneration = generation;
+    const auto jobGeneration = slots[slot].generation;
     const auto rate = engineRate;
+    const bool wantOverview = slot == samplerSlot;
     pool.addJob (
-        [this, stillAlive = alive, jobGeneration, rate, asset, file, name]
+        [this, stillAlive = alive, slot, jobGeneration, rate, wantOverview, asset, file, name]
         {
             auto result = std::make_shared<Decoded>();
             result->asset = asset;
@@ -245,51 +279,52 @@ void SampleLoader::startLoad (model::AssetId asset, juce::File file, std::string
                     {
                         std::vector<float> samples (decoded.getReadPointer (ch),
                                                     decoded.getReadPointer (ch) + length);
-                        for (auto& s : samples)
-                            if (!std::isfinite (s))
-                                s = 0.0f;
+                        for (auto& value : samples)
+                            if (!std::isfinite (value))
+                                value = 0.0f;
                         buffer->channels.push_back (dsp::resample (samples, reader->sampleRate, rate));
                     }
-                    result->overview = computeOverview (buffer->channels, overviewPoints);
+                    if (wantOverview)
+                        result->overview = computeOverview (buffer->channels, overviewPoints);
                     result->durationSeconds = static_cast<double> (length) / reader->sampleRate;
                     result->buffer = std::move (buffer);
                 }
             }
 
             juce::MessageManager::callAsync (
-                [this, stillAlive, jobGeneration, result]
+                [this, stillAlive, slot, jobGeneration, result]
                 {
                     if (*stillAlive)
-                        apply (jobGeneration, result);
+                        apply (slot, jobGeneration, result);
                 });
         });
 }
 
-void SampleLoader::apply (std::uint64_t jobGeneration, std::shared_ptr<Decoded> result)
+void SampleLoader::apply (std::size_t slot, std::uint64_t jobGeneration, std::shared_ptr<Decoded> result)
 {
-    if (jobGeneration != generation)
+    if (jobGeneration != slots[slot].generation)
         return; // superseded by a newer request
 
     if (!result->error.empty())
     {
+        publish (slot, nullptr);
         State failed;
         failed.name = result->name;
         failed.missing = true;
-        setState (std::move (failed));
-        if (onError)
-            onError (result->error);
+        setState (slot, std::move (failed));
+        error (result->error);
         return;
     }
 
-    engine.loadSamplerSample (std::move (result->buffer));
-    loadedRate = result->rate;
+    publish (slot, std::move (result->buffer));
+    slots[slot].loadedRate = result->rate;
 
     State loaded;
     loaded.name = result->name;
     loaded.loaded = true;
     loaded.durationSeconds = result->durationSeconds;
     loaded.overview = std::move (result->overview);
-    setState (std::move (loaded));
+    setState (slot, std::move (loaded));
 }
 
 } // namespace ap::desktop

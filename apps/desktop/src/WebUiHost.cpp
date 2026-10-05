@@ -147,7 +147,13 @@ WebUiHost::WebUiHost (AudioDeviceHost& hostToUse, engine::Engine& engineToUse, S
         sendStatus();
     };
     session.onChanged = [this] { onProjectChanged(); };
-    samples.onStateChanged = [this] { sendSamplerState(); };
+    samples.onStateChanged = [this] (std::size_t slot)
+    {
+        if (slot == SampleLoader::samplerSlot)
+            sendSamplerState();
+        else
+            sendDrumPad (slot - 1);
+    };
     samples.onError
         = [this] (const std::string& message) { showNotice (ProjectActions::NoticeLevel::error, message); };
     setSize (1100, 720);
@@ -192,6 +198,9 @@ void WebUiHost::handle (const ap::bridge::AppReady&)
     sendProjectState();
     sendInstrumentState();
     sendSamplerState();
+    sendDrumPattern();
+    for (std::size_t pad = 0; pad < model::DrumKit::numPads; ++pad)
+        sendDrumPad (pad);
 }
 
 void WebUiHost::handle (const ap::bridge::AudioOpenSettings&)
@@ -301,14 +310,88 @@ void WebUiHost::showNotice (ProjectActions::NoticeLevel level, const std::string
 
 void WebUiHost::handle (const ap::bridge::InstrumentSelect& intent)
 {
-    engine.setLiveInstrument (intent.instrument == 1 ? engine::Engine::LiveInstrument::sampler
-                                                     : engine::Engine::LiveInstrument::synth);
+    engine.setLiveInstrument (static_cast<engine::Engine::LiveInstrument> (intent.instrument));
     sendInstrumentState();
 }
 
 void WebUiHost::handle (const ap::bridge::SamplerLoad&)
 {
-    samples.chooseAndImport();
+    samples.chooseAndImport (SampleLoader::samplerSlot);
+}
+
+void WebUiHost::handle (const ap::bridge::DrumsSetStep& intent)
+{
+    auto steps = session.project().drums.steps;
+    auto& row = steps[static_cast<std::size_t> (intent.pad)];
+    const auto bit = static_cast<std::uint16_t> (1u << static_cast<unsigned> (intent.step));
+    row = static_cast<std::uint16_t> (intent.on ? (row | bit) : (row & ~bit));
+    if (!session.perform (model::SetDrumSteps {steps},
+                          static_cast<model::ProjectDocument::GestureId> (intent.gesture)))
+        sendDrumPattern();
+}
+
+void WebUiHost::handle (const ap::bridge::DrumsClear&)
+{
+    session.perform (model::SetDrumSteps {{}});
+}
+
+void WebUiHost::handle (const ap::bridge::DrumsTrigger& intent)
+{
+    // Pads play through the same lock-free note queue as the keyboard (GM drum notes).
+    engine.sendNoteFromUi ({instruments::NoteEvent::Type::noteOn,
+                            static_cast<std::uint8_t> (instruments::DrumMachine::firstMidiNote + intent.pad),
+                            static_cast<float> (intent.velocity)});
+}
+
+void WebUiHost::handle (const ap::bridge::DrumsSetPad& intent)
+{
+    const auto pad = static_cast<std::size_t> (intent.pad);
+    auto settings = session.project().drums.pads[pad];
+    settings.volumeDb = static_cast<float> (intent.volumeDb);
+    settings.pitch = static_cast<float> (intent.pitch);
+    settings.muted = intent.muted;
+    if (!session.perform (model::SetDrumPad {pad, settings},
+                          static_cast<model::ProjectDocument::GestureId> (intent.gesture)))
+        sendDrumPad (pad);
+}
+
+void WebUiHost::handle (const ap::bridge::DrumsLoadPad& intent)
+{
+    samples.chooseAndImport (SampleLoader::padSlot (static_cast<std::size_t> (intent.pad)));
+}
+
+void WebUiHost::handle (const ap::bridge::DrumsResetPad& intent)
+{
+    const auto pad = static_cast<std::size_t> (intent.pad);
+    auto settings = session.project().drums.pads[pad];
+    settings.sample = {};
+    session.perform (model::SetDrumPad {pad, settings});
+}
+
+void WebUiHost::sendDrumPattern()
+{
+    ap::bridge::DrumsPattern event;
+    for (const auto steps : session.project().drums.steps)
+        event.steps.push_back (static_cast<float> (steps));
+    emit (event);
+}
+
+void WebUiHost::sendDrumPad (std::size_t pad)
+{
+    const auto& settings = session.project().drums.pads[pad];
+    const auto& state = samples.getState (SampleLoader::padSlot (pad));
+
+    ap::bridge::DrumsPad event;
+    event.pad = static_cast<int> (pad);
+    event.custom = settings.sample.isValid();
+    event.name = event.custom
+                   ? model::sanitiseName (state.name, ap::bridge::DrumsPad::nameMaxLength).value_or ("Sample")
+                   : std::string (instruments::factoryKitNames[pad]);
+    event.volumeDb = static_cast<double> (settings.volumeDb);
+    event.pitch = static_cast<double> (settings.pitch);
+    event.muted = settings.muted;
+    event.missing = state.missing;
+    emit (event);
 }
 
 void WebUiHost::sendInstrumentState()
@@ -318,7 +401,7 @@ void WebUiHost::sendInstrumentState()
 
 void WebUiHost::sendSamplerState()
 {
-    const auto& state = samples.getState();
+    const auto& state = samples.getState (SampleLoader::samplerSlot);
     ap::bridge::SamplerState event;
     event.name = model::sanitiseName (state.name, ap::bridge::SamplerState::nameMaxLength).value_or ("");
     event.loaded = state.loaded;
@@ -334,6 +417,9 @@ void WebUiHost::onProjectChanged()
 {
     samples.sync (host.getStatus().sampleRate);
     sendProjectState();
+    sendDrumPattern();
+    for (std::size_t pad = 0; pad < model::DrumKit::numPads; ++pad)
+        sendDrumPad (pad);
     sendTransportState();
     for (std::size_t i = 0; i < params::numParameters; ++i)
         sendParameter (static_cast<params::ParamId> (i));
@@ -444,6 +530,9 @@ void WebUiHost::sendTransportPosition (bool force)
     event.bar = static_cast<int> (std::clamp<std::int64_t> (
         position.bar, ap::bridge::TransportPosition::barMin, ap::bridge::TransportPosition::barMax));
     event.beat = position.beat;
+    const auto ticks = std::max<core::Ticks> (0, state.positionTicks);
+    event.step = static_cast<int> ((ticks / instruments::DrumMachine::ticksPerStep)
+                                   % instruments::DrumMachine::numSteps);
     event.countingIn = state.countingIn;
 
     if (force || !(event == lastPosition))

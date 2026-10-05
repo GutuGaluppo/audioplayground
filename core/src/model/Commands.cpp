@@ -191,6 +191,27 @@ ApplyResult apply (Command& command, Project& project)
                 c.previous = std::exchange (project.samplerAsset, c.asset);
                 return ApplyResult::applied;
             },
+            [&project] (SetDrumSteps& c) -> ApplyResult
+            {
+                if (c.steps == project.drums.steps)
+                    return ApplyResult::unchanged;
+                c.previous = std::exchange (project.drums.steps, c.steps);
+                return ApplyResult::applied;
+            },
+            [&project] (SetDrumPad& c) -> ApplyResult
+            {
+                if (c.pad >= DrumKit::numPads || !std::isfinite (c.value.volumeDb)
+                    || !std::isfinite (c.value.pitch))
+                    return ApplyResult::rejected;
+                if (c.value.sample.isValid() && project.findAsset (c.value.sample) == nullptr)
+                    return ApplyResult::rejected;
+                c.value.volumeDb = std::clamp (c.value.volumeDb, DrumPad::minVolumeDb, DrumPad::maxVolumeDb);
+                c.value.pitch = std::clamp (c.value.pitch, -DrumPad::maxPitch, DrumPad::maxPitch);
+                if (c.value == project.drums.pads[c.pad])
+                    return ApplyResult::unchanged;
+                c.previous = std::exchange (project.drums.pads[c.pad], c.value);
+                return ApplyResult::applied;
+            },
             [&project] (SetParameter& c) -> ApplyResult
             {
                 const auto index = static_cast<std::size_t> (c.id);
@@ -270,6 +291,8 @@ void revert (const Command& command, Project& project)
                 project.nextAssetId = c.previousNextAssetId;
             },
             [&project] (const SetSamplerAsset& c) { project.samplerAsset = c.previous; },
+            [&project] (const SetDrumSteps& c) { project.drums.steps = c.previous; },
+            [&project] (const SetDrumPad& c) { project.drums.pads[c.pad] = c.previous; },
             [&project] (const SetParameter& c)
             { project.parameters[static_cast<std::size_t> (c.id)] = c.previous; },
         },
@@ -294,6 +317,8 @@ std::string_view describe (const Command& command) noexcept
             [] (const SetParameter& c) { return params::descriptor (c.id).name; },
             [] (const AddAsset&) { return std::string_view ("Import audio"); },
             [] (const SetSamplerAsset&) { return std::string_view ("Change sample"); },
+            [] (const SetDrumSteps&) { return std::string_view ("Edit pattern"); },
+            [] (const SetDrumPad&) { return std::string_view ("Change pad"); },
         },
         command);
 }
@@ -316,6 +341,10 @@ bool canMerge (const Command& previous, const Command& next) noexcept
             else if constexpr (std::is_same_v<T, SetTrackVolume> || std::is_same_v<T, SetTrackPan>
                                || std::is_same_v<T, RenameTrack>)
                 return p.id == n.id;
+            else if constexpr (std::is_same_v<T, SetDrumSteps>)
+                return true;
+            else if constexpr (std::is_same_v<T, SetDrumPad>)
+                return p.pad == n.pad;
             else
                 return false; // structural edits and toggles are always separate steps
         },
@@ -340,6 +369,10 @@ void merge (Command& previous, const Command& next)
             else if constexpr (std::is_same_v<T, SetTrackPan>)
                 p.pan = n.pan;
             else if constexpr (std::is_same_v<T, SetParameter>)
+                p.value = n.value;
+            else if constexpr (std::is_same_v<T, SetDrumSteps>)
+                p.steps = n.steps;
+            else if constexpr (std::is_same_v<T, SetDrumPad>)
                 p.value = n.value;
         },
         previous);

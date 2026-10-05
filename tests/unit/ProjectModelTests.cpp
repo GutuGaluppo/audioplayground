@@ -297,3 +297,30 @@ TEST_CASE ("isSafeAssetPath accepts only audio/<plain name>", "[model][security]
         CHECK_FALSE (isSafeAssetPath (bad));
     }
 }
+
+TEST_CASE ("Painting drum steps in one gesture is a single undo step", "[model][drums]")
+{
+    ProjectDocument doc;
+    auto steps = doc.project().drums.steps;
+    for (unsigned step = 0; step < 16; step += 4)
+    {
+        steps[0] = static_cast<std::uint16_t> (steps[0] | (1u << step));
+        REQUIRE (doc.perform (SetDrumSteps {steps}, 9));
+    }
+    CHECK (doc.project().drums.steps[0] == 0x1111);
+    CHECK (doc.undoDescription() == "Edit pattern");
+    REQUIRE (doc.undo());
+    CHECK (doc.project().drums.steps[0] == 0);
+    CHECK_FALSE (doc.canUndo());
+}
+
+TEST_CASE ("Drum pad settings are validated and clamped", "[model][drums]")
+{
+    ProjectDocument doc;
+    CHECK_FALSE (doc.perform (SetDrumPad {16, DrumPad {}}));
+    CHECK_FALSE (doc.perform (SetDrumPad {0, DrumPad {AssetId {3}, 0.0f, 0.0f, false}}));
+    CHECK_FALSE (doc.perform (SetDrumPad {0, DrumPad {AssetId {}, NAN, 0.0f, false}}));
+    REQUIRE (doc.perform (SetDrumPad {0, DrumPad {AssetId {}, 40.0f, -99.0f, true}}));
+    CHECK (doc.project().drums.pads[0].volumeDb == DrumPad::maxVolumeDb);
+    CHECK (doc.project().drums.pads[0].pitch == -DrumPad::maxPitch);
+}

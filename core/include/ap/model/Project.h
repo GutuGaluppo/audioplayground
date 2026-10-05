@@ -73,6 +73,32 @@ struct Track
     bool operator== (const Track&) const = default;
 };
 
+struct DrumPad
+{
+    static constexpr float minVolumeDb = -60.0f;
+    static constexpr float maxVolumeDb = 6.0f;
+    static constexpr float maxPitch = 24.0f;
+
+    AssetId sample; // invalid = built-in factory sound
+    float volumeDb = 0.0f;
+    float pitch = 0.0f; // semitones
+    bool muted = false;
+
+    bool operator== (const DrumPad&) const = default;
+};
+
+// 4x4 drum machine: pad settings and a one-bar, 16-step pattern (bit n of steps[pad] = step n).
+struct DrumKit
+{
+    static constexpr std::size_t numPads = 16;
+    static constexpr std::size_t numSteps = 16;
+
+    std::array<DrumPad, numPads> pads {};
+    std::array<std::uint16_t, numPads> steps {};
+
+    bool operator== (const DrumKit&) const = default;
+};
+
 // Project state (guide §20 "Project State"). Plain value type: copyable, comparable, no
 // pointers. Changed only through commands (ADR-003).
 struct Project
@@ -92,6 +118,7 @@ struct Project
     std::vector<Asset> assets;
     std::uint64_t nextAssetId = 1;
     AssetId samplerAsset; // sample loaded in the sampler (none if invalid)
+    DrumKit drums;
 
     // Parameters this build does not know (written by a newer version with the same schema).
     // Kept verbatim and written back so opening and saving never loses them (guide §11).

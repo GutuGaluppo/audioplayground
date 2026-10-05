@@ -83,10 +83,82 @@
       "instrument": {
         "type": "int",
         "min": 0,
+        "max": 2
+      }
+    },
+    "sampler.load": {},
+    "drums.setStep": {
+      "pad": {
+        "type": "int",
+        "min": 0,
+        "max": 15
+      },
+      "step": {
+        "type": "int",
+        "min": 0,
+        "max": 15
+      },
+      "on": {
+        "type": "bool"
+      },
+      "gesture": {
+        "type": "int",
+        "min": 0,
+        "max": 2147483647
+      }
+    },
+    "drums.clear": {},
+    "drums.trigger": {
+      "pad": {
+        "type": "int",
+        "min": 0,
+        "max": 15
+      },
+      "velocity": {
+        "type": "number",
+        "min": 0,
         "max": 1
       }
     },
-    "sampler.load": {}
+    "drums.setPad": {
+      "pad": {
+        "type": "int",
+        "min": 0,
+        "max": 15
+      },
+      "volumeDb": {
+        "type": "number",
+        "min": -60,
+        "max": 6
+      },
+      "pitch": {
+        "type": "number",
+        "min": -24,
+        "max": 24
+      },
+      "muted": {
+        "type": "bool"
+      },
+      "gesture": {
+        "type": "int",
+        "min": 0,
+        "max": 2147483647
+      }
+    },
+    "drums.loadPad": {
+      "pad": {
+        "type": "int",
+        "min": 0,
+        "max": 15
+      }
+    },
+    "drums.resetPad": {
+      "pad": {
+        "type": "int",
+        "min": 0,
+        "max": 15
+      }
+    }
   },
   "events": {
     "engine.status": {
@@ -165,6 +237,11 @@
       },
       "countingIn": {
         "type": "bool"
+      },
+      "step": {
+        "type": "int",
+        "min": 0,
+        "max": 15
       }
     },
     "param.value": {
@@ -221,7 +298,7 @@
       "instrument": {
         "type": "int",
         "min": 0,
-        "max": 1
+        "max": 2
       }
     },
     "sampler.state": {
@@ -248,6 +325,44 @@
         "min": 0,
         "max": 1,
         "maxItems": 512
+      }
+    },
+    "drums.pattern": {
+      "steps": {
+        "type": "floatArray",
+        "min": 0,
+        "max": 65535,
+        "maxItems": 16
+      }
+    },
+    "drums.pad": {
+      "pad": {
+        "type": "int",
+        "min": 0,
+        "max": 15
+      },
+      "name": {
+        "type": "string",
+        "maxLength": 256
+      },
+      "volumeDb": {
+        "type": "number",
+        "min": -60,
+        "max": 6
+      },
+      "pitch": {
+        "type": "number",
+        "min": -24,
+        "max": 24
+      },
+      "muted": {
+        "type": "bool"
+      },
+      "custom": {
+        "type": "bool"
+      },
+      "missing": {
+        "type": "bool"
       }
     }
   }

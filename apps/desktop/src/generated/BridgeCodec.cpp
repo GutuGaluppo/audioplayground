@@ -355,6 +355,80 @@ std::optional<Intent> parseSamplerLoad (const juce::var& payloadVar)
 
     return Intent {message};
 }
+
+std::optional<Intent> parseDrumsSetStep (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"pad", "step", "on", "gesture"}))
+        return std::nullopt;
+
+    DrumsSetStep message;
+    if (!readInt (*payload, "pad", DrumsSetStep::padMin, DrumsSetStep::padMax, message.pad)) return std::nullopt;
+    if (!readInt (*payload, "step", DrumsSetStep::stepMin, DrumsSetStep::stepMax, message.step)) return std::nullopt;
+    if (!readBool (*payload, "on", message.on)) return std::nullopt;
+    if (!readInt (*payload, "gesture", DrumsSetStep::gestureMin, DrumsSetStep::gestureMax, message.gesture)) return std::nullopt;
+    return Intent {message};
+}
+
+std::optional<Intent> parseDrumsClear (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {}))
+        return std::nullopt;
+
+    DrumsClear message;
+
+    return Intent {message};
+}
+
+std::optional<Intent> parseDrumsTrigger (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"pad", "velocity"}))
+        return std::nullopt;
+
+    DrumsTrigger message;
+    if (!readInt (*payload, "pad", DrumsTrigger::padMin, DrumsTrigger::padMax, message.pad)) return std::nullopt;
+    if (!readNumber (*payload, "velocity", DrumsTrigger::velocityMin, DrumsTrigger::velocityMax, message.velocity)) return std::nullopt;
+    return Intent {message};
+}
+
+std::optional<Intent> parseDrumsSetPad (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"pad", "volumeDb", "pitch", "muted", "gesture"}))
+        return std::nullopt;
+
+    DrumsSetPad message;
+    if (!readInt (*payload, "pad", DrumsSetPad::padMin, DrumsSetPad::padMax, message.pad)) return std::nullopt;
+    if (!readNumber (*payload, "volumeDb", DrumsSetPad::volumeDbMin, DrumsSetPad::volumeDbMax, message.volumeDb)) return std::nullopt;
+    if (!readNumber (*payload, "pitch", DrumsSetPad::pitchMin, DrumsSetPad::pitchMax, message.pitch)) return std::nullopt;
+    if (!readBool (*payload, "muted", message.muted)) return std::nullopt;
+    if (!readInt (*payload, "gesture", DrumsSetPad::gestureMin, DrumsSetPad::gestureMax, message.gesture)) return std::nullopt;
+    return Intent {message};
+}
+
+std::optional<Intent> parseDrumsLoadPad (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"pad"}))
+        return std::nullopt;
+
+    DrumsLoadPad message;
+    if (!readInt (*payload, "pad", DrumsLoadPad::padMin, DrumsLoadPad::padMax, message.pad)) return std::nullopt;
+    return Intent {message};
+}
+
+std::optional<Intent> parseDrumsResetPad (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"pad"}))
+        return std::nullopt;
+
+    DrumsResetPad message;
+    if (!readInt (*payload, "pad", DrumsResetPad::padMin, DrumsResetPad::padMax, message.pad)) return std::nullopt;
+    return Intent {message};
+}
 } // namespace
 
 std::optional<Intent> parseIntent (const juce::var& message)
@@ -414,6 +488,18 @@ std::optional<Intent> parseIntent (const juce::var& message)
         return parseInstrumentSelect (payload);
     if (typeName == SamplerLoad::type)
         return parseSamplerLoad (payload);
+    if (typeName == DrumsSetStep::type)
+        return parseDrumsSetStep (payload);
+    if (typeName == DrumsClear::type)
+        return parseDrumsClear (payload);
+    if (typeName == DrumsTrigger::type)
+        return parseDrumsTrigger (payload);
+    if (typeName == DrumsSetPad::type)
+        return parseDrumsSetPad (payload);
+    if (typeName == DrumsLoadPad::type)
+        return parseDrumsLoadPad (payload);
+    if (typeName == DrumsResetPad::type)
+        return parseDrumsResetPad (payload);
 
     return std::nullopt;
 }
@@ -456,6 +542,7 @@ juce::var toVar (const Event& event)
                 payload->setProperty ("bar", m.bar);
                 payload->setProperty ("beat", m.beat);
                 payload->setProperty ("countingIn", m.countingIn);
+                payload->setProperty ("step", m.step);
                 return envelope (TransportPosition::type, payload);
             },
             [] (const ParamValue& m) -> juce::var
@@ -505,6 +592,24 @@ juce::var toVar (const Event& event)
                 payload->setProperty ("durationSeconds", m.durationSeconds);
                 payload->setProperty ("overview", toVarArray (m.overview));
                 return envelope (SamplerState::type, payload);
+            },
+            [] (const DrumsPattern& m) -> juce::var
+            {
+                auto* payload = new juce::DynamicObject();
+                payload->setProperty ("steps", toVarArray (m.steps));
+                return envelope (DrumsPattern::type, payload);
+            },
+            [] (const DrumsPad& m) -> juce::var
+            {
+                auto* payload = new juce::DynamicObject();
+                payload->setProperty ("pad", m.pad);
+                payload->setProperty ("name", juce::String (m.name));
+                payload->setProperty ("volumeDb", m.volumeDb);
+                payload->setProperty ("pitch", m.pitch);
+                payload->setProperty ("muted", m.muted);
+                payload->setProperty ("custom", m.custom);
+                payload->setProperty ("missing", m.missing);
+                return envelope (DrumsPad::type, payload);
             }},
         event);
 }

@@ -28,6 +28,11 @@ Project sampleProject()
     REQUIRE (doc.perform (SetParameter {ap::params::ParamId::toneLevel, -30.0f}));
     REQUIRE (doc.perform (AddAsset {"audio/1-kick.wav", "kick.wav"}));
     REQUIRE (doc.perform (SetSamplerAsset {doc.project().assets[0].id}));
+    auto steps = doc.project().drums.steps;
+    steps[0] = 0x1111;
+    steps[2] = 0x5555;
+    REQUIRE (doc.perform (SetDrumSteps {steps}));
+    REQUIRE (doc.perform (SetDrumPad {1, DrumPad {doc.project().assets[0].id, -6.0f, 2.0f, true}}));
     return doc.project();
 }
 
@@ -123,6 +128,12 @@ TEST_CASE ("Malformed and hostile project files are rejected", "[persistence][se
         {"nextAssetId too low", [] (auto& j) { j["nextAssetId"] = 1; }},
         {"sampler asset missing", [] (auto& j) { j["samplerAsset"] = 99; }},
         {"sampler asset negative", [] (auto& j) { j["samplerAsset"] = -1; }},
+        {"drum kit too small", [] (auto& j) { j["drums"]["pads"].erase (0); }},
+        {"drum steps too large", [] (auto& j) { j["drums"]["steps"][0] = 70000; }},
+        {"drum steps negative", [] (auto& j) { j["drums"]["steps"][0] = -1; }},
+        {"drum pad missing asset", [] (auto& j) { j["drums"]["pads"][0]["sample"] = 42; }},
+        {"drum pad volume too high", [] (auto& j) { j["drums"]["pads"][0]["volumeDb"] = 20; }},
+        {"drum pad extra key", [] (auto& j) { j["drums"]["pads"][0]["file"] = "x"; }},
         {"too many tracks",
          [] (auto& j)
          {

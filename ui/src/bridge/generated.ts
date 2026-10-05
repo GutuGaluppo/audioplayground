@@ -136,7 +136,55 @@ export interface SamplerLoad {
   readonly payload: {};
 }
 
-export type Intent = AppReady | AudioOpenSettings | ToneSetEnabled | TransportPlay | TransportStop | TransportReturnToStart | TransportSetTempo | TransportSetCountIn | MetronomeSetEnabled | ParamSet | EditUndo | EditRedo | ProjectNew | ProjectOpen | ProjectSave | ProjectSaveAs | ProjectRename | NoteOn | NoteOff | NoteAllOff | InstrumentSelect | SamplerLoad;
+export interface DrumsSetStep {
+  readonly type: 'drums.setStep';
+  readonly payload: {
+    readonly pad: number;
+    readonly step: number;
+    readonly on: boolean;
+    readonly gesture: number;
+  };
+}
+
+export interface DrumsClear {
+  readonly type: 'drums.clear';
+  readonly payload: {};
+}
+
+export interface DrumsTrigger {
+  readonly type: 'drums.trigger';
+  readonly payload: {
+    readonly pad: number;
+    readonly velocity: number;
+  };
+}
+
+export interface DrumsSetPad {
+  readonly type: 'drums.setPad';
+  readonly payload: {
+    readonly pad: number;
+    readonly volumeDb: number;
+    readonly pitch: number;
+    readonly muted: boolean;
+    readonly gesture: number;
+  };
+}
+
+export interface DrumsLoadPad {
+  readonly type: 'drums.loadPad';
+  readonly payload: {
+    readonly pad: number;
+  };
+}
+
+export interface DrumsResetPad {
+  readonly type: 'drums.resetPad';
+  readonly payload: {
+    readonly pad: number;
+  };
+}
+
+export type Intent = AppReady | AudioOpenSettings | ToneSetEnabled | TransportPlay | TransportStop | TransportReturnToStart | TransportSetTempo | TransportSetCountIn | MetronomeSetEnabled | ParamSet | EditUndo | EditRedo | ProjectNew | ProjectOpen | ProjectSave | ProjectSaveAs | ProjectRename | NoteOn | NoteOff | NoteAllOff | InstrumentSelect | SamplerLoad | DrumsSetStep | DrumsClear | DrumsTrigger | DrumsSetPad | DrumsLoadPad | DrumsResetPad;
 
 // Events: native -> UI
 export interface EngineStatus {
@@ -176,6 +224,7 @@ export interface TransportPosition {
     readonly bar: number;
     readonly beat: number;
     readonly countingIn: boolean;
+    readonly step: number;
   };
 }
 
@@ -233,7 +282,27 @@ export interface SamplerState {
   };
 }
 
-export type NativeEvent = EngineStatus | EngineMeters | TransportState | TransportPosition | ParamValue | HistoryState | ProjectState | AppNotice | InstrumentState | SamplerState;
+export interface DrumsPattern {
+  readonly type: 'drums.pattern';
+  readonly payload: {
+    readonly steps: readonly number[];
+  };
+}
+
+export interface DrumsPad {
+  readonly type: 'drums.pad';
+  readonly payload: {
+    readonly pad: number;
+    readonly name: string;
+    readonly volumeDb: number;
+    readonly pitch: number;
+    readonly muted: boolean;
+    readonly custom: boolean;
+    readonly missing: boolean;
+  };
+}
+
+export type NativeEvent = EngineStatus | EngineMeters | TransportState | TransportPosition | ParamValue | HistoryState | ProjectState | AppNotice | InstrumentState | SamplerState | DrumsPattern | DrumsPad;
 export type NativeEventType = NativeEvent['type'];
 
 /** Payload type for each native event type. */
@@ -248,6 +317,8 @@ export interface NativeEventPayloads {
   'app.notice': AppNotice['payload'];
   'instrument.state': InstrumentState['payload'];
   'sampler.state': SamplerState['payload'];
+  'drums.pattern': DrumsPattern['payload'];
+  'drums.pad': DrumsPad['payload'];
 }
 
 type Payload = Record<string, unknown>;
@@ -290,10 +361,11 @@ const eventValidators: Record<NativeEventType, (payload: Payload) => boolean> = 
     Number.isInteger(payload['countInBars']) && (payload['countInBars'] as number) >= 0 && (payload['countInBars'] as number) <= 4 &&
     typeof payload['metronomeEnabled'] === 'boolean',
   'transport.position': (payload) =>
-    hasOnlyKeys(payload, ['bar', 'beat', 'countingIn']) &&
+    hasOnlyKeys(payload, ['bar', 'beat', 'countingIn', 'step']) &&
     Number.isInteger(payload['bar']) && (payload['bar'] as number) >= -1000 && (payload['bar'] as number) <= 100000000 &&
     Number.isInteger(payload['beat']) && (payload['beat'] as number) >= 1 && (payload['beat'] as number) <= 32 &&
-    typeof payload['countingIn'] === 'boolean',
+    typeof payload['countingIn'] === 'boolean' &&
+    Number.isInteger(payload['step']) && (payload['step'] as number) >= 0 && (payload['step'] as number) <= 15,
   'param.value': (payload) =>
     hasOnlyKeys(payload, ['id', 'value']) &&
     typeof payload['id'] === 'string' && payload['id'].length <= 64 &&
@@ -315,7 +387,7 @@ const eventValidators: Record<NativeEventType, (payload: Payload) => boolean> = 
     typeof payload['message'] === 'string' && payload['message'].length <= 1024,
   'instrument.state': (payload) =>
     hasOnlyKeys(payload, ['instrument']) &&
-    Number.isInteger(payload['instrument']) && (payload['instrument'] as number) >= 0 && (payload['instrument'] as number) <= 1,
+    Number.isInteger(payload['instrument']) && (payload['instrument'] as number) >= 0 && (payload['instrument'] as number) <= 2,
   'sampler.state': (payload) =>
     hasOnlyKeys(payload, ['name', 'loaded', 'missing', 'loading', 'durationSeconds', 'overview']) &&
     typeof payload['name'] === 'string' && payload['name'].length <= 256 &&
@@ -324,6 +396,18 @@ const eventValidators: Record<NativeEventType, (payload: Payload) => boolean> = 
     typeof payload['loading'] === 'boolean' &&
     typeof payload['durationSeconds'] === 'number' && Number.isFinite(payload['durationSeconds']) && payload['durationSeconds'] >= 0 && payload['durationSeconds'] <= 100000 &&
     isNumberArray(payload['overview'], 0, 1, 512),
+  'drums.pattern': (payload) =>
+    hasOnlyKeys(payload, ['steps']) &&
+    isNumberArray(payload['steps'], 0, 65535, 16),
+  'drums.pad': (payload) =>
+    hasOnlyKeys(payload, ['pad', 'name', 'volumeDb', 'pitch', 'muted', 'custom', 'missing']) &&
+    Number.isInteger(payload['pad']) && (payload['pad'] as number) >= 0 && (payload['pad'] as number) <= 15 &&
+    typeof payload['name'] === 'string' && payload['name'].length <= 256 &&
+    typeof payload['volumeDb'] === 'number' && Number.isFinite(payload['volumeDb']) && payload['volumeDb'] >= -60 && payload['volumeDb'] <= 6 &&
+    typeof payload['pitch'] === 'number' && Number.isFinite(payload['pitch']) && payload['pitch'] >= -24 && payload['pitch'] <= 24 &&
+    typeof payload['muted'] === 'boolean' &&
+    typeof payload['custom'] === 'boolean' &&
+    typeof payload['missing'] === 'boolean',
 };
 
 /** Strictly validates a message received from native code. Returns null if it is malformed. */

@@ -5,6 +5,7 @@ add_executable(ap_unit_tests
     support/WavFile.cpp
     unit/BuildInfoTests.cpp
     unit/ConcurrencyTests.cpp
+    unit/DrumMachineTests.cpp
     unit/EngineTests.cpp
     unit/LinearSmoothedValueTests.cpp
     unit/MetronomeTests.cpp

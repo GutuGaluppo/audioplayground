@@ -54,6 +54,12 @@ private:
     void handle (const ap::bridge::NoteAllOff&);
     void handle (const ap::bridge::InstrumentSelect&);
     void handle (const ap::bridge::SamplerLoad&);
+    void handle (const ap::bridge::DrumsSetStep&);
+    void handle (const ap::bridge::DrumsClear&);
+    void handle (const ap::bridge::DrumsTrigger&);
+    void handle (const ap::bridge::DrumsSetPad&);
+    void handle (const ap::bridge::DrumsLoadPad&);
+    void handle (const ap::bridge::DrumsResetPad&);
     void handle (const ap::bridge::TransportPlay&);
     void handle (const ap::bridge::TransportStop&);
     void handle (const ap::bridge::TransportReturnToStart&);
@@ -69,6 +75,8 @@ private:
     void sendProjectState();
     void sendInstrumentState();
     void sendSamplerState();
+    void sendDrumPattern();
+    void sendDrumPad (std::size_t pad);
     void onProjectChanged();
     void sendTransportPosition (bool force);
     void timerCallback() override;

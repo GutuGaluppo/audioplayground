@@ -85,7 +85,7 @@ TEST_CASE ("SampleLoader decodes, resamples and hands the sample to the engine",
     f.loader.sync (48000.0);
     f.waitForLoad();
 
-    const auto& state = f.loader.getState();
+    const auto& state = f.loader.getState (desktop::SampleLoader::samplerSlot);
     CHECK (state.loaded);
     CHECK_FALSE (state.missing);
     CHECK (std::abs (state.durationSeconds - 0.5) < 1.0e-6);
@@ -139,7 +139,7 @@ TEST_CASE ("SampleLoader rejects corrupt and truncated files safely", "[samples]
     f.processBlock();
 
     // Either rejected with a message, or (truncated) loaded as the audio that is actually there.
-    const auto& state = f.loader.getState();
+    const auto& state = f.loader.getState (desktop::SampleLoader::samplerSlot);
     CHECK ((state.missing || state.loaded));
     CHECK ((state.loaded || !f.errors.empty()));
     for (const float peak : state.overview)

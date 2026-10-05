@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useBridge } from '../bridge/BridgeContext';
+import { useLatest } from '../state/latestEvent';
+import { useStores } from '../state/StoresContext';
 import {
   isBlackKey,
   MAX_BASE_NOTE,
@@ -30,7 +32,13 @@ function isTextEntry(target: EventTarget | null): boolean {
  * Playable keyboard: on-screen keys (mouse/touch) and the computer keyboard. All notes are
  * released when the window loses focus, so a note can never get stuck.
  */
+/** The piano keyboard for melodic instruments; the drums use their own pads instead. */
 export function Keyboard() {
+  const instrument = useLatest(useStores().instrument);
+  return instrument?.instrument === 2 ? null : <PianoKeyboard />;
+}
+
+function PianoKeyboard() {
   const bridge = useBridge();
   const [baseNote, setBaseNote] = useState(48); // C3
   const [velocityIndex, setVelocityIndex] = useState(4);

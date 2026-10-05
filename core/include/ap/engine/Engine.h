@@ -9,6 +9,7 @@
 #include "ap/engine/Metronome.h"
 #include "ap/engine/RenderGraph.h"
 #include "ap/engine/Transport.h"
+#include "ap/instruments/DrumMachine.h"
 #include "ap/instruments/Sampler.h"
 #include "ap/instruments/Synth.h"
 #include "ap/params/Parameters.h"
@@ -54,7 +55,8 @@ public:
     enum class LiveInstrument : std::uint8_t
     {
         synth = 0,
-        sampler = 1
+        sampler = 1,
+        drums = 2
     };
     void setLiveInstrument (LiveInstrument instrument) noexcept
     {
@@ -84,7 +86,13 @@ public:
     {
         graphs.publish (std::move (next));
     }
-    std::size_t collectGarbage() noexcept { return graphs.collectGarbage() + sampler.collectGarbage(); }
+    std::size_t collectGarbage() noexcept
+    {
+        return graphs.collectGarbage() + sampler.collectGarbage() + drums.collectGarbage();
+    }
+
+    // Pattern and pad settings are lock-free setters; see DrumMachine for the threading rules.
+    [[nodiscard]] instruments::DrumMachine& getDrums() noexcept { return drums; }
 
     // Project version of the graph the audio thread is currently rendering (0 = none yet).
     [[nodiscard]] std::uint64_t getRenderedGraphVersion() const noexcept
@@ -114,6 +122,7 @@ private:
     Metronome metronome;
     instruments::Synth synth;
     instruments::Sampler sampler;
+    instruments::DrumMachine drums;
     std::atomic<LiveInstrument> liveInstrument {LiveInstrument::synth};
     LiveInstrument routedInstrument = LiveInstrument::synth; // audio thread
     core::SpscQueue<instruments::NoteEvent, 256> uiNotes;

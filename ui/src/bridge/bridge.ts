@@ -115,6 +115,38 @@ export function createSimulatedBridge(): Bridge {
     router.dispatch({ type: 'app.notice', payload: { level: 0, message } });
   };
 
+  const FACTORY = [
+    'Kick',
+    'Snare',
+    'Closed Hat',
+    'Open Hat',
+    'Clap',
+    'Low Tom',
+    'Mid Tom',
+    'High Tom',
+    'Rim',
+    'Cowbell',
+    'Shaker',
+    'Crash',
+    'Perc Low',
+    'Perc High',
+    'Bass',
+    'Zap',
+  ];
+  const drumSteps = Array.from({ length: 16 }, () => 0);
+  const drumPads = FACTORY.map((name) => ({ name, volumeDb: 0, pitch: 0, muted: false }));
+  const sendPattern = () => {
+    router.dispatch({ type: 'drums.pattern', payload: { steps: [...drumSteps] } });
+  };
+  const sendPad = (pad: number) => {
+    const info = drumPads[pad];
+    if (!info) return;
+    router.dispatch({
+      type: 'drums.pad',
+      payload: { pad, ...info, custom: false, missing: false },
+    });
+  };
+
   const undoStack: Edit[] = [];
   const redoStack: Edit[] = [];
 
@@ -168,7 +200,8 @@ export function createSimulatedBridge(): Bridge {
     const beats = countingIn ? -countInBeatsLeft : beatsElapsed;
     const bar = Math.floor(beats / 4) + 1;
     const beat = (((beats % 4) + 4) % 4) + 1;
-    router.dispatch({ type: 'transport.position', payload: { bar, beat, countingIn } });
+    const step = countingIn ? 0 : (((beatsElapsed * 4) % 16) + 16) % 16;
+    router.dispatch({ type: 'transport.position', payload: { bar, beat, countingIn, step } });
   };
 
   if (typeof window !== 'undefined') {
@@ -201,6 +234,10 @@ export function createSimulatedBridge(): Bridge {
             sendHistory();
             sendProject();
             router.dispatch({ type: 'instrument.state', payload: { instrument: 0 } });
+            sendPattern();
+            drumPads.forEach((_, pad) => {
+              sendPad(pad);
+            });
             router.dispatch({
               type: 'sampler.state',
               payload: {
@@ -319,6 +356,38 @@ export function createSimulatedBridge(): Bridge {
                 ),
               },
             });
+          });
+          return;
+        case 'drums.setStep':
+          queueMicrotask(() => {
+            const { pad, step, on } = intent.payload;
+            const row = drumSteps[pad] ?? 0;
+            drumSteps[pad] = on ? row | (1 << step) : row & ~(1 << step);
+            dirty = true;
+            sendPattern();
+            sendProject();
+          });
+          return;
+        case 'drums.clear':
+          queueMicrotask(() => {
+            drumSteps.fill(0);
+            sendPattern();
+          });
+          return;
+        case 'drums.setPad':
+          queueMicrotask(() => {
+            const { pad, volumeDb, pitch, muted } = intent.payload;
+            const info = drumPads[pad];
+            if (info) Object.assign(info, { volumeDb, pitch, muted });
+            sendPad(pad);
+          });
+          return;
+        case 'drums.trigger':
+        case 'drums.resetPad':
+          return;
+        case 'drums.loadPad':
+          queueMicrotask(() => {
+            notice('Loading pad samples needs the desktop app.');
           });
           return;
         case 'note.on':

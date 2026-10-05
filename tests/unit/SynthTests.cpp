@@ -161,7 +161,8 @@ TEST_CASE ("Synth chord through the engine matches the golden file", "[synth][go
         REQUIRE (engine.sendNoteFromUi (on (note, 0.8f)));
 
     const auto audio = engine::renderOffline (engine, {48000.0, 2, 24000, 512});
-    const auto result = test::compareWithGolden ("synth_chord_48k", {48000.0, audio}, 1.0e-5f);
+    const auto result
+        = test::compareWithGolden ("synth_chord_48k", {48000.0, audio}, test::crossPlatformTolerance);
     INFO (result.message);
     CHECK (result.passed);
 }

@@ -186,7 +186,7 @@ LoadedProject parseV1 (const Json& root)
     requireExactKeys (root,
                       {"format", "schemaVersion", "name", "createdAt", "updatedAt", "tempo", "timeSignature",
                        "exportSampleRate", "nextTrackId", "tracks", "parameters", "assets", "nextAssetId",
-                       "samplerAsset"},
+                       "samplerAsset", "drums"},
                       "project");
 
     LoadedProject loaded;
@@ -265,6 +265,41 @@ LoadedProject parseV1 (const Json& root)
     if (project.samplerAsset.isValid() && project.findAsset (project.samplerAsset) == nullptr)
         invalid ("samplerAsset refers to a missing asset");
 
+    const auto& drums = root["drums"];
+    requireExactKeys (drums, {"pads", "steps"}, "drums");
+    const auto& pads = drums["pads"];
+    const auto& steps = drums["steps"];
+    if (!pads.is_array() || pads.size() != DrumKit::numPads || !steps.is_array()
+        || steps.size() != DrumKit::numPads)
+        invalid ("the drum kit must have 16 pads and 16 step rows");
+    for (std::size_t i = 0; i < DrumKit::numPads; ++i)
+    {
+        const auto& json = pads[i];
+        requireExactKeys (json, {"sample", "volumeDb", "pitch", "muted"}, "drum pad");
+        auto& pad = project.drums.pads[i];
+        const auto& sample = json["sample"];
+        if (!sample.is_number_unsigned() && !(sample.is_number_integer() && sample.get<std::int64_t>() == 0))
+            invalid ("drum pad sample must be an asset id or 0");
+        pad.sample = AssetId {sample.get<std::uint64_t>()};
+        if (pad.sample.isValid() && project.findAsset (pad.sample) == nullptr)
+            invalid ("drum pad refers to a missing asset");
+        pad.volumeDb
+            = static_cast<float> (numberInRange (json["volumeDb"], static_cast<double> (DrumPad::minVolumeDb),
+                                                 static_cast<double> (DrumPad::maxVolumeDb), "pad volume"));
+        pad.pitch
+            = static_cast<float> (numberInRange (json["pitch"], -static_cast<double> (DrumPad::maxPitch),
+                                                 static_cast<double> (DrumPad::maxPitch), "pad pitch"));
+        pad.muted = boolean (json["muted"], "pad mute");
+
+        if (!steps[i].is_number_unsigned()
+            && !(steps[i].is_number_integer() && steps[i].get<std::int64_t>() == 0))
+            invalid ("drum steps must be whole numbers");
+        const auto mask = steps[i].get<std::uint64_t>();
+        if (mask > 0xFFFF)
+            invalid ("drum steps are out of range");
+        project.drums.steps[i] = static_cast<std::uint16_t> (mask);
+    }
+
     const auto& parameters = root["parameters"];
     if (!parameters.is_object())
         invalid ("parameters must be an object");
@@ -338,6 +373,24 @@ std::string serialiseProject (const Project& project, const ProjectMetadata& met
     root["assets"] = std::move (assets);
     root["nextAssetId"] = project.nextAssetId;
     root["samplerAsset"] = project.samplerAsset.value;
+
+    auto pads = OrderedJson::array();
+    auto steps = OrderedJson::array();
+    for (std::size_t i = 0; i < DrumKit::numPads; ++i)
+    {
+        const auto& pad = project.drums.pads[i];
+        OrderedJson json;
+        json["sample"] = pad.sample.value;
+        json["volumeDb"] = pad.volumeDb;
+        json["pitch"] = pad.pitch;
+        json["muted"] = pad.muted;
+        pads.push_back (std::move (json));
+        steps.push_back (project.drums.steps[i]);
+    }
+    OrderedJson drums;
+    drums["pads"] = std::move (pads);
+    drums["steps"] = std::move (steps);
+    root["drums"] = std::move (drums);
 
     return root.dump (2) + "\n";
 }
