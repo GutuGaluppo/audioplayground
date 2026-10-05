@@ -1,3 +1,5 @@
+import { isParamId, PARAMETERS } from '../params/generated';
+import type { ParamId } from '../params/generated';
 import { parseNativeEvent, PROTOCOL_VERSION } from './generated';
 import type { Intent, NativeEventPayloads, NativeEventType } from './generated';
 
@@ -70,7 +72,15 @@ function createNativeBridge(juce: JuceGlobal): Bridge {
 export function createSimulatedBridge(): Bridge {
   const router = new EventRouter();
   let toneEnabled = false;
-  let toneLevelDb = -18;
+  const params = new Map<ParamId, number>(
+    Object.values(PARAMETERS).map((d) => [d.id, d.defaultValue] as const),
+  );
+  const sendParam = (id: ParamId) => {
+    router.dispatch({
+      type: 'param.value',
+      payload: { id, value: params.get(id) ?? PARAMETERS[id].defaultValue },
+    });
+  };
   let playing = false;
   let bpm = 120;
   let countInBars = 0;
@@ -88,7 +98,6 @@ export function createSimulatedBridge(): Bridge {
         outputLatencyMs: 5.3,
         error: '',
         toneEnabled,
-        toneLevelDb,
       },
     });
   };
@@ -110,7 +119,7 @@ export function createSimulatedBridge(): Bridge {
 
   if (typeof window !== 'undefined') {
     window.setInterval(() => {
-      const level = toneEnabled ? Math.pow(10, toneLevelDb / 20) : 0;
+      const level = toneEnabled ? Math.pow(10, (params.get('tone.level') ?? -18) / 20) : 0;
       router.dispatch({ type: 'engine.meters', payload: { peak: level } });
     }, 1000 / 30);
 
@@ -134,6 +143,7 @@ export function createSimulatedBridge(): Bridge {
             sendStatus();
             sendTransportState();
             sendPosition();
+            for (const id of params.keys()) sendParam(id);
           });
           return;
         case 'audio.openSettings':
@@ -142,9 +152,15 @@ export function createSimulatedBridge(): Bridge {
         case 'tone.setEnabled':
           toneEnabled = intent.payload.enabled;
           break;
-        case 'tone.setLevel':
-          toneLevelDb = intent.payload.db;
-          break;
+        case 'param.set': {
+          const { id, value } = intent.payload;
+          if (!isParamId(id) || value < PARAMETERS[id].min || value > PARAMETERS[id].max) return;
+          params.set(id, value);
+          queueMicrotask(() => {
+            sendParam(id);
+          });
+          return;
+        }
         case 'transport.play':
           if (!playing) countInBeatsLeft = countInBars * 4;
           playing = true;

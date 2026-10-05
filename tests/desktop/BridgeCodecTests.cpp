@@ -25,12 +25,11 @@ TEST_CASE ("parseIntent accepts well-formed intents", "[bridge]")
     REQUIRE (enable.has_value());
     CHECK (std::get<ToneSetEnabled> (*enable).enabled);
 
-    const auto level = parseIntent (parseJson (R"({"type":"tone.setLevel","payload":{"db":-24}})"));
-    REQUIRE (level.has_value());
-    CHECK (std::get<ToneSetLevel> (*level).db == -24.0);
-
-    const auto boundary = parseIntent (parseJson (R"({"type":"tone.setLevel","payload":{"db":-6.0}})"));
-    CHECK (boundary.has_value());
+    const auto param
+        = parseIntent (parseJson (R"({"type":"param.set","payload":{"id":"tone.level","value":-24}})"));
+    REQUIRE (param.has_value());
+    CHECK (std::get<ParamSet> (*param).id == "tone.level");
+    CHECK (std::get<ParamSet> (*param).value == -24.0);
 }
 
 TEST_CASE ("parseIntent rejects malformed or hostile input", "[bridge][security]")
@@ -51,10 +50,11 @@ TEST_CASE ("parseIntent rejects malformed or hostile input", "[bridge][security]
         R"({"type":"tone.setEnabled","payload":{}})",
         R"({"type":"tone.setEnabled","payload":{"enabled":1}})",
         R"({"type":"tone.setEnabled","payload":{"enabled":"true"}})",
-        R"({"type":"tone.setLevel","payload":{"db":0}})",
-        R"({"type":"tone.setLevel","payload":{"db":-61}})",
-        R"({"type":"tone.setLevel","payload":{"db":"-12"}})",
-        R"({"type":"tone.setLevel","payload":{"db":-12,"db2":0}})",
+        R"({"type":"param.set","payload":{"id":"tone.level"}})",
+        R"({"type":"param.set","payload":{"id":"tone.level","value":"-12"}})",
+        R"({"type":"param.set","payload":{"id":7,"value":-12}})",
+        R"({"type":"param.set","payload":{"id":"tone.level","value":1e9}})",
+        R"({"type":"param.set","payload":{"id":"tone.level","value":-12,"extra":0}})",
     };
 
     for (const auto* json : rejected)
@@ -62,6 +62,13 @@ TEST_CASE ("parseIntent rejects malformed or hostile input", "[bridge][security]
         INFO (json);
         CHECK_FALSE (parseIntent (parseJson (json)).has_value());
     }
+
+    const auto longId = juce::String::repeatedString ("a", 65);
+    CHECK_FALSE (
+        parseIntent (
+            parseJson (
+                ("{\"type\":\"param.set\",\"payload\":{\"id\":\"" + longId + "\",\"value\":0}}").toRawUTF8()))
+            .has_value());
 }
 
 TEST_CASE ("parseIntent rejects non-finite numbers", "[bridge][security]")
@@ -70,9 +77,10 @@ TEST_CASE ("parseIntent rejects non-finite numbers", "[bridge][security]")
          {std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::infinity()})
     {
         auto* payload = new juce::DynamicObject();
-        payload->setProperty ("db", value);
+        payload->setProperty ("id", "tone.level");
+        payload->setProperty ("value", value);
         auto* message = new juce::DynamicObject();
-        message->setProperty ("type", "tone.setLevel");
+        message->setProperty ("type", "param.set");
         message->setProperty ("payload", juce::var (payload));
 
         CHECK_FALSE (parseIntent (juce::var (message)).has_value());
@@ -86,7 +94,6 @@ TEST_CASE ("toVar serialises events into the documented envelope", "[bridge]")
     status.sampleRate = 48000.0;
     status.bufferSize = 256;
     status.toneEnabled = true;
-    status.toneLevelDb = -18.0;
 
     const auto json = juce::JSON::toString (toVar (Event{status}), true);
     const auto parsed = juce::JSON::parse (json);

@@ -57,9 +57,11 @@ void Engine::process (core::AudioBlock output) noexcept AP_NONBLOCKING
     if (!prepared)
         return;
 
-    transport.advance (output.numSamples,
-                       [this, output] (int offset, int length, core::Samples start) noexcept
-                       { metronome.render (output, offset, length, start, transport.getTempoMap()); });
+    const float metronomeGain = decibelsToGain (parameters.get (params::ParamId::metronomeLevel));
+    transport.advance (
+        output.numSamples,
+        [this, output, metronomeGain] (int offset, int length, core::Samples start) noexcept
+        { metronome.render (output, offset, length, start, transport.getTempoMap(), metronomeGain); });
 
     if (!transport.isPlayingOnAudioThread())
         metronome.renderTail (output);
@@ -71,7 +73,7 @@ void Engine::process (core::AudioBlock output) noexcept AP_NONBLOCKING
 void Engine::renderTestTone (core::AudioBlock output) noexcept AP_NONBLOCKING
 {
     const bool enabled = toneEnabled.load (std::memory_order_relaxed);
-    const float levelGain = decibelsToGain (toneLevelDb.load (std::memory_order_relaxed));
+    const float levelGain = decibelsToGain (parameters.get (params::ParamId::toneLevel));
     toneGain.setTarget (enabled ? levelGain : 0.0f);
     toneFrequency.setTarget (toneFrequencyHz.load (std::memory_order_relaxed));
 
@@ -140,21 +142,9 @@ void Engine::setTestToneFrequency (float hz) noexcept
                            std::memory_order_relaxed);
 }
 
-void Engine::setTestToneLevelDb (float db) noexcept
-{
-    if (!std::isfinite (db))
-        return;
-    toneLevelDb.store (std::clamp (db, minToneLevelDb, maxToneLevelDb), std::memory_order_relaxed);
-}
-
 bool Engine::isTestToneEnabled() const noexcept
 {
     return toneEnabled.load (std::memory_order_relaxed);
-}
-
-float Engine::getTestToneLevelDb() const noexcept
-{
-    return toneLevelDb.load (std::memory_order_relaxed);
 }
 
 float Engine::consumeOutputPeak() noexcept

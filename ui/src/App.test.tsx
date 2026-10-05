@@ -96,6 +96,20 @@ describe('App', () => {
     expect(countIn.getAttribute('aria-pressed')).toBe('true');
   });
 
+  it('shows parameter values from the engine and sends changes', async () => {
+    await renderApp();
+    const level = screen.getByRole('slider', { name: 'Level' });
+    expect(level.getAttribute('aria-valuetext')).toBe('-18.0 dB');
+
+    fireEvent.change(level, { target: { value: '1000' } });
+    await flush();
+    expect(level.getAttribute('aria-valuetext')).toBe('-6.0 dB');
+
+    fireEvent.doubleClick(level);
+    await flush();
+    expect(level.getAttribute('aria-valuetext')).toBe('-18.0 dB');
+  });
+
   it('shows the bar and beat position', async () => {
     await renderApp();
     expect(screen.getByLabelText('Position').textContent).toBe('1.1');

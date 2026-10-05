@@ -1,14 +1,12 @@
-import { useEffect, useId } from 'react';
+import { useEffect } from 'react';
 
 import { useBridge } from './bridge/BridgeContext';
 import type { EngineStatus } from './bridge/generated';
+import { ParamSlider } from './components/ParamSlider';
 import { PeakMeter } from './components/PeakMeter';
 import { TransportBar } from './components/TransportBar';
 import { useLatest } from './state/latestEvent';
 import { useStores } from './state/StoresContext';
-
-const MIN_LEVEL_DB = -60;
-const MAX_LEVEL_DB = -6;
 
 function formatDevice(status: EngineStatus['payload']): string {
   if (!status.deviceName) return 'No audio output';
@@ -23,7 +21,6 @@ function formatDevice(status: EngineStatus['payload']): string {
 export function App() {
   const bridge = useBridge();
   const status = useLatest(useStores().engineStatus);
-  const levelId = useId();
 
   useEffect(() => {
     bridge.send({ type: 'app.ready', payload: {} });
@@ -66,26 +63,7 @@ export function App() {
             <span>{toneEnabled ? 'Stop test tone' : 'Play test tone'}</span>
           </button>
 
-          <div className="field">
-            <label htmlFor={levelId}>Level</label>
-            <input
-              id={levelId}
-              type="range"
-              min={MIN_LEVEL_DB}
-              max={MAX_LEVEL_DB}
-              step={1}
-              value={status?.toneLevelDb ?? -18}
-              disabled={!status}
-              aria-valuetext={`${String(status?.toneLevelDb ?? -18)} dB`}
-              onChange={(event) => {
-                bridge.send({
-                  type: 'tone.setLevel',
-                  payload: { db: Number(event.currentTarget.value) },
-                });
-              }}
-            />
-            <output htmlFor={levelId}>{status?.toneLevelDb ?? -18} dB</output>
-          </div>
+          <ParamSlider id="tone.level" label="Level" />
 
           <PeakMeter />
         </section>

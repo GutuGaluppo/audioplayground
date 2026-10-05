@@ -9,7 +9,7 @@
     "ui:dev": "pnpm --filter @ap/ui dev",
     "ui:build": "pnpm --filter @ap/ui build",
     "check": "pnpm codegen:check && pnpm -r run typecheck && pnpm -r run lint && pnpm -r run format:check && pnpm -r run test",
-    "codegen": "node tools/codegen/bridge.mjs",
-    "codegen:check": "node tools/codegen/bridge.mjs --check"
+    "codegen": "node tools/codegen/bridge.mjs && node tools/codegen/parameters.mjs",
+    "codegen:check": "node tools/codegen/bridge.mjs --check && node tools/codegen/parameters.mjs --check"
   }
 }

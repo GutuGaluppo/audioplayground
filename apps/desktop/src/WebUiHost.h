@@ -32,7 +32,7 @@ private:
     void handle (const ap::bridge::AppReady&);
     void handle (const ap::bridge::AudioOpenSettings&);
     void handle (const ap::bridge::ToneSetEnabled&);
-    void handle (const ap::bridge::ToneSetLevel&);
+    void handle (const ap::bridge::ParamSet&);
     void handle (const ap::bridge::TransportPlay&);
     void handle (const ap::bridge::TransportStop&);
     void handle (const ap::bridge::TransportReturnToStart&);
@@ -43,6 +43,7 @@ private:
     void emit (const ap::bridge::Event& event);
     void sendStatus();
     void sendTransportState();
+    void sendParameter (params::ParamId id);
     void sendTransportPosition (bool force);
     void timerCallback() override;
     void showAudioSettings();

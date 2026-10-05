@@ -120,7 +120,7 @@ TEST_CASE ("Metronome follows the loop", "[metronome][loop]")
 TEST_CASE ("Metronome click is free of discontinuities and bounded", "[metronome]")
 {
     Engine engine;
-    engine.getMetronome().setLevelDb (0.0f);
+    engine.getParameters().set (ap::params::ParamId::metronomeLevel, 0.0f);
     const auto audio = renderOffline (playingEngine (engine), {48000.0, 1, 48000, 512});
 
     float maxStep = 0.0f;

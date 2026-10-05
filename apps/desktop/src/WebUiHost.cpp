@@ -169,6 +169,9 @@ void WebUiHost::handle (const ap::bridge::AppReady&)
     sendStatus();
     sendTransportState();
     sendTransportPosition (true);
+
+    for (std::size_t i = 0; i < params::numParameters; ++i)
+        sendParameter (static_cast<params::ParamId> (i));
 }
 
 void WebUiHost::handle (const ap::bridge::AudioOpenSettings&)
@@ -182,10 +185,31 @@ void WebUiHost::handle (const ap::bridge::ToneSetEnabled& intent)
     sendStatus();
 }
 
-void WebUiHost::handle (const ap::bridge::ToneSetLevel& intent)
+void WebUiHost::handle (const ap::bridge::ParamSet& intent)
 {
-    engine.setTestToneLevelDb (static_cast<float> (intent.db));
-    sendStatus();
+    // The codec checked the envelope; the parameter system checks the ID and its own range.
+    const auto id = params::findParamId (intent.id);
+    if (!id)
+    {
+        DBG ("Rejected param.set for an unknown parameter");
+        return;
+    }
+
+    const auto value = static_cast<float> (intent.value);
+    if (!params::isInRange (params::descriptor (*id), value))
+    {
+        DBG ("Rejected out-of-range param.set");
+        return;
+    }
+
+    engine.getParameters().set (*id, value);
+    sendParameter (*id);
+}
+
+void WebUiHost::sendParameter (params::ParamId id)
+{
+    emit (ap::bridge::ParamValue{std::string (params::descriptor (id).id),
+                                 static_cast<double> (engine.getParameters().get (id))});
 }
 
 void WebUiHost::handle (const ap::bridge::TransportPlay&)
@@ -240,7 +264,6 @@ void WebUiHost::sendStatus()
                     ? std::string ("Audio device unavailable. Choose another output device.")
                     : status.error.substring (0, 900).toStdString();
     event.toneEnabled = engine.isTestToneEnabled();
-    event.toneLevelDb = static_cast<double> (engine.getTestToneLevelDb());
 
     emit (event);
 }

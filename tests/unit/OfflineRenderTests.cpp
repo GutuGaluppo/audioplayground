@@ -15,7 +15,7 @@ namespace
 void configureReferenceTone (Engine& engine)
 {
     engine.setTestToneFrequency (1000.0f);
-    engine.setTestToneLevelDb (-12.0f);
+    engine.getParameters().set (ap::params::ParamId::toneLevel, -12.0f);
     engine.setTestToneEnabled (true);
 }
 } // namespace

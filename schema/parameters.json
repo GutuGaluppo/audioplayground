@@ -1,0 +1,25 @@
+{
+  "$comment": "Processor parameters (guide §16). IDs are persistence contracts: never rename or reuse one after release. Edit, then run `pnpm codegen`.",
+  "parameters": [
+    {
+      "id": "tone.level",
+      "name": "Test tone level",
+      "unit": "dB",
+      "min": -60,
+      "max": -6,
+      "default": -18,
+      "curve": "linear",
+      "step": 0.5
+    },
+    {
+      "id": "metronome.level",
+      "name": "Click level",
+      "unit": "dB",
+      "min": -60,
+      "max": 0,
+      "default": -12,
+      "curve": "linear",
+      "step": 0.5
+    }
+  ]
+}

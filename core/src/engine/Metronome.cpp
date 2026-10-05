@@ -6,12 +6,6 @@
 namespace ap::engine
 {
 
-void Metronome::setLevelDb (float db) noexcept
-{
-    if (std::isfinite (db))
-        levelDb.store (std::clamp (db, minLevelDb, maxLevelDb), std::memory_order_relaxed);
-}
-
 void Metronome::renderVoice (core::AudioBlock output, int from, int to) noexcept AP_NONBLOCKING
 {
     if (!click.isActive())
@@ -26,11 +20,11 @@ void Metronome::renderVoice (core::AudioBlock output, int from, int to) noexcept
 }
 
 void Metronome::render (core::AudioBlock output, int offset, int length, core::Samples startSample,
-                        const core::TempoMap& tempoMap) noexcept AP_NONBLOCKING
+                        const core::TempoMap& tempoMap, float accentGain) noexcept AP_NONBLOCKING
 {
     const bool enabled = enabledFlag.load (std::memory_order_relaxed);
     const bool countingIn = startSample < 0;
-    const float gain = std::pow (10.0f, levelDb.load (std::memory_order_relaxed) / 20.0f);
+    const float gain = accentGain;
 
     const auto signature = tempoMap.getTimeSignature();
     const auto ticksPerBeat = signature.ticksPerBeat();

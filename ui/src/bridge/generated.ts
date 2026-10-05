@@ -22,13 +22,6 @@ export interface ToneSetEnabled {
   };
 }
 
-export interface ToneSetLevel {
-  readonly type: 'tone.setLevel';
-  readonly payload: {
-    readonly db: number;
-  };
-}
-
 export interface TransportPlay {
   readonly type: 'transport.play';
   readonly payload: {};
@@ -65,7 +58,15 @@ export interface MetronomeSetEnabled {
   };
 }
 
-export type Intent = AppReady | AudioOpenSettings | ToneSetEnabled | ToneSetLevel | TransportPlay | TransportStop | TransportReturnToStart | TransportSetTempo | TransportSetCountIn | MetronomeSetEnabled;
+export interface ParamSet {
+  readonly type: 'param.set';
+  readonly payload: {
+    readonly id: string;
+    readonly value: number;
+  };
+}
+
+export type Intent = AppReady | AudioOpenSettings | ToneSetEnabled | TransportPlay | TransportStop | TransportReturnToStart | TransportSetTempo | TransportSetCountIn | MetronomeSetEnabled | ParamSet;
 
 // Events: native -> UI
 export interface EngineStatus {
@@ -77,7 +78,6 @@ export interface EngineStatus {
     readonly outputLatencyMs: number;
     readonly error: string;
     readonly toneEnabled: boolean;
-    readonly toneLevelDb: number;
   };
 }
 
@@ -109,7 +109,15 @@ export interface TransportPosition {
   };
 }
 
-export type NativeEvent = EngineStatus | EngineMeters | TransportState | TransportPosition;
+export interface ParamValue {
+  readonly type: 'param.value';
+  readonly payload: {
+    readonly id: string;
+    readonly value: number;
+  };
+}
+
+export type NativeEvent = EngineStatus | EngineMeters | TransportState | TransportPosition | ParamValue;
 export type NativeEventType = NativeEvent['type'];
 
 /** Payload type for each native event type. */
@@ -118,6 +126,7 @@ export interface NativeEventPayloads {
   'engine.meters': EngineMeters['payload'];
   'transport.state': TransportState['payload'];
   'transport.position': TransportPosition['payload'];
+  'param.value': ParamValue['payload'];
 }
 
 type Payload = Record<string, unknown>;
@@ -133,14 +142,13 @@ function hasOnlyKeys(payload: Payload, keys: readonly string[]): boolean {
 
 const eventValidators: Record<NativeEventType, (payload: Payload) => boolean> = {
   'engine.status': (payload) =>
-    hasOnlyKeys(payload, ['deviceName', 'sampleRate', 'bufferSize', 'outputLatencyMs', 'error', 'toneEnabled', 'toneLevelDb']) &&
+    hasOnlyKeys(payload, ['deviceName', 'sampleRate', 'bufferSize', 'outputLatencyMs', 'error', 'toneEnabled']) &&
     typeof payload['deviceName'] === 'string' && payload['deviceName'].length <= 256 &&
     typeof payload['sampleRate'] === 'number' && Number.isFinite(payload['sampleRate']) && payload['sampleRate'] >= 0 && payload['sampleRate'] <= 768000 &&
     Number.isInteger(payload['bufferSize']) && (payload['bufferSize'] as number) >= 0 && (payload['bufferSize'] as number) <= 65536 &&
     typeof payload['outputLatencyMs'] === 'number' && Number.isFinite(payload['outputLatencyMs']) && payload['outputLatencyMs'] >= 0 && payload['outputLatencyMs'] <= 10000 &&
     typeof payload['error'] === 'string' && payload['error'].length <= 1024 &&
-    typeof payload['toneEnabled'] === 'boolean' &&
-    typeof payload['toneLevelDb'] === 'number' && Number.isFinite(payload['toneLevelDb']) && payload['toneLevelDb'] >= -60 && payload['toneLevelDb'] <= -6,
+    typeof payload['toneEnabled'] === 'boolean',
   'engine.meters': (payload) =>
     hasOnlyKeys(payload, ['peak']) &&
     typeof payload['peak'] === 'number' && Number.isFinite(payload['peak']) && payload['peak'] >= 0 && payload['peak'] <= 1,
@@ -157,6 +165,10 @@ const eventValidators: Record<NativeEventType, (payload: Payload) => boolean> = 
     Number.isInteger(payload['bar']) && (payload['bar'] as number) >= -1000 && (payload['bar'] as number) <= 100000000 &&
     Number.isInteger(payload['beat']) && (payload['beat'] as number) >= 1 && (payload['beat'] as number) <= 32 &&
     typeof payload['countingIn'] === 'boolean',
+  'param.value': (payload) =>
+    hasOnlyKeys(payload, ['id', 'value']) &&
+    typeof payload['id'] === 'string' && payload['id'].length <= 64 &&
+    typeof payload['value'] === 'number' && Number.isFinite(payload['value']) && payload['value'] >= -1000000 && payload['value'] <= 1000000,
 };
 
 /** Strictly validates a message received from native code. Returns null if it is malformed. */

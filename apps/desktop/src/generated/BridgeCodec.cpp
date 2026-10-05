@@ -114,17 +114,6 @@ std::optional<Intent> parseToneSetEnabled (const juce::var& payloadVar)
     return Intent {message};
 }
 
-std::optional<Intent> parseToneSetLevel (const juce::var& payloadVar)
-{
-    const auto* payload = payloadVar.getDynamicObject();
-    if (payload == nullptr || !hasOnlyKeys (*payload, {"db"}))
-        return std::nullopt;
-
-    ToneSetLevel message;
-    if (!readNumber (*payload, "db", ToneSetLevel::dbMin, ToneSetLevel::dbMax, message.db)) return std::nullopt;
-    return Intent {message};
-}
-
 std::optional<Intent> parseTransportPlay (const juce::var& payloadVar)
 {
     const auto* payload = payloadVar.getDynamicObject();
@@ -190,6 +179,18 @@ std::optional<Intent> parseMetronomeSetEnabled (const juce::var& payloadVar)
     if (!readBool (*payload, "enabled", message.enabled)) return std::nullopt;
     return Intent {message};
 }
+
+std::optional<Intent> parseParamSet (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"id", "value"}))
+        return std::nullopt;
+
+    ParamSet message;
+    if (!readString (*payload, "id", ParamSet::idMaxLength, message.id)) return std::nullopt;
+    if (!readNumber (*payload, "value", ParamSet::valueMin, ParamSet::valueMax, message.value)) return std::nullopt;
+    return Intent {message};
+}
 } // namespace
 
 std::optional<Intent> parseIntent (const juce::var& message)
@@ -211,8 +212,6 @@ std::optional<Intent> parseIntent (const juce::var& message)
         return parseAudioOpenSettings (payload);
     if (typeName == ToneSetEnabled::type)
         return parseToneSetEnabled (payload);
-    if (typeName == ToneSetLevel::type)
-        return parseToneSetLevel (payload);
     if (typeName == TransportPlay::type)
         return parseTransportPlay (payload);
     if (typeName == TransportStop::type)
@@ -225,6 +224,8 @@ std::optional<Intent> parseIntent (const juce::var& message)
         return parseTransportSetCountIn (payload);
     if (typeName == MetronomeSetEnabled::type)
         return parseMetronomeSetEnabled (payload);
+    if (typeName == ParamSet::type)
+        return parseParamSet (payload);
 
     return std::nullopt;
 }
@@ -242,7 +243,6 @@ juce::var toVar (const Event& event)
                 payload->setProperty ("outputLatencyMs", m.outputLatencyMs);
                 payload->setProperty ("error", juce::String (m.error));
                 payload->setProperty ("toneEnabled", m.toneEnabled);
-                payload->setProperty ("toneLevelDb", m.toneLevelDb);
                 return envelope (EngineStatus::type, payload);
             },
             [] (const EngineMeters& m) -> juce::var
@@ -269,6 +269,13 @@ juce::var toVar (const Event& event)
                 payload->setProperty ("beat", m.beat);
                 payload->setProperty ("countingIn", m.countingIn);
                 return envelope (TransportPosition::type, payload);
+            },
+            [] (const ParamValue& m) -> juce::var
+            {
+                auto* payload = new juce::DynamicObject();
+                payload->setProperty ("id", juce::String (m.id));
+                payload->setProperty ("value", m.value);
+                return envelope (ParamValue::type, payload);
             }},
         event);
 }

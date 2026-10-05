@@ -28,6 +28,11 @@ float maxStep (const std::vector<float>& samples)
     return step;
 }
 
+void setToneLevel (Engine& engine, float db)
+{
+    engine.getParameters().set (ap::params::ParamId::toneLevel, db);
+}
+
 bool allFinite (const std::vector<float>& samples)
 {
     return std::all_of (samples.begin(), samples.end(), [] (float s) { return std::isfinite (s); });
@@ -64,7 +69,7 @@ TEST_CASE ("Engine tone fades in without a click and settles at the requested le
     Engine engine;
     engine.prepare (48000.0, 4800);
     engine.setTestToneFrequency (1000.0f);
-    engine.setTestToneLevelDb (-12.0f);
+    setToneLevel (engine, -12.0f);
     engine.setTestToneEnabled (true);
 
     TestBuffer buffer (2, 4800); // 100 ms
@@ -88,7 +93,7 @@ TEST_CASE ("Engine tone is continuous across irregular block sizes", "[engine]")
     Engine engine;
     engine.prepare (44100.0, blockSize);
     engine.setTestToneFrequency (440.0f);
-    engine.setTestToneLevelDb (-6.0f);
+    setToneLevel (engine, -6.0f);
     engine.setTestToneEnabled (true);
 
     constexpr int totalSamples = 44100 / 2;
@@ -131,13 +136,14 @@ TEST_CASE ("Engine ignores non-finite parameter values and clamps out-of-range o
     engine.prepare (48000.0, 4800);
     engine.setTestToneEnabled (true);
     engine.setTestToneFrequency (std::numeric_limits<float>::quiet_NaN());
-    engine.setTestToneLevelDb (std::numeric_limits<float>::infinity());
-    engine.setTestToneLevelDb (+40.0f); // clamped to maxToneLevelDb
+    setToneLevel (engine, std::numeric_limits<float>::infinity());
+    setToneLevel (engine, +40.0f); // clamped to the parameter maximum
 
     TestBuffer buffer (2, 4800);
     engine.process (buffer.block());
 
-    const float maxPeak = std::pow (10.0f, Engine::maxToneLevelDb / 20.0f);
+    const float maxPeak
+        = std::pow (10.0f, ap::params::descriptor (ap::params::ParamId::toneLevel).max / 20.0f);
     CHECK (allFinite (buffer.channel (0)));
     CHECK (peakOf (buffer.channel (0)) <= maxPeak + 1.0e-4f);
     CHECK (engine.getNonFiniteSampleCount() == 0);
@@ -148,7 +154,7 @@ TEST_CASE ("Engine peak meter reports and resets", "[engine]")
     Engine engine;
     engine.prepare (48000.0, 4800);
     engine.setTestToneEnabled (true);
-    engine.setTestToneLevelDb (-6.0f);
+    setToneLevel (engine, -6.0f);
 
     TestBuffer buffer (2, 4800);
     engine.process (buffer.block());

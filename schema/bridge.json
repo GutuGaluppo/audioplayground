@@ -9,13 +9,6 @@
         "type": "bool"
       }
     },
-    "tone.setLevel": {
-      "db": {
-        "type": "number",
-        "min": -60,
-        "max": -6
-      }
-    },
     "transport.play": {},
     "transport.stop": {},
     "transport.returnToStart": {},
@@ -36,6 +29,17 @@
     "metronome.setEnabled": {
       "enabled": {
         "type": "bool"
+      }
+    },
+    "param.set": {
+      "id": {
+        "type": "string",
+        "maxLength": 64
+      },
+      "value": {
+        "type": "number",
+        "min": -1000000,
+        "max": 1000000
       }
     }
   },
@@ -66,11 +70,6 @@
       },
       "toneEnabled": {
         "type": "bool"
-      },
-      "toneLevelDb": {
-        "type": "number",
-        "min": -60,
-        "max": -6
       }
     },
     "engine.meters": {
@@ -121,6 +120,17 @@
       },
       "countingIn": {
         "type": "bool"
+      }
+    },
+    "param.value": {
+      "id": {
+        "type": "string",
+        "maxLength": 64
+      },
+      "value": {
+        "type": "number",
+        "min": -1000000,
+        "max": 1000000
       }
     }
   }

@@ -1,4 +1,4 @@
 dist
 coverage
 pnpm-lock.yaml
-src/bridge/generated.ts
+src/**/generated.ts

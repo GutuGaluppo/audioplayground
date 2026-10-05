@@ -11,7 +11,6 @@ const validStatus = {
     outputLatencyMs: 5,
     error: '',
     toneEnabled: false,
-    toneLevelDb: -18,
   },
 };
 

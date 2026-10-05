@@ -35,17 +35,6 @@ struct ToneSetEnabled
     bool operator== (const ToneSetEnabled&) const = default;
 };
 
-struct ToneSetLevel
-{
-    static constexpr std::string_view type = "tone.setLevel";
-    static constexpr double dbMin = -60.0;
-    static constexpr double dbMax = -6.0;
-
-    double db = 0.0;
-
-    bool operator== (const ToneSetLevel&) const = default;
-};
-
 struct TransportPlay
 {
     static constexpr std::string_view type = "transport.play";
@@ -98,6 +87,19 @@ struct MetronomeSetEnabled
     bool operator== (const MetronomeSetEnabled&) const = default;
 };
 
+struct ParamSet
+{
+    static constexpr std::string_view type = "param.set";
+    static constexpr std::size_t idMaxLength = 64;
+    static constexpr double valueMin = -1000000.0;
+    static constexpr double valueMax = 1000000.0;
+
+    std::string id {};
+    double value = 0.0;
+
+    bool operator== (const ParamSet&) const = default;
+};
+
 struct EngineStatus
 {
     static constexpr std::string_view type = "engine.status";
@@ -109,8 +111,6 @@ struct EngineStatus
     static constexpr double outputLatencyMsMin = 0.0;
     static constexpr double outputLatencyMsMax = 10000.0;
     static constexpr std::size_t errorMaxLength = 1024;
-    static constexpr double toneLevelDbMin = -60.0;
-    static constexpr double toneLevelDbMax = -6.0;
 
     std::string deviceName {};
     double sampleRate = 0.0;
@@ -118,7 +118,6 @@ struct EngineStatus
     double outputLatencyMs = 0.0;
     std::string error {};
     bool toneEnabled = false;
-    double toneLevelDb = 0.0;
 
     bool operator== (const EngineStatus&) const = default;
 };
@@ -171,7 +170,20 @@ struct TransportPosition
     bool operator== (const TransportPosition&) const = default;
 };
 
-using Intent = std::variant<AppReady, AudioOpenSettings, ToneSetEnabled, ToneSetLevel, TransportPlay, TransportStop, TransportReturnToStart, TransportSetTempo, TransportSetCountIn, MetronomeSetEnabled>;
-using Event = std::variant<EngineStatus, EngineMeters, TransportState, TransportPosition>;
+struct ParamValue
+{
+    static constexpr std::string_view type = "param.value";
+    static constexpr std::size_t idMaxLength = 64;
+    static constexpr double valueMin = -1000000.0;
+    static constexpr double valueMax = 1000000.0;
+
+    std::string id {};
+    double value = 0.0;
+
+    bool operator== (const ParamValue&) const = default;
+};
+
+using Intent = std::variant<AppReady, AudioOpenSettings, ToneSetEnabled, TransportPlay, TransportStop, TransportReturnToStart, TransportSetTempo, TransportSetCountIn, MetronomeSetEnabled, ParamSet>;
+using Event = std::variant<EngineStatus, EngineMeters, TransportState, TransportPosition, ParamValue>;
 
 } // namespace ap::bridge
