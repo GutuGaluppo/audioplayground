@@ -20,7 +20,7 @@ jobs:
       matrix:
         os: [macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 45
+    timeout-minutes: 70
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -35,7 +35,7 @@ jobs:
       - run: cmake --preset dev
       # Step-level timeouts keep the log if something hangs (a job-level timeout discards it).
       - run: cmake --build --preset dev --parallel
-        timeout-minutes: 30
+        timeout-minutes: 50
       - run: ctest --preset dev --timeout 300
         timeout-minutes: 10
 
