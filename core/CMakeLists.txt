@@ -3,11 +3,13 @@
 
 add_library(ap_core STATIC
     src/BuildInfo.cpp
+    src/dsp/Oversampler.cpp
     src/dsp/Peaks.cpp
     src/dsp/Resampler.cpp
     src/io/ProjectFiles.cpp
     src/io/Recordings.cpp
     src/fx/Compressor.cpp
+    src/fx/Distortion.cpp
     src/fx/Equalizer.cpp
     src/fx/Filter.cpp
     src/engine/Engine.cpp

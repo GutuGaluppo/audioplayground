@@ -287,7 +287,8 @@ Cada fase termina num **gate**: CI verde (sanitizers inclusos), benchmarks dentr
 | 018 (Filter) | ✅ Concluída: SVF TPT estéreo LP/BP/HP, cutoff em escala log e Q suavizados (20 ms), troca de modo com crossfade; golden `filter_sweep_48k`. Liga na cadeia de efeitos na 024 |
 | 019 (EQ) | ✅ Concluída: 3 bandas (low shelf, bell, high shelf) com as formulações SVF de Simper — mesmas curvas dos biquads RBJ, mas estáveis e sem cliques sob modulação (desvio deliberado da §3.6); golden `eq_sweep_48k` |
 | 020 (Compressor) | ✅ Concluída: feed-forward estéreo-linkado, pico, joelho suave, attack/release no domínio dB (Giannoulis 2012), make-up suavizado, medidor de redução; golden `compressor_bursts_48k` |
-| 021–023 (FX) | Próximas: Distortion (4× OS) → Delay → Reverb V1 |
+| 021 (Distortion) | ✅ Concluída: tanh levemente assimétrico a 4× (dois estágios halfband FIR, latência inteira de 38 amostras), DC blocker, compensação de drive, tom, mix com o seco alinhado; aliasing < −70 dB até 24 dB de drive (sem OS: −16 dB); golden `distortion_sweep_48k`. A cadeia (024) compensa a latência |
+| 022–023 (FX) | Próximas: Delay → Reverb V1 |
 | Escuta dos goldens de FX | ⏳ Precisa de um ouvinte humano (`tests/golden/*.wav`) |
 
 Decisões tomadas durante a execução:
