@@ -13,6 +13,7 @@ add_library(ap_core STATIC
     src/fx/Distortion.cpp
     src/fx/Equalizer.cpp
     src/fx/Filter.cpp
+    src/fx/Reverb.cpp
     src/engine/Engine.cpp
     src/engine/InputCapture.cpp
     src/engine/Metronome.cpp

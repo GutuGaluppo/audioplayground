@@ -22,6 +22,7 @@ add_executable(ap_unit_tests
     unit/ProjectFileTests.cpp
     unit/ProjectModelTests.cpp
     unit/RecordingTests.cpp
+    unit/ReverbTests.cpp
     unit/RenderGraphTests.cpp
     unit/ResamplerTests.cpp
     unit/SamplerTests.cpp

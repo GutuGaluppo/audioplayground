@@ -11,6 +11,14 @@ Every third-party library, algorithm, sample, impulse response, preset source an
 | Microsoft Edge WebView2 SDK (Windows) | 1.0.3485.44 | BSD-3-Clause | SHA-256 in `cmake/Dependencies.cmake` | Static loader linked into the Windows app |
 | React / React DOM | 19.3.0 | MIT | `ui/package.json` + `pnpm-lock.yaml` | |
 
+## Algorithms (our own implementations of published designs)
+
+| Algorithm | Source | Licence | Where |
+|---|---|---|---|
+| Freeverb structure and tunings (8 combs + 4 all-passes, stereo spread 23) | Jezar at Dreampoint, 2000 | Public domain | `core/src/fx/Reverb.cpp` (no Freeverb code copied) |
+| SVF shelf/bell formulation | Andrew Simper (Cytomic), technical paper | Published maths, no code | `core/include/ap/dsp/EqBand.h` |
+| Compressor gain computer and smoothing | Giannoulis, Massberg & Reiss, JAES 2012 | Published maths, no code | `core/src/fx/Compressor.cpp` |
+
 ## Development and test only (not shipped)
 
 | Component | Version | Licence |
