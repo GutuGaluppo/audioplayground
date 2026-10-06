@@ -42,5 +42,7 @@ export default defineConfig({
     environment: 'jsdom',
     include: ['src/**/*.test.{ts,tsx}'],
     setupFiles: ['src/test-setup.ts'],
+    // The contrast test reads the design tokens (other stylesheets stay empty in tests).
+    css: { include: [/tokens\.css/] },
   },
 });

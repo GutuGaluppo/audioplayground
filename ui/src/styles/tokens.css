@@ -33,10 +33,10 @@
   --ap-record: #ff4d4d;
 
   /* Clip colours by track kind; ink is the text and drawing on top of them. */
-  --ap-clip-audio: #2f7f78;
+  --ap-clip-audio: #2a726c;
   --ap-clip-synth: #3e5fc0;
   --ap-clip-sampler: #7a4cc0;
-  --ap-clip-drums: #b8692c;
+  --ap-clip-drums: #9c5925;
   --ap-clip-ink: #f1f3ff;
   --ap-grid-bar: rgb(255 255 255 / 9%);
   --ap-grid-beat: rgb(255 255 255 / 4%);

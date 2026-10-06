@@ -868,7 +868,7 @@ kbd {
   display: grid;
   grid-template-columns: var(--header-width) var(--lanes-width);
   grid-template-rows: 28px;
-  grid-auto-rows: 64px;
+  grid-auto-rows: 76px;
   width: max-content;
   align-content: start;
 }
@@ -1010,8 +1010,8 @@ kbd {
 }
 
 .track-header__toggle {
-  width: 22px;
-  height: 20px;
+  width: 32px;
+  height: 32px;
   flex: none;
   padding: 0;
   border: 1px solid var(--ap-border);

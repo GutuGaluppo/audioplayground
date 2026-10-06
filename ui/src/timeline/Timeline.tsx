@@ -310,6 +310,25 @@ export function Timeline() {
     remove: () => {
       if (selected) bridge.send({ type: 'clip.remove', payload: { clip: selected.clip.id } });
     },
+    // Keyboard editing: arrows move the selected clip by a beat, Shift+arrows change its length.
+    nudge: (direction: number, resize: boolean) => {
+      if (!selected) return;
+      const { clip, track } = selected;
+      if (resize) {
+        const end = clamp(clipEnd(clip) + direction * beat, clip.start + beat, MAX_TICKS);
+        bridge.send({
+          type: 'clip.resize',
+          payload: { clip: clip.id, edge: 1, ticks: end, gesture: 0 },
+        });
+      } else {
+        const start = clamp(clip.start + direction * beat, 0, MAX_TICKS - clip.length);
+        if (start !== clip.start)
+          bridge.send({
+            type: 'clip.move',
+            payload: { clip: clip.id, track: track.id, start, gesture: 0 },
+          });
+      }
+    },
     loop: () => {
       if (selected && !isAudioClip(selected.clip))
         bridge.send({
@@ -332,6 +351,13 @@ export function Timeline() {
         actionsRef.current.remove();
       else if (mod && key === 'd') actionsRef.current.duplicate();
       else if (mod && key === 't') actionsRef.current.split();
+      else if (
+        !mod &&
+        (event.key === 'ArrowLeft' || event.key === 'ArrowRight') &&
+        !(event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement)
+      )
+        actionsRef.current.nudge(event.key === 'ArrowLeft' ? -1 : 1, event.shiftKey);
+      else if (!mod && event.key === 'Escape') stores.selection.set({ track: null, clip: null });
       else return;
       event.preventDefault();
     };
@@ -339,7 +365,7 @@ export function Timeline() {
     return () => {
       window.removeEventListener('keydown', onKeyDown);
     };
-  }, []);
+  }, [stores.selection]);
 
   const zoom = (factor: number) => {
     setPxPerBeat((value) => clamp(Math.round(value * factor), MIN_PX_PER_BEAT, MAX_PX_PER_BEAT));

@@ -29,6 +29,7 @@ Every third-party library, algorithm, sample, impulse response, preset source an
 | Vitest, jsdom, Testing Library | 5.0.3 / 30.1.2 / 16.3.3 | MIT |
 | ESLint, typescript-eslint, eslint-plugin-react-hooks | 10.12.0 / 8.71.0 / 7.1.1 | MIT |
 | Prettier | 3.9.9 | MIT |
+| dom-accessibility-api | 0.5.16 | MIT (accessible-name checks in UI tests; already a Testing Library dependency) |
 
 ## Audio content
 None yet.
