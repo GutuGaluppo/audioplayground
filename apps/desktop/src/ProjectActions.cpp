@@ -1,12 +1,14 @@
 #include "ProjectActions.h"
 
 #include "AppPaths.h"
+#include "ap/model/ClipEditing.h"
 
 namespace ap::desktop
 {
 namespace
 {
 constexpr auto lastProjectKey = "lastProject";
+constexpr auto welcomedKey = "welcomed"; // the first-run starter song has been offered
 
 juce::File defaultProjectsDirectory()
 {
@@ -205,7 +207,16 @@ void ProjectActions::restoreLastSession (bool previousSessionCrashed)
 
     if (previousSessionCrashed)
         if (const auto recovered = session.recoverFromAutosave (lastProject))
+        {
             notice (NoticeLevel::info, *recovered);
+            settings.setValue (welcomedKey, true);
+            return;
+        }
+
+    // The very first launch opens on a beat, so pressing Space makes music right away (plan §3.7).
+    if (!lastProject && !settings.getBoolValue (welcomedKey, false))
+        session.newProject (model::starterProject());
+    settings.setValue (welcomedKey, true);
 }
 
 } // namespace ap::desktop

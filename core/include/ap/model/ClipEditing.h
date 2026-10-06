@@ -51,4 +51,9 @@ namespace ap::model
 // A new, empty drum pattern clip: its content is one pattern long and loops for the whole clip.
 [[nodiscard]] Clip makePatternClip (core::Ticks start, core::Ticks length);
 
+// What the app opens with the very first time (plan §3.7, "first sound in under 5 s"): a drum track
+// with a four-bar beat and an empty synth track to play over it. Valid by construction (built
+// through commands).
+[[nodiscard]] Project starterProject();
+
 } // namespace ap::model

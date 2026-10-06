@@ -40,7 +40,8 @@ public:
     // it has never been saved.
     [[nodiscard]] const io::ProjectFolder& assetRoot() const noexcept { return folder ? *folder : scratch; }
 
-    void newProject();
+    // A new, never-saved project (empty unless one is given, e.g. the first-run starter song).
+    void newProject (model::Project initial = {});
     [[nodiscard]] std::optional<std::string> save(); // needs a location
     [[nodiscard]] std::optional<std::string> saveAs (const io::ProjectFolder& target);
     [[nodiscard]] std::optional<std::string> open (const io::ProjectFolder& source);

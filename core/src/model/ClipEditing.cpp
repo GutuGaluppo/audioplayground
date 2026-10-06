@@ -1,5 +1,7 @@
 #include "ap/model/ClipEditing.h"
 
+#include "ap/model/ProjectDocument.h"
+
 #include <algorithm>
 #include <cmath>
 
@@ -196,6 +198,28 @@ Clip makePatternClip (core::Ticks start, core::Ticks length)
     clip.length = length;
     clip.loopLength = DrumKit::patternLength;
     return clip;
+}
+
+Project starterProject()
+{
+    ProjectDocument doc;
+    (void)doc.perform (RenameProject {"First song"});
+    (void)doc.perform (AddTrack {InstrumentKind::drums});
+    (void)doc.perform (AddTrack {InstrumentKind::synth});
+
+    // Kick on 1 and the "and" of 2 and 3, snare on 2 and 4, closed hats on the eighths.
+    constexpr std::size_t kick = 0;
+    constexpr std::size_t snare = 1;
+    constexpr std::size_t closedHat = 2;
+    auto beat = makePatternClip (0, 4 * DrumKit::patternLength);
+    for (const std::size_t step : {0u, 6u, 10u})
+        beat = withDrumStep (beat, kick, step, true);
+    for (const std::size_t step : {4u, 12u})
+        beat = withDrumStep (beat, snare, step, true);
+    for (std::size_t step = 0; step < DrumKit::numSteps; step += 2)
+        beat = withDrumStep (beat, closedHat, step, true);
+    (void)doc.perform (AddClip {doc.project().tracks.front().id, beat});
+    return doc.project();
 }
 
 } // namespace ap::model

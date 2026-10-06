@@ -104,9 +104,10 @@ void Session::loadInto (model::LoadedProject loaded, std::optional<io::ProjectFo
     notify();
 }
 
-void Session::newProject()
+void Session::newProject (model::Project initial)
 {
     model::LoadedProject fresh;
+    fresh.project = std::move (initial);
     fresh.metadata.createdAt = model::currentTimestampUtc();
     fresh.metadata.updatedAt = fresh.metadata.createdAt;
     loadInto (std::move (fresh), std::nullopt, false);

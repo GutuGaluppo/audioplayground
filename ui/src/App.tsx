@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { useBridge } from './bridge/BridgeContext';
 import type { EngineStatus } from './bridge/generated';
 import { Notices } from './components/Notices';
+import { QuickStart } from './components/QuickStart';
 import { ParamSlider } from './components/ParamSlider';
 import { LimiterLight, PeakMeter } from './components/PeakMeter';
 import { TransportBar } from './components/TransportBar';
@@ -66,6 +67,7 @@ export function App() {
       <main className="workspace">
         <Timeline />
         <div className="workspace__bottom">
+          <QuickStart />
           <InstrumentArea />
           <ClipEditor />
           <EffectsPanel />

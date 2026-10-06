@@ -1499,3 +1499,41 @@ kbd {
   width: 96px;
   accent-color: var(--ap-accent);
 }
+
+/* --- Quick start (Phase 6) ---------------------------------------------------------------- */
+
+.quick-start {
+  display: grid;
+  align-content: start;
+  gap: var(--ap-space-2);
+  flex: 0 0 240px;
+  padding: var(--ap-space-3);
+  border: 1px solid var(--ap-border);
+  border-radius: var(--ap-radius-md);
+  background: var(--ap-surface);
+  font-size: var(--ap-text-sm);
+}
+
+.quick-start__title {
+  margin: 0;
+  font-size: var(--ap-text-sm);
+  font-weight: 600;
+}
+
+.quick-start ul {
+  display: grid;
+  gap: var(--ap-space-1);
+  margin: 0;
+  padding-left: var(--ap-space-4);
+  color: var(--ap-text-muted);
+}
+
+.quick-start kbd {
+  padding: 0 4px;
+  border: 1px solid var(--ap-border);
+  border-radius: var(--ap-radius-sm);
+  background: var(--ap-bg);
+  color: var(--ap-text);
+  font-family: var(--ap-font-mono);
+  font-size: var(--ap-text-xs);
+}

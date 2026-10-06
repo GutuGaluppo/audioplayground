@@ -370,3 +370,17 @@ TEST_CASE ("Editing a clip in the gesture that created it stays one undo step", 
     REQUIRE (doc.redo());
     CHECK (doc.project() == after);
 }
+
+TEST_CASE ("The first-run starter song has a four-bar beat and a synth track to play on", "[model]")
+{
+    const auto project = starterProject();
+    REQUIRE (project.tracks.size() == 2);
+    CHECK (project.tracks[0].instrument == InstrumentKind::drums);
+    CHECK (project.tracks[1].instrument == InstrumentKind::synth);
+    REQUIRE (project.tracks[0].clips.size() == 1);
+    const auto& groove = project.tracks[0].clips[0];
+    CHECK (groove.length == 4 * DrumKit::patternLength);
+    CHECK (groove.loopLength == DrumKit::patternLength);
+    CHECK (groove.notes.size() == 3 + 2 + 8);
+    CHECK (project.tracks[1].clips.empty());
+}

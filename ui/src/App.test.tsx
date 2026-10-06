@@ -463,4 +463,13 @@ describe('App', () => {
     expect(screen.queryByRole('status', { name: 'Exporting' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Export…' })).toBeTruthy();
   });
+
+  it('shows quick-start tips until they are dismissed', async () => {
+    window.localStorage.removeItem('ap.quickStart.dismissed');
+    await renderApp();
+    expect(screen.getByRole('complementary', { name: 'Quick start' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Got it' }));
+    expect(screen.queryByRole('complementary', { name: 'Quick start' })).toBeNull();
+    expect(window.localStorage.getItem('ap.quickStart.dismissed')).toBe('1');
+  });
 });
