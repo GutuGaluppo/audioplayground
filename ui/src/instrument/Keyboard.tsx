@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { VuMeter } from '../components/VuMeter';
 import { useBridge } from '../bridge/BridgeContext';
 import { useLatest } from '../state/latestEvent';
 import { useStores } from '../state/StoresContext';
@@ -135,13 +136,46 @@ function PianoKeyboard() {
   return (
     <section className="keyboard" aria-label="Keyboard">
       <div className="keyboard__info">
-        <span>
-          Octave <strong>{noteName(baseNote)}</strong> <kbd>Z</kbd>
+        <span className="keyboard__group">
+          Octave
+          <button
+            type="button"
+            className="button keyboard__step"
+            aria-label="Octave down"
+            tabIndex={-1}
+            onClick={() => {
+              setBaseNote((n) => Math.max(MIN_BASE_NOTE, n - 12));
+            }}
+          >
+            −
+          </button>
+          <strong>{noteName(baseNote)}</strong>
+          <button
+            type="button"
+            className="button keyboard__step"
+            aria-label="Octave up"
+            tabIndex={-1}
+            onClick={() => {
+              setBaseNote((n) => Math.min(MAX_BASE_NOTE, n + 12));
+            }}
+          >
+            +
+          </button>
+          <kbd>Z</kbd>
           <kbd>X</kbd>
         </span>
-        <span>
-          Velocity <strong>{Math.round(velocity * 127)}</strong> <kbd>C</kbd>
+        <span className="keyboard__group">
+          Velocity
+          <span className="keyboard__velocity" aria-hidden="true">
+            <span style={{ width: `${String(Math.round(velocity * 100))}%` }} />
+          </span>
+          <strong>{Math.round(velocity * 127)}</strong>
+          <kbd>C</kbd>
           <kbd>V</kbd>
+        </span>
+        <span className="keyboard__group keyboard__master">
+          Master
+          <VuMeter label="Master VU meter" />
         </span>
       </div>
       <div

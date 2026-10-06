@@ -1,5 +1,5 @@
 import { useBridge } from '../bridge/BridgeContext';
-import { ParamSlider } from '../components/ParamSlider';
+import { ParamKnob } from '../components/Knob';
 import { useParameter } from '../params/parameterStore';
 import { useStores } from '../state/StoresContext';
 
@@ -33,16 +33,16 @@ export function SynthPanel() {
         ))}
       </div>
 
-      <div className="synth__grid">
-        <ParamSlider id="synth.cutoff" />
-        <ParamSlider id="synth.resonance" />
-        <ParamSlider id="synth.detune" />
-        <ParamSlider id="synth.pitch" />
-        <ParamSlider id="synth.attack" />
-        <ParamSlider id="synth.decay" />
-        <ParamSlider id="synth.sustain" />
-        <ParamSlider id="synth.release" />
-        <ParamSlider id="synth.volume" />
+      <div className="knob-grid">
+        <ParamKnob id="synth.cutoff" />
+        <ParamKnob id="synth.resonance" />
+        <ParamKnob id="synth.detune" />
+        <ParamKnob id="synth.pitch" />
+        <ParamKnob id="synth.attack" />
+        <ParamKnob id="synth.decay" />
+        <ParamKnob id="synth.sustain" />
+        <ParamKnob id="synth.release" />
+        <ParamKnob id="synth.volume" />
       </div>
     </section>
   );

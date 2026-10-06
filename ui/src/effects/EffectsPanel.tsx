@@ -1,11 +1,12 @@
 import { useBridge } from '../bridge/BridgeContext';
 import type { TimelineTrack } from '../bridge/generated';
-import { ValueSlider } from '../components/ValueSlider';
+import { ValueKnob } from '../components/Knob';
 import { EFFECTS } from '../params/generated';
 import type { EffectDescriptor } from '../params/generated';
 import { useLatest } from '../state/latestEvent';
 import { useStores } from '../state/StoresContext';
 import { useSelection } from '../timeline/selection';
+import { CURVES } from './curves';
 import { PRESETS } from './presets';
 
 const FILTER_MODES = ['Low-pass', 'High-pass', 'Band-pass'] as const;
@@ -24,6 +25,7 @@ function EffectCard({
   const state = track.effects[index];
   const enabled = state?.enabled ?? false;
   const values = effect.parameters.map((d, i) => state?.values[i] ?? d.defaultValue);
+  const Curve = CURVES[effect.id];
   const presets = PRESETS.filter((p) => p.effect === index);
 
   const send = (next: { enabled?: boolean; values?: readonly number[] }, gesture = 0) => {
@@ -45,7 +47,12 @@ function EffectCard({
   };
 
   return (
-    <section className="effect" data-enabled={enabled} aria-label={`${effect.name} effect`}>
+    <section
+      className="effect"
+      data-effect={effect.id}
+      data-enabled={enabled}
+      aria-label={`${effect.name} effect`}
+    >
       <header className="effect__header">
         <button
           type="button"
@@ -75,35 +82,42 @@ function EffectCard({
           ))}
         </select>
       </header>
-      <div className="effect__values">
-        {effect.parameters.map((d, i) =>
-          d.id === 'filter.mode' ? (
-            <div key={d.id} className="segmented" role="radiogroup" aria-label="Filter mode">
-              {FILTER_MODES.map((name, mode) => (
-                <button
-                  key={name}
-                  type="button"
-                  role="radio"
-                  aria-checked={values[i] === mode}
-                  onClick={() => {
-                    setValue(i, mode, 0);
-                  }}
-                >
-                  {name}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <ValueSlider
-              key={d.id}
-              descriptor={d}
-              value={values[i]}
-              onChange={(value, gesture) => {
-                setValue(i, value, gesture);
-              }}
-            />
-          ),
-        )}
+      <div className="effect__body">
+        <div className="effect__values">
+          {effect.parameters.map((d, i) =>
+            d.id === 'filter.mode' ? (
+              <div key={d.id} className="segmented" role="radiogroup" aria-label="Filter mode">
+                {FILTER_MODES.map((name, mode) => (
+                  <button
+                    key={name}
+                    type="button"
+                    role="radio"
+                    aria-checked={values[i] === mode}
+                    onClick={() => {
+                      setValue(i, mode, 0);
+                    }}
+                  >
+                    {name}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <ValueKnob
+                key={d.id}
+                descriptor={d}
+                value={values[i]}
+                onChange={(value, gesture) => {
+                  setValue(i, value, gesture);
+                }}
+              />
+            ),
+          )}
+        </div>
+        {Curve ? (
+          <div className="effect__display">
+            <Curve values={values} />
+          </div>
+        ) : null}
       </div>
     </section>
   );

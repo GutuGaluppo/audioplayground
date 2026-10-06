@@ -8,6 +8,7 @@ import { createStores } from './state/stores';
 import { StoresContext } from './state/StoresContext';
 import './styles/tokens.css';
 import './styles/base.css';
+import './styles/skin.css';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {

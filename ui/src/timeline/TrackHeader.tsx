@@ -1,3 +1,4 @@
+import { DrumIcon, MicIcon, SamplerIcon, SynthIcon } from '../components/icons';
 import { useRef, useState } from 'react';
 
 import { useBridge } from '../bridge/BridgeContext';
@@ -8,7 +9,7 @@ import { useLatest } from '../state/latestEvent';
 import { useStores } from '../state/StoresContext';
 import { kindLabel, TrackKind } from './model';
 
-const KIND_ICONS = ['〰', '◆', '▶', '◼'];
+const KIND_ICONS = [MicIcon, SynthIcon, SamplerIcon, DrumIcon];
 
 /** Name, mute, solo, volume and pan of one track (guide §3.5: no separate mixer in the MVP). */
 export function TrackHeader({
@@ -47,7 +48,10 @@ export function TrackHeader({
     >
       <div className="track-header__top">
         <span className="track-header__icon" title={kindLabel(track.kind)} aria-hidden="true">
-          {KIND_ICONS[track.kind] ?? '•'}
+          {(() => {
+            const Icon = KIND_ICONS[track.kind];
+            return Icon ? <Icon /> : '•';
+          })()}
         </span>
         {renaming ? (
           <input

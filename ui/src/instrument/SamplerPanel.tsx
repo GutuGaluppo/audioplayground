@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 
 import { useBridge } from '../bridge/BridgeContext';
-import { ParamSlider } from '../components/ParamSlider';
+import { ParamKnob } from '../components/Knob';
 import { useParameter } from '../params/parameterStore';
 import { useLatest } from '../state/latestEvent';
 import { useStores } from '../state/StoresContext';
@@ -114,11 +114,11 @@ export function SamplerPanel() {
         ))}
       </div>
 
-      <div className="synth__grid">
-        <ParamSlider id="sampler.start" />
-        <ParamSlider id="sampler.end" />
-        <ParamSlider id="sampler.pitch" />
-        <ParamSlider id="sampler.gain" />
+      <div className="knob-grid">
+        <ParamKnob id="sampler.start" />
+        <ParamKnob id="sampler.end" />
+        <ParamKnob id="sampler.pitch" />
+        <ParamKnob id="sampler.gain" />
       </div>
     </section>
   );

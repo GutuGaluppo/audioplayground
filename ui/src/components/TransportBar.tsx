@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import { useBridge } from '../bridge/BridgeContext';
+import { ParamKnob } from './Knob';
 import { HistoryControls } from './HistoryControls';
 import { ProjectHeader } from './ProjectHeader';
 import { useLatest } from '../state/latestEvent';
@@ -69,6 +70,17 @@ export function TransportBar() {
   return (
     <header className="transport" aria-label="Transport">
       <div className="transport__group">
+        <div className="brand" aria-hidden="true">
+          <svg className="brand__mark" viewBox="0 0 28 28" fill="currentColor">
+            {[3, 8, 5, 14, 9, 20, 12, 8, 5, 3].map((h, i) => (
+              <rect key={i} x={1 + i * 2.7} y={14 - h / 2} width="1.6" height={h} rx="0.8" />
+            ))}
+          </svg>
+          <span className="brand__name">
+            <span className="brand__title">Audio Playground</span>
+            <span className="brand__tag">Make · Explore · Discover</span>
+          </span>
+        </div>
         <ProjectHeader />
         <span className="transport__divider" aria-hidden="true" />
         <button
@@ -131,13 +143,19 @@ export function TransportBar() {
         <HistoryControls />
       </div>
 
-      <output
-        className="transport__position"
-        aria-label="Position"
-        data-counting-in={position?.countingIn ?? false}
-      >
-        {position ? `${String(position.bar)}.${String(position.beat)}` : '–'}
-      </output>
+      <div className="transport__display">
+        <span className="transport__labels" aria-hidden="true">
+          <span>BAR</span>
+          <span>BEAT</span>
+        </span>
+        <output
+          className="transport__position"
+          aria-label="Position"
+          data-counting-in={position?.countingIn ?? false}
+        >
+          {position ? `${String(position.bar)}.${String(position.beat)}` : '–'}
+        </output>
+      </div>
 
       <div className="transport__group">
         <label className="transport__tempo">
@@ -168,6 +186,8 @@ export function TransportBar() {
         <span className="transport__meter">
           {state ? `${String(state.numerator)}/${String(state.denominator)}` : ''}
         </span>
+
+        <ParamKnob id="metronome.level" label="Click level" size="sm" />
 
         <button
           type="button"

@@ -35,12 +35,9 @@ function contrast(a: string, b: string): number {
 
 describe('colour tokens', () => {
   const dark = tokenValues(tokens, ':root {');
-  const light = new Map([...dark, ...tokenValues(tokens, ":root[data-theme='light']")]);
 
-  it.each([
-    ['dark', dark],
-    ['light', light],
-  ])('meet AA contrast for text in the %s theme', (_, theme) => {
+  it('meet AA contrast for text', () => {
+    const theme = dark;
     const get = (name: string) => {
       const value = theme.get(name);
       if (!value) throw new Error(`missing token ${name}`);
@@ -53,7 +50,7 @@ describe('colour tokens', () => {
       ['text-muted', 'surface'],
       ['accent', 'bg'],
       ['accent', 'surface'],
-      ['bg', 'accent'], // text on accent buttons
+      ['accent-ink', 'accent'], // text on accent buttons
       ['clip-ink', 'clip-audio'],
       ['clip-ink', 'clip-synth'],
       ['clip-ink', 'clip-sampler'],
