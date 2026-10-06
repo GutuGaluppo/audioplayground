@@ -46,10 +46,12 @@ if(AP_BUILD_DESKTOP)
     add_executable(ap_desktop_tests
         desktop/AudioRecorderTests.cpp
         desktop/BridgeCodecTests.cpp
+        desktop/NoteCaptureTests.cpp
         desktop/NoteRecorderTests.cpp
         desktop/SampleLoaderTests.cpp
         desktop/SessionTests.cpp
         "${PROJECT_SOURCE_DIR}/apps/desktop/src/AudioRecorder.cpp"
+        "${PROJECT_SOURCE_DIR}/apps/desktop/src/NoteCapture.cpp"
         "${PROJECT_SOURCE_DIR}/apps/desktop/src/NoteRecorder.cpp"
         "${PROJECT_SOURCE_DIR}/apps/desktop/src/SampleLoader.cpp"
         "${PROJECT_SOURCE_DIR}/apps/desktop/src/Session.cpp"
@@ -67,7 +69,7 @@ if(AP_BUILD_DESKTOP)
         juce::juce_recommended_config_flags
         Catch2::Catch2WithMain)
     get_target_property(_ap_test_opts ap_project_options INTERFACE_COMPILE_OPTIONS)
-    set_source_files_properties(desktop/AudioRecorderTests.cpp desktop/BridgeCodecTests.cpp desktop/NoteRecorderTests.cpp desktop/SampleLoaderTests.cpp desktop/SessionTests.cpp
+    set_source_files_properties(desktop/AudioRecorderTests.cpp desktop/BridgeCodecTests.cpp desktop/NoteCaptureTests.cpp desktop/NoteRecorderTests.cpp desktop/SampleLoaderTests.cpp desktop/SessionTests.cpp
         PROPERTIES COMPILE_OPTIONS "${_ap_test_opts}")
     catch_discover_tests(ap_desktop_tests)
 endif()

@@ -17,7 +17,7 @@ struct Fixture
     test::TempDirectory temp;
     engine::Engine engine;
     desktop::Session session {engine, io::ProjectFolder {temp.path() / "Unsaved"}};
-    desktop::NoteRecorder recorder {session, engine};
+    desktop::NoteRecorder recorder {session};
     test::TestBuffer buffer {2, 480}; // 10 ms at 48 kHz
 
     Fixture() { engine.prepare (48000.0, 480); }
@@ -26,7 +26,8 @@ struct Fixture
     {
         for (int b = 0; b < blocks; ++b)
             engine.process (buffer.block());
-        recorder.poll();
+        while (const auto note = engine.popPlayedNote())
+            recorder.handle (*note);
     }
 
     void note (NoteEvent::Type type, int pitch, float velocity = 0.8f)

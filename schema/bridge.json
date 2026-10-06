@@ -171,6 +171,7 @@
       }
     },
     "transport.record": {},
+    "transport.capture": {},
     "transport.seek": {
       "ticks": {
         "type": "int",
@@ -562,6 +563,9 @@
         "type": "int",
         "min": 0,
         "max": 2147483647
+      },
+      "captureAvailable": {
+        "type": "bool"
       },
       "loopEnabled": {
         "type": "bool"

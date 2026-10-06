@@ -19,6 +19,7 @@ export function TransportBar() {
 
   const playing = state?.playing ?? false;
   const recording = state?.recording ?? false;
+  const captureAvailable = state?.captureAvailable ?? false;
   const [tempoDraft, setTempoDraft] = useState<string | null>(null);
 
   useEffect(() => {
@@ -36,6 +37,15 @@ export function TransportBar() {
       ) {
         event.preventDefault();
         bridge.send({ type: 'transport.record', payload: {} });
+      } else if (
+        event.code === 'KeyC' &&
+        event.shiftKey &&
+        !event.metaKey &&
+        !event.ctrlKey &&
+        !event.altKey
+      ) {
+        event.preventDefault();
+        bridge.send({ type: 'transport.capture', payload: {} });
       }
     };
     window.addEventListener('keydown', onKeyDown);
@@ -104,6 +114,18 @@ export function TransportBar() {
           }}
         >
           <span aria-hidden="true">●</span>
+        </button>
+        <button
+          type="button"
+          className="transport__button transport__button--capture"
+          aria-label="Capture what you just played"
+          title="Capture: turn what you just played into a clip, even without recording (Shift+C)"
+          disabled={!captureAvailable}
+          onClick={() => {
+            bridge.send({ type: 'transport.capture', payload: {} });
+          }}
+        >
+          <span aria-hidden="true">⤓</span>
         </button>
         <span className="transport__divider" aria-hidden="true" />
         <HistoryControls />

@@ -120,7 +120,8 @@ WebUiHost::WebUiHost (AudioDeviceHost& hostToUse, engine::Engine& engineToUse, S
     , actions (actionsToUse)
     , samples (samplesToUse)
     , audioRecorder (audioRecorderToUse)
-    , recorder (sessionToUse, engineToUse)
+    , recorder (sessionToUse)
+    , capture (sessionToUse)
 {
     const auto devUrl = developmentServerUrl();
 
@@ -525,6 +526,8 @@ void WebUiHost::sendTransportState()
     event.armedTrack = static_cast<int> (
         std::min<std::uint64_t> (audioRecorder.getArmedTrack().value, std::numeric_limits<int>::max()));
     lastRecording = event.recording;
+    event.captureAvailable = capture.hasNotes();
+    lastCaptureAvailable = event.captureAvailable;
     const auto loop = transport.getLoop();
     event.loopEnabled = loop.enabled;
     event.loopStart = static_cast<int> (std::clamp<core::Ticks> (loop.start, 0, model::maxTimelineTicks));
@@ -565,19 +568,19 @@ void WebUiHost::timerCallback()
         ap::bridge::EngineMeters {juce::jlimit (0.0, 1.0, static_cast<double> (engine.consumeOutputPeak())),
                                   juce::jlimit (0.0, 1.0, static_cast<double> (engine.consumeInputPeak()))});
 
-    recorder.poll();
+    pumpPlayedNotes();
     audioRecorder.poll(); // may end the take by itself (loop wrap, device change, length limit)
 
     // The audio thread may change the playing state (e.g. a device restart); keep the UI in sync.
     if (engine.getTransport().getState().playing != lastPlaying)
     {
-        if (lastPlaying && recorder.isRecording())
-            recorder.stop (engine.getTransport().getState().positionTicks);
+        if (lastPlaying)
+            stopNoteRecording (engine.getTransport().getState().positionTicks);
         if (lastPlaying)
             audioRecorder.stop();
         sendTransportState();
     }
-    else if (isRecording() != lastRecording)
+    else if (isRecording() != lastRecording || capture.hasNotes() != lastCaptureAvailable)
         sendTransportState();
 
     sendTransportPosition (false);

@@ -2,6 +2,7 @@
 
 #include "AudioDeviceHost.h"
 #include "AudioRecorder.h"
+#include "NoteCapture.h"
 #include "NoteRecorder.h"
 #include "ProjectActions.h"
 #include "SampleLoader.h"
@@ -69,6 +70,7 @@ private:
     void handle (const ap::bridge::TransportSetCountIn&);
     void handle (const ap::bridge::MetronomeSetEnabled&);
     void handle (const ap::bridge::TransportRecord&);
+    void handle (const ap::bridge::TransportCapture&);
     void handle (const ap::bridge::TransportSeek&);
     void handle (const ap::bridge::TransportSetLoop&);
     void handle (const ap::bridge::TrackAdd&);
@@ -95,6 +97,8 @@ private:
     bool editClip (std::uint64_t clip, model::ClipEdit edit, std::uint64_t gesture,
                    const std::function<model::Clip (const model::Clip&)>& change);
     void stopTransport();
+    void stopNoteRecording (core::Ticks position);
+    void pumpPlayedNotes();
     void disarm();
     [[nodiscard]] bool isRecording() const noexcept
     {
@@ -125,10 +129,12 @@ private:
     AudioRecorder& audioRecorder;
 
     NoteRecorder recorder;
+    NoteCapture capture;
     std::unique_ptr<LockedDownWebView> webView;
     ap::bridge::TransportPosition lastPosition;
     bool lastPlaying = false;
     bool lastRecording = false;
+    bool lastCaptureAvailable = false;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (WebUiHost)
 };

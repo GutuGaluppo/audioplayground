@@ -25,11 +25,14 @@
 namespace ap::engine
 {
 
-// A live note played while recording, stamped with the timeline position the player heard when
-// playing it (the output latency is subtracted).
-struct RecordedNote
+// A live note (keyboard, MIDI), stamped with when the player heard the music while playing it:
+// the output latency is subtracted. Every live note is logged, so notes can be recorded while the
+// transport plays and captured afterwards (retroactive capture) whether it played or not.
+struct PlayedNote
 {
-    core::Ticks ticks = 0;
+    core::Samples clock = 0; // engine sample clock: counts every rendered sample, never jumps
+    bool playing = false;    // the transport was playing (ticks is valid)
+    core::Ticks ticks = 0;   // timeline position, may be negative during a count-in
     instruments::NoteEvent event;
     model::InstrumentKind instrument = model::InstrumentKind::synth;
 };
@@ -98,23 +101,20 @@ public:
     bool sendNoteFromUi (const instruments::NoteEvent& event) noexcept { return uiNotes.push (event); }
     bool sendNoteFromMidi (const instruments::NoteEvent& event) noexcept { return midiNotes.push (event); }
 
-    // Note recording (any thread). While enabled and playing, live notes are queued for the
-    // message thread, which builds the clip. latency: output latency in samples, so a note is
-    // placed where the player heard the music, not where the engine was rendering.
-    void setNoteRecording (bool enabled) noexcept
-    {
-        recordingNotes.store (enabled, std::memory_order_relaxed);
-    }
-    [[nodiscard]] bool isRecordingNotes() const noexcept
-    {
-        return recordingNotes.load (std::memory_order_relaxed);
-    }
+    // Played-note log. latency: output latency in samples, so a note is stamped where the player
+    // heard the music, not where the engine was rendering. Any thread.
     void setRecordingLatency (core::Samples latency) noexcept
     {
         recordingLatency.store (std::max<core::Samples> (0, latency), std::memory_order_relaxed);
     }
-    // Message thread only.
-    [[nodiscard]] std::optional<RecordedNote> popRecordedNote() noexcept { return recordedNotes.pop(); }
+    // Message thread only (the single consumer). Drain it regularly: when full, new notes are not
+    // logged (they still play).
+    [[nodiscard]] std::optional<PlayedNote> popPlayedNote() noexcept { return playedNotes.pop(); }
+    // The engine sample clock now (see PlayedNote::clock), minus the output latency.
+    [[nodiscard]] core::Samples getHeardClock() const noexcept
+    {
+        return clock.load (std::memory_order_relaxed) - recordingLatency.load (std::memory_order_relaxed);
+    }
 
     // Audio recording: the device input captured while the transport plays (see InputCapture).
     [[nodiscard]] InputCapture& getInputCapture() noexcept { return inputCapture; }
@@ -183,9 +183,9 @@ private:
     TimelinePlayer timeline;
     std::vector<float> busStorage; // 2 channels x maxBlock per instrument, allocated in prepare()
 
-    std::atomic<bool> recordingNotes {false};
     std::atomic<core::Samples> recordingLatency {0};
-    core::SpscQueue<RecordedNote, 1024> recordedNotes;
+    core::SpscQueue<PlayedNote, 1024> playedNotes;
+    std::atomic<core::Samples> clock {0}; // written by the audio thread only
 
     dsp::SineOscillator toneOscillator;
     dsp::LinearSmoothedValue toneGain;

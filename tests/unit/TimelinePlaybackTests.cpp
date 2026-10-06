@@ -292,17 +292,21 @@ TEST_CASE ("Track mute and volume apply to the instrument's timeline and live no
     CHECK (peak (render (0.0f, true), 0, 48000) == 0.0f);
 }
 
-TEST_CASE ("Live notes are recorded where the player heard them", "[timeline][recording]")
+TEST_CASE ("Live notes are logged where the player heard them", "[timeline][recording]")
 {
     LiveRig rig;
-    rig.engine.setNoteRecording (true);
     rig.engine.setRecordingLatency (2048);
 
-    SECTION ("not while stopped")
+    SECTION ("while stopped: on the sample clock only")
     {
+        rig.run (4);
         rig.engine.sendNoteFromUi ({instruments::NoteEvent::Type::noteOn, 60, 1.0f});
         rig.run (1);
-        CHECK_FALSE (rig.engine.popRecordedNote());
+        const auto note = rig.engine.popPlayedNote();
+        REQUIRE (note);
+        CHECK_FALSE (note->playing);
+        CHECK (note->clock == 4 * 512 - 2048);
+        CHECK (rig.engine.getHeardClock() == 5 * 512 - 2048);
     }
 
     SECTION ("while playing, minus the output latency")
@@ -314,17 +318,19 @@ TEST_CASE ("Live notes are recorded where the player heard them", "[timeline][re
         rig.engine.sendNoteFromUi ({instruments::NoteEvent::Type::noteOff, 64, 0.0f});
         rig.run (1);
 
-        const auto on = rig.engine.popRecordedNote();
-        const auto off = rig.engine.popRecordedNote();
+        const auto on = rig.engine.popPlayedNote();
+        const auto off = rig.engine.popPlayedNote();
         REQUIRE (on);
         REQUIRE (off);
         const core::TempoMap map (120.0, {}, fs);
+        CHECK (on->playing);
         CHECK (on->ticks == map.samplesToTicks (20 * 512 - 2048));
+        CHECK (on->clock == 20 * 512 - 2048);
         CHECK (on->event.note == 64);
         CHECK (on->event.velocity == 0.5f);
         CHECK (on->instrument == model::InstrumentKind::synth);
         CHECK (off->ticks == map.samplesToTicks (21 * 512 - 2048));
         CHECK (off->event.type == instruments::NoteEvent::Type::noteOff);
-        CHECK_FALSE (rig.engine.popRecordedNote());
+        CHECK_FALSE (rig.engine.popPlayedNote());
     }
 }

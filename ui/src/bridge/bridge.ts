@@ -98,6 +98,7 @@ export function createSimulatedBridge(): Bridge {
   let beatsElapsed = 0;
   let countInBeatsLeft = 0;
   let recording = false;
+  let captureAvailable = false; // the simulation remembers that notes were played, not which
   let armedTrack = 0; // the simulated "microphone" is gentle noise on the input meter
   let loop = { enabled: false, start: 0, end: 0 };
 
@@ -208,6 +209,7 @@ export function createSimulatedBridge(): Bridge {
         metronomeEnabled,
         recording,
         armedTrack,
+        captureAvailable,
         loopEnabled: loop.enabled,
         loopStart: loop.start,
         loopEnd: loop.end,
@@ -430,9 +432,21 @@ export function createSimulatedBridge(): Bridge {
           });
           return;
         case 'note.on':
+          if (!captureAvailable) {
+            captureAvailable = true;
+            queueMicrotask(sendTransportState);
+          }
+          return; // no sound in the browser simulation
         case 'note.off':
         case 'note.allOff':
-          return; // no sound in the browser simulation
+          return;
+        case 'transport.capture':
+          captureAvailable = false;
+          queueMicrotask(() => {
+            notice('Capture turns what you just played into a clip in the desktop app.');
+            sendTransportState();
+          });
+          return;
         case 'edit.undo':
           queueMicrotask(() => {
             const edit = undoStack.pop();

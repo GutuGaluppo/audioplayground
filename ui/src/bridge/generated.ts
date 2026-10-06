@@ -232,6 +232,11 @@ export interface TransportRecord {
   readonly payload: {};
 }
 
+export interface TransportCapture {
+  readonly type: 'transport.capture';
+  readonly payload: {};
+}
+
 export interface TransportSeek {
   readonly type: 'transport.seek';
   readonly payload: {
@@ -412,7 +417,7 @@ export interface ClipEditNote {
   };
 }
 
-export type Intent = AppReady | AudioOpenSettings | ToneSetEnabled | TransportPlay | TransportStop | TransportReturnToStart | TransportSetTempo | TransportSetCountIn | MetronomeSetEnabled | ParamSet | EditUndo | EditRedo | ProjectNew | ProjectOpen | ProjectSave | ProjectSaveAs | ProjectRename | NoteOn | NoteOff | NoteAllOff | InstrumentSelect | SamplerLoad | DrumsSetStep | DrumsClear | DrumsTrigger | DrumsSetPad | DrumsLoadPad | DrumsResetPad | TransportRecord | TransportSeek | TransportSetLoop | TrackAdd | TrackRemove | TrackRename | TrackSetVolume | TrackSetPan | TrackSetMute | TrackSetSolo | TrackSetArmed | TrackImportAudio | ClipCreate | ClipMove | ClipResize | ClipSplit | ClipRemove | ClipDuplicate | ClipSetLoop | ClipAddNote | ClipRemoveNote | ClipEditNote;
+export type Intent = AppReady | AudioOpenSettings | ToneSetEnabled | TransportPlay | TransportStop | TransportReturnToStart | TransportSetTempo | TransportSetCountIn | MetronomeSetEnabled | ParamSet | EditUndo | EditRedo | ProjectNew | ProjectOpen | ProjectSave | ProjectSaveAs | ProjectRename | NoteOn | NoteOff | NoteAllOff | InstrumentSelect | SamplerLoad | DrumsSetStep | DrumsClear | DrumsTrigger | DrumsSetPad | DrumsLoadPad | DrumsResetPad | TransportRecord | TransportCapture | TransportSeek | TransportSetLoop | TrackAdd | TrackRemove | TrackRename | TrackSetVolume | TrackSetPan | TrackSetMute | TrackSetSolo | TrackSetArmed | TrackImportAudio | ClipCreate | ClipMove | ClipResize | ClipSplit | ClipRemove | ClipDuplicate | ClipSetLoop | ClipAddNote | ClipRemoveNote | ClipEditNote;
 
 // Events: native -> UI
 export interface EngineStatus {
@@ -449,6 +454,7 @@ export interface TransportState {
     readonly metronomeEnabled: boolean;
     readonly recording: boolean;
     readonly armedTrack: number;
+    readonly captureAvailable: boolean;
     readonly loopEnabled: boolean;
     readonly loopStart: number;
     readonly loopEnd: number;
@@ -665,7 +671,7 @@ const eventValidators: Record<NativeEventType, (payload: Payload) => boolean> = 
     typeof payload['peak'] === 'number' && Number.isFinite(payload['peak']) && payload['peak'] >= 0 && payload['peak'] <= 1 &&
     typeof payload['inputPeak'] === 'number' && Number.isFinite(payload['inputPeak']) && payload['inputPeak'] >= 0 && payload['inputPeak'] <= 1,
   'transport.state': (payload) =>
-    hasOnlyKeys(payload, ['playing', 'bpm', 'numerator', 'denominator', 'countInBars', 'metronomeEnabled', 'recording', 'armedTrack', 'loopEnabled', 'loopStart', 'loopEnd']) &&
+    hasOnlyKeys(payload, ['playing', 'bpm', 'numerator', 'denominator', 'countInBars', 'metronomeEnabled', 'recording', 'armedTrack', 'captureAvailable', 'loopEnabled', 'loopStart', 'loopEnd']) &&
     typeof payload['playing'] === 'boolean' &&
     typeof payload['bpm'] === 'number' && Number.isFinite(payload['bpm']) && payload['bpm'] >= 20 && payload['bpm'] <= 300 &&
     Number.isInteger(payload['numerator']) && (payload['numerator'] as number) >= 1 && (payload['numerator'] as number) <= 32 &&
@@ -674,6 +680,7 @@ const eventValidators: Record<NativeEventType, (payload: Payload) => boolean> = 
     typeof payload['metronomeEnabled'] === 'boolean' &&
     typeof payload['recording'] === 'boolean' &&
     Number.isInteger(payload['armedTrack']) && (payload['armedTrack'] as number) >= 0 && (payload['armedTrack'] as number) <= 2147483647 &&
+    typeof payload['captureAvailable'] === 'boolean' &&
     typeof payload['loopEnabled'] === 'boolean' &&
     Number.isInteger(payload['loopStart']) && (payload['loopStart'] as number) >= 0 && (payload['loopStart'] as number) <= 38400000 &&
     Number.isInteger(payload['loopEnd']) && (payload['loopEnd'] as number) >= 0 && (payload['loopEnd'] as number) <= 38400000,

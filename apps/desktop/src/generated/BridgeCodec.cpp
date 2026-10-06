@@ -508,6 +508,17 @@ std::optional<Intent> parseTransportRecord (const juce::var& payloadVar)
     return Intent {message};
 }
 
+std::optional<Intent> parseTransportCapture (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {}))
+        return std::nullopt;
+
+    TransportCapture message;
+
+    return Intent {message};
+}
+
 std::optional<Intent> parseTransportSeek (const juce::var& payloadVar)
 {
     const auto* payload = payloadVar.getDynamicObject();
@@ -844,6 +855,8 @@ std::optional<Intent> parseIntent (const juce::var& message)
         return parseDrumsResetPad (payload);
     if (typeName == TransportRecord::type)
         return parseTransportRecord (payload);
+    if (typeName == TransportCapture::type)
+        return parseTransportCapture (payload);
     if (typeName == TransportSeek::type)
         return parseTransportSeek (payload);
     if (typeName == TransportSetLoop::type)
@@ -926,6 +939,7 @@ juce::var toVar (const Event& event)
                 payload->setProperty ("metronomeEnabled", m.metronomeEnabled);
                 payload->setProperty ("recording", m.recording);
                 payload->setProperty ("armedTrack", m.armedTrack);
+                payload->setProperty ("captureAvailable", m.captureAvailable);
                 payload->setProperty ("loopEnabled", m.loopEnabled);
                 payload->setProperty ("loopStart", m.loopStart);
                 payload->setProperty ("loopEnd", m.loopEnd);

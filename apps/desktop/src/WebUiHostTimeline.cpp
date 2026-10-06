@@ -59,10 +59,27 @@ void WebUiHost::stopTransport()
 {
     const auto position = engine.getTransport().getState().positionTicks;
     engine.getTransport().requestStop();
-    if (recorder.isRecording())
-        recorder.stop (position);
+    stopNoteRecording (position);
     audioRecorder.stop();
     sendTransportState();
+}
+
+void WebUiHost::pumpPlayedNotes()
+{
+    while (const auto note = engine.popPlayedNote())
+    {
+        recorder.handle (*note);
+        capture.handle (*note);
+    }
+}
+
+void WebUiHost::stopNoteRecording (core::Ticks position)
+{
+    if (!recorder.isRecording())
+        return;
+    pumpPlayedNotes();
+    if (recorder.stop (position))
+        capture.clear(); // already on the timeline: capturing them again would duplicate them
 }
 
 void WebUiHost::disarm()
@@ -94,6 +111,15 @@ void WebUiHost::handle (const ap::bridge::TransportRecord&)
         }
     recorder.start();
     engine.getTransport().requestPlay();
+    sendTransportState();
+}
+
+void WebUiHost::handle (const ap::bridge::TransportCapture&)
+{
+    pumpPlayedNotes();
+    if (!capture.capture (engine.getHeardClock(), engine.getTransport().getState().positionTicks,
+                          engine.getSampleRate()))
+        showNotice (ProjectActions::NoticeLevel::info, "Play something first, then capture it.");
     sendTransportState();
 }
 

@@ -132,6 +132,7 @@ void Engine::processBlock (core::AudioBlock output, core::InputBlock input) noex
         renderInstrument (static_cast<model::InstrumentKind> (k), output);
 
     renderTestTone (output);
+    clock.store (clock.load (std::memory_order_relaxed) + output.numSamples, std::memory_order_relaxed);
 }
 
 void Engine::routeLiveNote (const instruments::NoteEvent& note) noexcept AP_NONBLOCKING
@@ -139,13 +140,13 @@ void Engine::routeLiveNote (const instruments::NoteEvent& note) noexcept AP_NONB
     const auto instrument = static_cast<model::InstrumentKind> (routedInstrument);
     timeline.events (instrument).add (0, note);
 
-    if (note.type != instruments::NoteEvent::Type::allNotesOff && transport.isPlayingOnAudioThread()
-        && recordingNotes.load (std::memory_order_relaxed))
-    {
-        const auto heard
-            = transport.getPositionOnAudioThread() - recordingLatency.load (std::memory_order_relaxed);
-        recordedNotes.push ({transport.getTempoMap().samplesToTicks (heard), note, instrument});
-    }
+    const auto latency = recordingLatency.load (std::memory_order_relaxed);
+    const bool playing = transport.isPlayingOnAudioThread();
+    const auto heardTicks
+        = playing ? transport.getTempoMap().samplesToTicks (transport.getPositionOnAudioThread() - latency)
+                  : 0;
+    (void)playedNotes.push (
+        {clock.load (std::memory_order_relaxed) - latency, playing, heardTicks, note, instrument});
 }
 
 void Engine::handleNote (model::InstrumentKind instrument,

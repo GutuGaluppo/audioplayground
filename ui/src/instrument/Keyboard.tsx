@@ -79,6 +79,7 @@ function PianoKeyboard() {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.metaKey || event.ctrlKey || event.altKey || isTextEntry(event.target)) return;
       if (event.code === OCTAVE_DOWN_CODE || event.code === OCTAVE_UP_CODE) {
+        if (event.shiftKey) return; // Shift+letter is a command (e.g. Shift+C: capture)
         if (!event.repeat)
           setBaseNote((n) =>
             Math.min(
@@ -89,6 +90,7 @@ function PianoKeyboard() {
         return;
       }
       if (event.code === VELOCITY_DOWN_CODE || event.code === VELOCITY_UP_CODE) {
+        if (event.shiftKey) return;
         if (!event.repeat)
           setVelocityIndex((i) =>
             Math.min(

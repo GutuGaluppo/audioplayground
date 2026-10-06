@@ -5,28 +5,34 @@
 
 #include <array>
 #include <optional>
+#include <string_view>
 #include <vector>
 
 namespace ap::desktop
 {
 
-// Turns the notes played while recording into a note clip on the track of the instrument they
-// were played on, creating that track if needed. One recording is one undo step. The clip spans
-// whole bars around what was played. Message thread only.
+using NotesPerInstrument = std::array<std::vector<model::Note>, model::numInstrumentKinds>;
+
+// Adds a note clip for each instrument that has notes (in timeline ticks), on that instrument's
+// track, creating the track if needed. Each clip spans whole bars around its notes; notes before 0
+// are cut at 0 (count-in). All of it is one undo step named description (a string literal).
+// Returns true if anything was added.
+bool addNoteClips (Session& session, std::string_view description, NotesPerInstrument notes);
+
+// Turns the notes played while recording into note clips (see addNoteClips). One recording is one
+// undo step. Message thread only; the host feeds it every played note from the engine's log.
 class NoteRecorder
 {
 public:
-    NoteRecorder (Session& session, engine::Engine& engine);
-    ~NoteRecorder();
+    explicit NoteRecorder (Session& session);
 
     void start();
-    // Stops recording and adds what was played. stopPosition closes notes still held.
-    // Returns true if a clip was added.
+    // Stops recording and adds what was played. stopPosition closes notes still held. Feed the
+    // notes logged so far first. Returns true if a clip was added.
     bool stop (core::Ticks stopPosition);
     [[nodiscard]] bool isRecording() const noexcept { return recording; }
 
-    // Collects notes from the engine; call regularly while recording.
-    void poll();
+    void handle (const engine::PlayedNote& note);
 
 private:
     struct Held
@@ -40,10 +46,9 @@ private:
     void close (std::size_t instrument, std::uint8_t pitch, core::Ticks end);
 
     Session& session;
-    engine::Engine& engine;
     bool recording = false;
     std::array<std::array<std::optional<Held>, 128>, numInstruments> held {};
-    std::array<std::vector<model::Note>, numInstruments> played;
+    NotesPerInstrument played;
 };
 
 } // namespace ap::desktop

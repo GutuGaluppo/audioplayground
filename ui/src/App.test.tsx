@@ -362,4 +362,37 @@ describe('App', () => {
     await flush();
     expect(loop.getAttribute('aria-pressed')).toBe('true');
   });
+
+  it('arms an audio track and meters its input', async () => {
+    await renderApp();
+    fireEvent.click(screen.getByRole('button', { name: '+ Track' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Audio' }));
+    await flush();
+    expect(screen.queryByRole('img', { name: 'Audio 1 input level' })).toBeNull();
+
+    const arm = screen.getByRole('button', { name: 'Record into Audio 1' });
+    fireEvent.click(arm);
+    await flush();
+    expect(arm.getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByRole('img', { name: 'Audio 1 input level' })).toBeTruthy();
+
+    fireEvent.click(arm);
+    await flush();
+    expect(arm.getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('captures what was just played with Shift+C', async () => {
+    await renderApp();
+    const capture = screen.getByRole('button', { name: 'Capture what you just played' });
+    expect(capture).toHaveProperty('disabled', true);
+
+    fireEvent.keyDown(window, { code: 'KeyA' });
+    fireEvent.keyUp(window, { code: 'KeyA' });
+    await flush();
+    expect(capture).toHaveProperty('disabled', false);
+
+    fireEvent.keyDown(window, { code: 'KeyC', shiftKey: true });
+    await flush();
+    expect(capture).toHaveProperty('disabled', true);
+  });
 });
