@@ -34,6 +34,9 @@ cmake --preset asan && cmake --build --preset asan && ctest --preset asan
 # RealtimeSanitizer (Clang >= 20; runs in CI — Apple Clang does not ship it)
 cmake --preset rtsan && cmake --build --preset rtsan && ctest --preset rtsan
 
+# CPU budget of the reference project (8 tracks, 16 voices, every effect; plan §3.2). Release only.
+cmake --preset release && cmake --build --preset release --target ap_benchmarks && ./build/release/tests/ap_benchmarks
+
 # Regenerate golden audio references after an intended sound change (review + listen before committing)
 AP_UPDATE_GOLDENS=1 ./build/dev/tests/ap_unit_tests "[golden]"
 

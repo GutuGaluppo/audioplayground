@@ -93,3 +93,13 @@ if(AP_BUILD_FUZZERS)
     target_compile_options(ap_fuzz_project_loader PRIVATE -fsanitize=fuzzer)
     target_link_options(ap_fuzz_project_loader PRIVATE -fsanitize=fuzzer)
 endif()
+
+# CPU budget of the reference project (plan §3.2). Meaningful in optimised builds only, so it is a
+# test there and a plain executable elsewhere.
+add_executable(ap_benchmarks benchmarks/ReferenceProject.cpp)
+target_include_directories(ap_benchmarks PRIVATE support)
+target_link_libraries(ap_benchmarks PRIVATE ap::core ap::project_options)
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
+    add_test(NAME cpu_budget_reference_project COMMAND ap_benchmarks)
+    set_tests_properties(cpu_budget_reference_project PROPERTIES LABELS benchmark)
+endif()
