@@ -115,6 +115,26 @@ struct Clip
     bool operator== (const Clip&) const = default;
 };
 
+// One effect of a track's fixed chain (ADR-009). values are in the order of
+// params::effectDescriptors[effect].parameters; unused slots stay 0.
+struct EffectState
+{
+    bool enabled = false;
+    std::array<float, params::maxEffectParameters> values {};
+
+    bool operator== (const EffectState&) const = default;
+};
+
+using TrackEffects = std::array<EffectState, params::numEffects>;
+
+// Every effect off, at its default values.
+[[nodiscard]] TrackEffects defaultTrackEffects() noexcept;
+[[nodiscard]] EffectState defaultEffectState (params::EffectKind effect) noexcept;
+
+// Clamps every value into its range and onto its step; nullopt if any value is not finite.
+[[nodiscard]] std::optional<EffectState> normaliseEffect (params::EffectKind effect,
+                                                          const EffectState& state) noexcept;
+
 struct Track
 {
     static constexpr float minVolumeDb = -60.0f; // treated as silence
@@ -132,6 +152,7 @@ struct Track
     bool muted = false;
     bool soloed = false;
     std::vector<Clip> clips; // sorted by start, then id
+    TrackEffects effects = defaultTrackEffects();
 
     bool operator== (const Track&) const = default;
 };

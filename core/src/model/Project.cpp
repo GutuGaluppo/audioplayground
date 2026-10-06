@@ -1,6 +1,7 @@
 #include "ap/model/Project.h"
 
 #include <algorithm>
+#include <cmath>
 
 namespace ap::model
 {
@@ -107,6 +108,43 @@ std::optional<std::string> sanitiseName (std::string_view input, std::size_t max
         result.resize (last + 1);
     }
 
+    return result;
+}
+
+EffectState defaultEffectState (params::EffectKind effect) noexcept
+{
+    const auto& descriptor = params::effectDescriptors[static_cast<std::size_t> (effect)];
+    EffectState state;
+    for (std::size_t i = 0; i < descriptor.numParameters; ++i)
+        state.values[i] = descriptor.parameters[i].defaultValue;
+    return state;
+}
+
+TrackEffects defaultTrackEffects() noexcept
+{
+    TrackEffects effects;
+    for (std::size_t e = 0; e < params::numEffects; ++e)
+        effects[e] = defaultEffectState (static_cast<params::EffectKind> (e));
+    return effects;
+}
+
+std::optional<EffectState> normaliseEffect (params::EffectKind effect, const EffectState& state) noexcept
+{
+    if (static_cast<std::size_t> (effect) >= params::numEffects)
+        return std::nullopt;
+    const auto& descriptor = params::effectDescriptors[static_cast<std::size_t> (effect)];
+    EffectState result;
+    result.enabled = state.enabled;
+    for (std::size_t i = 0; i < descriptor.numParameters; ++i)
+    {
+        const auto& d = descriptor.parameters[i];
+        const float value = state.values[i];
+        if (!std::isfinite (value))
+            return std::nullopt;
+        const float snapped
+            = d.min + std::round ((std::clamp (value, d.min, d.max) - d.min) / d.step) * d.step;
+        result.values[i] = std::clamp (snapped, d.min, d.max);
+    }
     return result;
 }
 

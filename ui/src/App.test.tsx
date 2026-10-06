@@ -395,4 +395,37 @@ describe('App', () => {
     await flush();
     expect(capture).toHaveProperty('disabled', true);
   });
+
+  it("edits the selected track's effects, with presets and undo", async () => {
+    await renderApp();
+    fireEvent.click(screen.getByRole('button', { name: '+ Track' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Audio' }));
+    await flush();
+    expect(screen.queryByRole('region', { name: 'Audio 1 effects' })).toBeNull();
+
+    fireEvent.pointerDown(screen.getByRole('group', { name: 'Audio 1 track' }));
+    await flush();
+    const panel = screen.getByRole('region', { name: 'Audio 1 effects' });
+    expect(panel).toBeTruthy();
+
+    const reverb = screen.getByRole('button', { name: 'Reverb off' });
+    fireEvent.click(reverb);
+    await flush();
+    expect(screen.getByRole('button', { name: 'Reverb on' }).getAttribute('aria-pressed')).toBe(
+      'true',
+    );
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Delay preset' }), {
+      target: { value: 'delay.space-echo' },
+    });
+    await flush();
+    expect(screen.getByRole('button', { name: 'Delay on' })).toBeTruthy();
+    expect(screen.getByRole('slider', { name: 'Time' }).getAttribute('aria-valuetext')).toBe(
+      '380 ms',
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /undo/i }));
+    await flush();
+    expect(screen.getByRole('button', { name: 'Delay off' })).toBeTruthy();
+  });
 });

@@ -10,6 +10,7 @@ add_executable(ap_unit_tests
     unit/DelayTests.cpp
     unit/DistortionTests.cpp
     unit/DrumMachineTests.cpp
+    unit/EffectChainTests.cpp
     unit/EngineTests.cpp
     unit/EqualizerTests.cpp
     unit/FilterTests.cpp

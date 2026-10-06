@@ -24,6 +24,50 @@ function fail(message) {
   process.exit(1);
 }
 
+const camel = (parts) => {
+  const joined = parts.map((part) => part[0].toUpperCase() + part.slice(1)).join('');
+  return joined[0].toLowerCase() + joined.slice(1);
+};
+const pascal = (text) => text[0].toUpperCase() + text.slice(1);
+
+function checkDescriptor(p) {
+  for (const key of ['min', 'max', 'default', 'step'])
+    if (!Number.isFinite(p[key])) fail(`${p.id}: ${key} must be a finite number`);
+  if (!(p.min < p.max)) fail(`${p.id}: min must be < max`);
+  if (p.default < p.min || p.default > p.max) fail(`${p.id}: default out of range`);
+  if (!(p.step > 0)) fail(`${p.id}: step must be > 0`);
+  if (!CURVES.has(p.curve)) fail(`${p.id}: curve must be one of ${[...CURVES].join(', ')}`);
+  if (p.curve === 'logarithmic' && p.min <= 0) fail(`${p.id}: logarithmic curves need min > 0`);
+  if (typeof p.name !== 'string' || p.name.length === 0) fail(`${p.id}: name required`);
+  if (typeof p.unit !== 'string') fail(`${p.id}: unit must be a string (may be empty)`);
+}
+
+// Per-track effect parameters: ids are "<effect>.<parameter>" and persistence contracts too.
+function loadEffects(globalIds) {
+  const { effects } = JSON.parse(readFileSync(schemaPath, 'utf8'));
+  if (!Array.isArray(effects) || effects.length === 0) fail('effects must be a non-empty array');
+  const seen = new Set();
+  return effects.map((effect) => {
+    if (!/^[a-z][a-zA-Z0-9]*$/.test(effect.id)) fail(`invalid effect id "${effect.id}"`);
+    if (seen.has(effect.id)) fail(`duplicate effect id "${effect.id}"`);
+    seen.add(effect.id);
+    if (typeof effect.name !== 'string' || effect.name.length === 0) fail(`${effect.id}: name required`);
+    if (!Array.isArray(effect.parameters) || effect.parameters.length === 0)
+      fail(`${effect.id}: parameters must be a non-empty array`);
+    const names = new Set();
+    const parameters = effect.parameters.map((p) => {
+      if (!/^[a-z][a-zA-Z0-9]*$/.test(p.id)) fail(`${effect.id}: invalid parameter id "${p.id}"`);
+      if (names.has(p.id)) fail(`${effect.id}: duplicate parameter "${p.id}"`);
+      names.add(p.id);
+      const full = { ...p, id: `${effect.id}.${p.id}`, key: p.id };
+      if (globalIds.has(full.id)) fail(`${full.id} clashes with a global parameter`);
+      checkDescriptor(full);
+      return full;
+    });
+    return { ...effect, parameters };
+  });
+}
+
 function load() {
   const { parameters } = JSON.parse(readFileSync(schemaPath, 'utf8'));
   if (!Array.isArray(parameters) || parameters.length === 0) fail('parameters must be a non-empty array');
@@ -33,27 +77,60 @@ function load() {
     if (!ID_PATTERN.test(p.id)) fail(`invalid id "${p.id}"`);
     if (seen.has(p.id)) fail(`duplicate id "${p.id}"`);
     seen.add(p.id);
-    for (const key of ['min', 'max', 'default', 'step'])
-      if (!Number.isFinite(p[key])) fail(`${p.id}: ${key} must be a finite number`);
-    if (!(p.min < p.max)) fail(`${p.id}: min must be < max`);
-    if (p.default < p.min || p.default > p.max) fail(`${p.id}: default out of range`);
-    if (!(p.step > 0)) fail(`${p.id}: step must be > 0`);
-    if (!CURVES.has(p.curve)) fail(`${p.id}: curve must be one of ${[...CURVES].join(', ')}`);
-    if (p.curve === 'logarithmic' && p.min <= 0) fail(`${p.id}: logarithmic curves need min > 0`);
-    if (typeof p.name !== 'string' || p.name.length === 0) fail(`${p.id}: name required`);
-    if (typeof p.unit !== 'string') fail(`${p.id}: unit must be a string (may be empty)`);
-    const enumName = p.id
-      .split('.')
-      .map((part) => part[0].toUpperCase() + part.slice(1))
-      .join('');
-    return { ...p, enumName: enumName[0].toLowerCase() + enumName.slice(1) };
+    checkDescriptor(p);
+    return { ...p, enumName: camel(p.id.split('.')) };
   });
 }
 
 const cppFloat = (v) => (Number.isInteger(v) ? `${v}.0f` : `${v}f`);
 const cppString = (s) => JSON.stringify(s);
 
-function generateCpp(params) {
+const cppDescriptor = (p) =>
+  `{${cppString(p.id)}, ${cppString(p.name)}, ${cppString(p.unit)}, ${cppFloat(p.min)}, ${cppFloat(p.max)}, ${cppFloat(p.default)}, ${cppFloat(p.step)}, Curve::${p.curve}}`;
+
+function generateCppEffects(effects) {
+  const maxParameters = Math.max(...effects.map((e) => e.parameters.length));
+  return `
+// --- Per-track effects (Task 024) -----------------------------------------------------------
+
+enum class EffectKind : std::uint8_t
+{
+${effects.map((e) => `    ${e.id},`).join('\n')}
+};
+
+inline constexpr std::size_t numEffects = ${effects.length};
+inline constexpr std::size_t maxEffectParameters = ${maxParameters};
+
+struct EffectDescriptor
+{
+    std::string_view id; // persistence contract
+    std::string_view name;
+    std::size_t numParameters;
+    std::array<ParameterDescriptor, maxEffectParameters> parameters; // the first numParameters are used
+};
+
+inline constexpr std::array<EffectDescriptor, numEffects> effectDescriptors {{
+${effects
+  .map(
+    (e) =>
+      `    {${cppString(e.id)}, ${cppString(e.name)}, ${e.parameters.length}, {{\n${e.parameters.map((p) => `        ${cppDescriptor(p)},`).join('\n')}\n    }}},`,
+  )
+  .join('\n')}
+}};
+${effects
+  .map(
+    (e) => `
+// Value indices of the ${e.name} effect.
+enum class ${pascal(e.id)}Param : std::uint8_t
+{
+${e.parameters.map((p) => `    ${p.key},`).join('\n')}
+};`,
+  )
+  .join('\n')}
+`;
+}
+
+function generateCpp(params, effects) {
   return `${banner}
 #pragma once
 
@@ -91,23 +168,30 @@ ${params.map((p) => `    ${p.enumName},`).join('\n')}
 inline constexpr std::size_t numParameters = ${params.length};
 
 inline constexpr std::array<ParameterDescriptor, numParameters> descriptors {{
-${params
-  .map(
-    (p) =>
-      `    {${cppString(p.id)}, ${cppString(p.name)}, ${cppString(p.unit)}, ${cppFloat(p.min)}, ${cppFloat(p.max)}, ${cppFloat(p.default)}, ${cppFloat(p.step)}, Curve::${p.curve}},`,
-  )
-  .join('\n')}
+${params.map((p) => `    ${cppDescriptor(p)},`).join('\n')}
 }};
-
+${generateCppEffects(effects)}
 } // namespace ap::params
 `;
 }
 
-function generateTs(params) {
+function generateTs(params, effects) {
   return `${banner}
 export type ParamId = ${params.map((p) => `'${p.id}'`).join(' | ')};
 
-export interface ParameterDescriptor {
+/** What every value control needs: range, default, step, display unit and curve. */
+export interface ValueDescriptor {
+  readonly id: string;
+  readonly name: string;
+  readonly unit: string;
+  readonly min: number;
+  readonly max: number;
+  readonly defaultValue: number;
+  readonly step: number;
+  readonly curve: 'linear' | 'logarithmic';
+}
+
+export interface ParameterDescriptor extends ValueDescriptor {
   readonly id: ParamId;
   readonly name: string;
   readonly unit: string;
@@ -130,13 +214,38 @@ ${params
 export function isParamId(value: unknown): value is ParamId {
   return typeof value === 'string' && Object.hasOwn(PARAMETERS, value);
 }
+
+export type EffectId = ${effects.map((e) => `'${e.id}'`).join(' | ')};
+
+export interface EffectDescriptor {
+  readonly id: EffectId;
+  readonly name: string;
+  /** In value order: track effect values are sent and stored in this order. */
+  readonly parameters: readonly ValueDescriptor[];
+}
+
+/** Per-track effects, in chain order (index = effect number on the bridge). */
+export const EFFECTS: readonly EffectDescriptor[] = [
+${effects
+  .map(
+    (e) =>
+      `  {\n    id: '${e.id}',\n    name: ${JSON.stringify(e.name)},\n    parameters: [\n${e.parameters
+        .map(
+          (p) =>
+            `      { id: '${p.id}', name: ${JSON.stringify(p.name)}, unit: ${JSON.stringify(p.unit)}, min: ${p.min}, max: ${p.max}, defaultValue: ${p.default}, step: ${p.step}, curve: '${p.curve}' },`,
+        )
+        .join('\n')}\n    ],\n  },`,
+  )
+  .join('\n')}
+];
 `;
 }
 
 const params = load();
+const effects = loadEffects(new Set(params.map((p) => p.id)));
 const files = new Map([
-  [outputs.cpp, generateCpp(params)],
-  [outputs.ts, generateTs(params)],
+  [outputs.cpp, generateCpp(params, effects)],
+  [outputs.ts, generateTs(params, effects)],
 ]);
 
 const check = process.argv.includes('--check');

@@ -99,12 +99,9 @@ std::optional<std::string> AudioRecorder::start (core::Samples latency)
     if (!engine.getInputCapture().start (engine.getSampleRate()))
         return "Recording could not start. Try again.";
 
-    take = Take {audioDir / fileName,
-                 "audio/" + fileName,
-                 nextTakeName (session.project()),
-                 track->id,
-                 std::max<core::Samples> (0, latency),
-                 false};
+    take = Take {audioDir / fileName, "audio/" + fileName, nextTakeName (session.project()), track->id,
+                 // The musician hears the engine's output after its own latency too.
+                 std::max<core::Samples> (0, latency) + engine.getOutputLatency(), false};
     stopWriter.store (false);
     writerFailed.store (false);
     framesOnDisk.store (0);

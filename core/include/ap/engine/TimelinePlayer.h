@@ -66,8 +66,28 @@ struct GainRamp
     }
 };
 
-// Plays the timeline (ADR-007) on the audio thread: renders audio clips into the output and turns
-// note clips into sample-accurate note events for the instruments, which the engine renders.
+// One stereo bus per track of the render graph, at unity gain (the engine applies the track's
+// effects, then its volume and pan). Bus t's left channel starts at data + 2 * t * stride, its right
+// channel stride samples later.
+struct TrackBuses
+{
+    float* data = nullptr;
+    int stride = 0;
+    std::size_t count = 0;
+
+    [[nodiscard]] float* left (std::size_t track) const noexcept AP_NONBLOCKING
+    {
+        return data + 2 * track * static_cast<std::size_t> (stride);
+    }
+    [[nodiscard]] float* right (std::size_t track) const noexcept AP_NONBLOCKING
+    {
+        return left (track) + stride;
+    }
+};
+
+// Plays the timeline (ADR-007) on the audio thread: renders audio clips into their tracks' buses
+// and turns note clips into sample-accurate note events for the instruments, which the engine
+// renders.
 //
 // - Audio clips fade over 2 ms at their edges and wherever playback jumps (start, seek, loop,
 //   stop); a jump also lets the audio that was playing fade out instead of cutting it.
@@ -84,11 +104,11 @@ public:
     void beginBlock (const RenderGraph* graph, int numSamples) noexcept AP_NONBLOCKING;
 
     // For each contiguous stretch of musical time in the block (see Transport::advance).
-    void segment (core::AudioBlock output, int offset, int length, core::Samples start,
+    void segment (const TrackBuses& buses, int offset, int length, core::Samples start,
                   const core::TempoMap& tempoMap) noexcept AP_NONBLOCKING;
 
     // Once per block, after the transport advanced.
-    void endBlock (core::AudioBlock output, bool playing,
+    void endBlock (const TrackBuses& buses, bool playing,
                    const core::TempoMap& tempoMap) noexcept AP_NONBLOCKING;
 
     [[nodiscard]] NoteEventList& events (model::InstrumentKind instrument) noexcept AP_NONBLOCKING
@@ -96,8 +116,11 @@ public:
         return eventLists[static_cast<std::size_t> (instrument)];
     }
 
-    // Gain for an instrument's output this block: its track's gain, or unity if it has no track.
-    [[nodiscard]] GainRamp instrumentGain (model::InstrumentKind instrument) const noexcept AP_NONBLOCKING;
+    // Gain (volume x pan x mute/solo) of the graph's track at this index for this block.
+    [[nodiscard]] GainRamp trackGain (std::size_t index) const noexcept AP_NONBLOCKING
+    {
+        return index < gainCount ? gains[index].ramp : GainRamp {};
+    }
 
 private:
     struct TrackGain
@@ -120,7 +143,7 @@ private:
         int remaining = 0; // samples of the fade left at the start of the range
     };
 
-    void renderAudio (core::AudioBlock output, int offset, int length, core::Samples start,
+    void renderAudio (const TrackBuses& buses, int offset, int length, core::Samples start,
                       const core::TempoMap& tempoMap, Fade fade) noexcept AP_NONBLOCKING;
     void scheduleNotes (int offset, int length, core::Samples start,
                         const core::TempoMap& tempoMap) noexcept AP_NONBLOCKING;
@@ -130,7 +153,7 @@ private:
                     core::Samples offSample, core::Samples segmentEnd, int segmentOffset,
                     core::Samples segmentStart) noexcept AP_NONBLOCKING;
     void jumpFrom (core::Samples position, int offset) noexcept AP_NONBLOCKING;
-    void renderTail (core::AudioBlock output, int offset, int length,
+    void renderTail (const TrackBuses& buses, int offset, int length,
                      const core::TempoMap& tempoMap) noexcept AP_NONBLOCKING;
 
     const RenderGraph* graph = nullptr;

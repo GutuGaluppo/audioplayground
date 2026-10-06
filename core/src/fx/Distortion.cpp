@@ -74,12 +74,41 @@ void Distortion::set (const DistortionSettings& settings) noexcept AP_NONBLOCKIN
     mix.setTarget (clampFinite (settings.mix, 0.0f, 1.0f, defaults.mix));
 }
 
+void Distortion::setImmediately (const DistortionSettings& settings) noexcept AP_NONBLOCKING
+{
+    set (settings);
+    drive.setCurrentAndTarget (drive.getTarget());
+    logTone.setCurrentAndTarget (logTone.getTarget());
+    output.setCurrentAndTarget (output.getTarget());
+    mix.setCurrentAndTarget (mix.getTarget());
+}
+
 void Distortion::process (core::AudioBlock block) noexcept AP_NONBLOCKING
 {
     if (block.isEmpty())
         return;
     const int numChannels = std::min (block.numChannels, 2);
     std::array<float, dsp::Oversampler4x::factor> up {};
+
+    // Fully dry (e.g. switched off in a track's chain): only the latency-matching delay runs.
+    if (!mix.isSmoothing() && mix.getCurrent() == 0.0f)
+    {
+        for (int i = 0; i < block.numSamples; ++i)
+        {
+            (void)drive.next();
+            (void)logTone.next();
+            const float out = output.next();
+            for (int ch = 0; ch < numChannels; ++ch)
+            {
+                auto& c = channels[static_cast<std::size_t> (ch)];
+                float& sample = block.channels[ch][i];
+                c.dry[c.dryPosition] = std::isfinite (sample) ? sample : 0.0f;
+                c.dryPosition = (c.dryPosition + 1) % dryLength;
+                sample = out * c.dry[c.dryPosition];
+            }
+        }
+        return;
+    }
 
     for (int i = 0; i < block.numSamples; ++i)
     {

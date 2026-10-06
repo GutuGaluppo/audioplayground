@@ -1371,3 +1371,94 @@ kbd {
   background: var(--ap-text);
   pointer-events: none;
 }
+
+/* --- Track effects (ADR-009) ------------------------------------------------------------- */
+
+.effects {
+  display: grid;
+  gap: var(--ap-space-2);
+  min-width: 0;
+  flex: 1 1 520px;
+}
+
+.effects__title {
+  margin: 0;
+  font-size: var(--ap-text-sm);
+  font-weight: 600;
+  color: var(--ap-text-muted);
+}
+
+.effects__chain {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--ap-space-2);
+}
+
+.effect {
+  display: grid;
+  align-content: start;
+  gap: var(--ap-space-2);
+  padding: var(--ap-space-2) var(--ap-space-3);
+  border: 1px solid var(--ap-border);
+  border-radius: var(--ap-radius-md);
+  background: var(--ap-surface);
+}
+
+.effect[data-enabled='false'] .effect__values {
+  opacity: 0.55;
+}
+
+.effect__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ap-space-2);
+}
+
+.effect__toggle {
+  min-height: 32px;
+  padding: 0 var(--ap-space-3);
+  border: 1px solid var(--ap-border);
+  border-radius: var(--ap-radius-sm);
+  background: transparent;
+  color: var(--ap-text-muted);
+  font-size: var(--ap-text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.effect__toggle[aria-pressed='true'] {
+  border-color: var(--ap-accent);
+  background: var(--ap-accent);
+  color: var(--ap-bg);
+}
+
+.effect__preset {
+  min-height: 32px;
+  max-width: 140px;
+  border: 1px solid var(--ap-border);
+  border-radius: var(--ap-radius-sm);
+  background: var(--ap-bg);
+  color: var(--ap-text);
+  font: inherit;
+  font-size: var(--ap-text-xs);
+}
+
+.effect__values {
+  display: grid;
+  gap: var(--ap-space-1);
+}
+
+.limiter-light {
+  padding: 0 var(--ap-space-1);
+  border: 1px solid var(--ap-border);
+  border-radius: var(--ap-radius-sm);
+  color: var(--ap-text-muted);
+  font-size: var(--ap-text-xs);
+}
+
+.limiter-light[data-active='true'] {
+  border-color: var(--ap-meter-hot);
+  background: var(--ap-meter-hot);
+  color: #17181b;
+}

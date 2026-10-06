@@ -37,6 +37,8 @@ public:
     void prepare (double sampleRate);
     void reset() noexcept AP_NONBLOCKING;
     void set (const DistortionSettings& settings) noexcept AP_NONBLOCKING;
+    // Same, without gliding (e.g. right after prepare()).
+    void setImmediately (const DistortionSettings& settings) noexcept AP_NONBLOCKING;
     void process (core::AudioBlock block) noexcept AP_NONBLOCKING;
 
     [[nodiscard]] static constexpr int latency() noexcept { return dsp::Oversampler4x::latency(); }

@@ -71,6 +71,7 @@ describe('parseNativeEvent with lists of records', () => {
     muted: false,
     soloed: false,
     clips: [clip],
+    effects: [{ enabled: true, values: [1, 2, 3] }],
   };
   const state = (tracks: unknown) => ({ type: 'timeline.state', payload: { tracks } });
 

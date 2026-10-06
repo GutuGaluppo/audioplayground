@@ -128,6 +128,22 @@ struct SetTrackVolume
     float previous = 0.0f;
 };
 
+// Changes one effect of a track's chain (on/off and values). Gestures merge per track and effect.
+struct SetTrackEffect
+{
+    SetTrackEffect (TrackId track, params::EffectKind which, EffectState state) noexcept
+        : id (track)
+        , effect (which)
+        , value (state)
+    {
+    }
+
+    TrackId id;
+    params::EffectKind effect;
+    EffectState value;
+    EffectState previous;
+};
+
 struct SetTrackPan
 {
     SetTrackPan (TrackId track, float newPan) noexcept
@@ -296,8 +312,8 @@ struct SplitClip
 
 using Command
     = std::variant<SetTempo, SetTimeSignature, RenameProject, AddTrack, RemoveTrack, MoveTrack, RenameTrack,
-                   SetTrackVolume, SetTrackPan, SetTrackMute, SetTrackSolo, SetParameter, AddAsset,
-                   SetSamplerAsset, SetDrumPad, AddClip, RemoveClip, SetClip, SplitClip>;
+                   SetTrackVolume, SetTrackPan, SetTrackEffect, SetTrackMute, SetTrackSolo, SetParameter,
+                   AddAsset, SetSamplerAsset, SetDrumPad, AddClip, RemoveClip, SetClip, SplitClip>;
 
 enum class ApplyResult
 {

@@ -62,6 +62,18 @@ struct TimelineClip
     bool operator== (const TimelineClip&) const = default;
 };
 
+struct TimelineEffect
+{
+    static constexpr float valuesMin = -100000.0f;
+    static constexpr float valuesMax = 100000.0f;
+    static constexpr std::size_t valuesMaxItems = 8;
+
+    bool enabled = false;
+    std::vector<float> values {};
+
+    bool operator== (const TimelineEffect&) const = default;
+};
+
 struct TimelineTrack
 {
     static constexpr int idMin = 1;
@@ -74,6 +86,7 @@ struct TimelineTrack
     static constexpr double panMin = -1.0;
     static constexpr double panMax = 1.0;
     static constexpr std::size_t clipsMaxItems = 512;
+    static constexpr std::size_t effectsMaxItems = 6;
 
     int id = 0;
     int kind = 0;
@@ -83,6 +96,7 @@ struct TimelineTrack
     bool muted = false;
     bool soloed = false;
     std::vector<TimelineClip> clips {};
+    std::vector<TimelineEffect> effects {};
 
     bool operator== (const TimelineTrack&) const = default;
 };
@@ -536,6 +550,28 @@ struct TrackSetArmed
     bool operator== (const TrackSetArmed&) const = default;
 };
 
+struct TrackSetEffect
+{
+    static constexpr std::string_view type = "track.setEffect";
+    static constexpr int trackMin = 1;
+    static constexpr int trackMax = 2147483647;
+    static constexpr int effectMin = 0;
+    static constexpr int effectMax = 5;
+    static constexpr float valuesMin = -100000.0f;
+    static constexpr float valuesMax = 100000.0f;
+    static constexpr std::size_t valuesMaxItems = 8;
+    static constexpr int gestureMin = 0;
+    static constexpr int gestureMax = 2147483647;
+
+    int track = 0;
+    int effect = 0;
+    bool enabled = false;
+    std::vector<float> values {};
+    int gesture = 0;
+
+    bool operator== (const TrackSetEffect&) const = default;
+};
+
 struct TrackImportAudio
 {
     static constexpr std::string_view type = "track.importAudio";
@@ -761,9 +797,12 @@ struct EngineMeters
     static constexpr double peakMax = 1.0;
     static constexpr double inputPeakMin = 0.0;
     static constexpr double inputPeakMax = 1.0;
+    static constexpr double limiterDbMin = -60.0;
+    static constexpr double limiterDbMax = 0.0;
 
     double peak = 0.0;
     double inputPeak = 0.0;
+    double limiterDb = 0.0;
 
     bool operator== (const EngineMeters&) const = default;
 };
@@ -961,7 +1000,7 @@ struct TimelinePeaks
     bool operator== (const TimelinePeaks&) const = default;
 };
 
-using Intent = std::variant<AppReady, AudioOpenSettings, ToneSetEnabled, TransportPlay, TransportStop, TransportReturnToStart, TransportSetTempo, TransportSetCountIn, MetronomeSetEnabled, ParamSet, EditUndo, EditRedo, ProjectNew, ProjectOpen, ProjectSave, ProjectSaveAs, ProjectRename, NoteOn, NoteOff, NoteAllOff, InstrumentSelect, SamplerLoad, DrumsSetStep, DrumsClear, DrumsTrigger, DrumsSetPad, DrumsLoadPad, DrumsResetPad, TransportRecord, TransportCapture, TransportSeek, TransportSetLoop, TrackAdd, TrackRemove, TrackRename, TrackSetVolume, TrackSetPan, TrackSetMute, TrackSetSolo, TrackSetArmed, TrackImportAudio, ClipCreate, ClipMove, ClipResize, ClipSplit, ClipRemove, ClipDuplicate, ClipSetLoop, ClipAddNote, ClipRemoveNote, ClipEditNote>;
+using Intent = std::variant<AppReady, AudioOpenSettings, ToneSetEnabled, TransportPlay, TransportStop, TransportReturnToStart, TransportSetTempo, TransportSetCountIn, MetronomeSetEnabled, ParamSet, EditUndo, EditRedo, ProjectNew, ProjectOpen, ProjectSave, ProjectSaveAs, ProjectRename, NoteOn, NoteOff, NoteAllOff, InstrumentSelect, SamplerLoad, DrumsSetStep, DrumsClear, DrumsTrigger, DrumsSetPad, DrumsLoadPad, DrumsResetPad, TransportRecord, TransportCapture, TransportSeek, TransportSetLoop, TrackAdd, TrackRemove, TrackRename, TrackSetVolume, TrackSetPan, TrackSetMute, TrackSetSolo, TrackSetArmed, TrackSetEffect, TrackImportAudio, ClipCreate, ClipMove, ClipResize, ClipSplit, ClipRemove, ClipDuplicate, ClipSetLoop, ClipAddNote, ClipRemoveNote, ClipEditNote>;
 using Event = std::variant<EngineStatus, EngineMeters, TransportState, TransportPosition, ParamValue, HistoryState, ProjectState, AppNotice, InstrumentState, SamplerState, DrumsPad, TimelineState, TimelineAssets, TimelinePeaks>;
 
 } // namespace ap::bridge

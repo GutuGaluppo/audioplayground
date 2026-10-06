@@ -308,3 +308,38 @@ TEST_CASE ("Drum pad settings are validated and clamped", "[model][drums]")
     CHECK (doc.project().drums.pads[0].volumeDb == DrumPad::maxVolumeDb);
     CHECK (doc.project().drums.pads[0].pitch == -DrumPad::maxPitch);
 }
+
+TEST_CASE ("Track effects are clamped, snapped, undoable, and a gesture is one step", "[model][effects]")
+{
+    using ap::params::EffectKind;
+    ProjectDocument doc;
+    const auto track = addTrack (doc);
+
+    auto filter = defaultEffectState (EffectKind::filter);
+    filter.enabled = true;
+    filter.values[0] = 1.4f;     // mode snaps to 1 (high-pass)
+    filter.values[1] = 99999.0f; // cutoff clamps to 20 kHz
+    REQUIRE (doc.perform (SetTrackEffect {track, EffectKind::filter, filter}));
+    const auto& stored = doc.project().tracks[0].effects[static_cast<std::size_t> (EffectKind::filter)];
+    CHECK (stored.enabled);
+    CHECK (stored.values[0] == 1.0f);
+    CHECK (stored.values[1] == 20000.0f);
+    CHECK (doc.undoDescription() == "Filter");
+
+    filter.values[1] = std::numeric_limits<float>::quiet_NaN();
+    CHECK_FALSE (doc.perform (SetTrackEffect {track, EffectKind::filter, filter}));
+    CHECK_FALSE (doc.perform (SetTrackEffect {TrackId {999}, EffectKind::filter, stored}));
+
+    // A drag is one undo step.
+    auto reverb = defaultEffectState (EffectKind::reverb);
+    reverb.enabled = true;
+    for (int mix = 10; mix <= 50; mix += 10)
+    {
+        reverb.values[3] = static_cast<float> (mix);
+        REQUIRE (doc.perform (SetTrackEffect {track, EffectKind::reverb, reverb}, 7));
+    }
+    REQUIRE (doc.undo());
+    CHECK_FALSE (doc.project().tracks[0].effects[static_cast<std::size_t> (EffectKind::reverb)].enabled);
+    REQUIRE (doc.undo());
+    CHECK (doc.project().tracks[0].effects == defaultTrackEffects());
+}

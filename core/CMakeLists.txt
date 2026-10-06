@@ -13,6 +13,7 @@ add_library(ap_core STATIC
     src/fx/Distortion.cpp
     src/fx/Equalizer.cpp
     src/fx/Filter.cpp
+    src/fx/Limiter.cpp
     src/fx/Reverb.cpp
     src/engine/Engine.cpp
     src/engine/InputCapture.cpp
@@ -20,6 +21,7 @@ add_library(ap_core STATIC
     src/engine/OfflineRenderer.cpp
     src/engine/RenderGraph.cpp
     src/engine/TimelinePlayer.cpp
+    src/engine/TrackChain.cpp
     src/engine/Transport.cpp
     src/instruments/DrumMachine.cpp
     src/instruments/FactoryKit.cpp

@@ -30,6 +30,7 @@ RenderGraph buildRenderGraph (const model::Project& project, std::uint64_t proje
         render.id = track.id;
         render.kind = track.kind;
         render.instrument = track.instrument;
+        render.effects = track.effects;
         render.audible
             = !track.muted && (!anySolo || track.soloed) && track.volumeDb > model::Track::minVolumeDb;
 

@@ -11,6 +11,7 @@
 #include "ap/engine/RenderGraph.h"
 #include "ap/engine/TimelinePlayer.h"
 #include "ap/engine/Transport.h"
+#include "ap/fx/Limiter.h"
 #include "ap/instruments/DrumMachine.h"
 #include "ap/instruments/Sampler.h"
 #include "ap/instruments/Synth.h"
@@ -18,7 +19,9 @@
 
 #include <array>
 #include <atomic>
+#include <map>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <vector>
 
@@ -101,8 +104,9 @@ public:
     bool sendNoteFromUi (const instruments::NoteEvent& event) noexcept { return uiNotes.push (event); }
     bool sendNoteFromMidi (const instruments::NoteEvent& event) noexcept { return midiNotes.push (event); }
 
-    // Played-note log. latency: output latency in samples, so a note is stamped where the player
-    // heard the music, not where the engine was rendering. Any thread.
+    // Played-note log. latency: the device's output latency in samples (the engine adds its own,
+    // getOutputLatency), so a note is stamped where the player heard the music, not where the
+    // engine was rendering. Any thread.
     void setRecordingLatency (core::Samples latency) noexcept
     {
         recordingLatency.store (std::max<core::Samples> (0, latency), std::memory_order_relaxed);
@@ -113,7 +117,8 @@ public:
     // The engine sample clock now (see PlayedNote::clock), minus the output latency.
     [[nodiscard]] core::Samples getHeardClock() const noexcept
     {
-        return clock.load (std::memory_order_relaxed) - recordingLatency.load (std::memory_order_relaxed);
+        return clock.load (std::memory_order_relaxed) - recordingLatency.load (std::memory_order_relaxed)
+             - getOutputLatency();
     }
 
     // Audio recording: the device input captured while the transport plays (see InputCapture).
@@ -122,10 +127,9 @@ public:
 
     // Render structure (message thread). Snapshots are swapped in at the next block boundary;
     // retired ones are freed by collectGarbage(), which must be called periodically.
-    void publishRenderGraph (std::unique_ptr<RenderGraph> next) noexcept
-    {
-        graphs.publish (std::move (next));
-    }
+    // Gives every track its effect chain (kept across graphs, created on first use) before
+    // publishing.
+    void publishRenderGraph (std::unique_ptr<RenderGraph> next);
     std::size_t collectGarbage() noexcept
     {
         return graphs.collectGarbage() + sampler.collectGarbage() + drums.collectGarbage();
@@ -139,6 +143,17 @@ public:
     {
         return renderedGraphVersion.load (std::memory_order_acquire);
     }
+
+    // Delay from the timeline (and live notes) to the output, in samples at the prepared rate:
+    // the track chains' constant latency plus the master limiter's lookahead (ADR-009). Offline
+    // rendering and recording compensate it.
+    [[nodiscard]] int getOutputLatency() const noexcept
+    {
+        return outputLatency.load (std::memory_order_relaxed);
+    }
+
+    // Master limiter gain reduction since the last call, in dB (<= 0). Resets it.
+    [[nodiscard]] float consumeLimiterReductionDb() noexcept { return limiter.consumeGainReductionDb(); }
 
     // Highest absolute output sample since the last call. Resets the meter.
     [[nodiscard]] float consumeOutputPeak() noexcept;
@@ -157,7 +172,9 @@ private:
     void routeLiveNote (const instruments::NoteEvent& note) noexcept AP_NONBLOCKING;
     void handleNote (model::InstrumentKind instrument,
                      const instruments::NoteEvent& note) noexcept AP_NONBLOCKING;
-    void renderInstrument (model::InstrumentKind instrument, core::AudioBlock output) noexcept AP_NONBLOCKING;
+    void renderInstrument (model::InstrumentKind instrument, int numSamples) noexcept AP_NONBLOCKING;
+    void mixTracks (core::AudioBlock output, const TrackBuses& buses) noexcept AP_NONBLOCKING;
+    void mixDirect (core::AudioBlock output) noexcept AP_NONBLOCKING;
     void renderTestTone (core::AudioBlock output) noexcept AP_NONBLOCKING;
     void finaliseOutput (core::AudioBlock output) noexcept AP_NONBLOCKING;
     static void updatePeak (std::atomic<float>& peak, float blockPeak) noexcept AP_NONBLOCKING;
@@ -181,7 +198,21 @@ private:
     core::SpscQueue<instruments::NoteEvent, 256> midiNotes;
 
     TimelinePlayer timeline;
-    std::vector<float> busStorage; // 2 channels x maxBlock per instrument, allocated in prepare()
+    std::vector<float> busStorage;      // 2 channels x maxBlock per instrument, allocated in prepare()
+    std::vector<float> trackBusStorage; // 2 channels x maxBlock per track (Project::maxTracks)
+    // Sources that belong to no track (metronome, test tone, an instrument without a track) are
+    // delayed by the chains' latency so they stay in time with the tracks.
+    std::vector<float> directBus; // 2 x maxBlock
+    std::array<std::array<float, TrackChain::latency()>, 2> directDelay {};
+    std::size_t directDelayPosition = 0;
+    fx::Limiter limiter;
+    std::atomic<int> outputLatency {0};
+
+    // Effect chains by track id. Message thread (publish) and prepare(); never the audio thread.
+    std::mutex chainLock;
+    std::map<std::uint64_t, std::shared_ptr<TrackChain>> chains;
+    double chainRate = 48000.0; // guarded by chainLock
+    int chainBlock = 512;       // guarded by chainLock
 
     std::atomic<core::Samples> recordingLatency {0};
     core::SpscQueue<PlayedNote, 1024> playedNotes;

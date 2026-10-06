@@ -71,3 +71,37 @@ export function PeakMeter({
     </div>
   );
 }
+
+/** Lights while the master limiter is reducing the level (it protects ears and speakers). */
+export function LimiterLight() {
+  const bridge = useBridge();
+  const lightRef = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    let held = 0;
+    let frame = 0;
+    const unsubscribe = bridge.on('engine.meters', ({ limiterDb }) => {
+      if (limiterDb < -0.5) held = performance.now();
+    });
+    const draw = () => {
+      const light = lightRef.current;
+      if (light) light.dataset['active'] = performance.now() - held < 300 ? 'true' : 'false';
+      frame = requestAnimationFrame(draw);
+    };
+    frame = requestAnimationFrame(draw);
+    return () => {
+      cancelAnimationFrame(frame);
+      unsubscribe();
+    };
+  }, [bridge]);
+
+  return (
+    <span
+      ref={lightRef}
+      className="limiter-light"
+      title="Master limiter: lights while it reduces the level"
+    >
+      Limit
+    </span>
+  );
+}

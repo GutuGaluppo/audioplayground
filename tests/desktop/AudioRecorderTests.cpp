@@ -108,11 +108,13 @@ TEST_CASE ("A recorded take becomes a latency-compensated clip on the armed trac
     CHECK (samples.front() == static_cast<float> (5 * block) * 1.0e-7f);
     CHECK (samples.back() == static_cast<float> (155 * block - 1) * 1.0e-7f);
 
-    // Frame 0 was captured at position 0, so it belongs `latency` samples earlier: before the start.
+    // Frame 0 was captured at position 0, so it belongs `latency` (plus the engine's own) samples
+    // earlier: before the start.
     const core::TempoMap map (project.tempoBpm, project.timeSignature, rate);
     CHECK (clip.start == 0);
-    CHECK (core::flicksToFrames (clip.sourceOffset, rate) == latency);
-    CHECK (map.ticksToSamples (clip.end()) <= 150 * block - latency);
+    const auto total = latency + f.engine.getOutputLatency();
+    CHECK (core::flicksToFrames (clip.sourceOffset, rate) == total);
+    CHECK (map.ticksToSamples (clip.end()) <= 150 * block - total);
 
     // One undo step removes the clip and the asset.
     CHECK (f.session.document().version() == versionBefore + 1);
@@ -182,7 +184,11 @@ TEST_CASE ("A loop wrap ends the take and keeps it", "[recording]")
     CHECK_FALSE (f.recorder->isRecording());
     REQUIRE (f.notices.size() == 1);
     REQUIRE (f.session.project().tracks[0].clips.size() == 1);
-    CHECK (f.session.project().tracks[0].clips[0].length == core::ticksPerQuarterNote);
+    // One beat of audio, minus what the latency compensation moved before the song start.
+    const core::TempoMap map (120.0, {}, rate);
+    const auto length = f.session.project().tracks[0].clips[0].length;
+    CHECK (length <= core::ticksPerQuarterNote);
+    CHECK (length >= core::ticksPerQuarterNote - map.samplesToTicks (f.engine.getOutputLatency()) - 1);
 }
 
 TEST_CASE ("Nothing is added when nothing was played after the song start", "[recording]")

@@ -232,7 +232,7 @@ export function createSimulatedBridge(): Bridge {
     window.setInterval(() => {
       const level = toneEnabled ? Math.pow(10, (params.get('tone.level') ?? -18) / 20) : 0;
       const inputPeak = armedTrack ? 0.05 + Math.random() * 0.1 : 0;
-      router.dispatch({ type: 'engine.meters', payload: { peak: level, inputPeak } });
+      router.dispatch({ type: 'engine.meters', payload: { peak: level, inputPeak, limiterDb: 0 } });
     }, 1000 / 30);
 
     const tick = () => {

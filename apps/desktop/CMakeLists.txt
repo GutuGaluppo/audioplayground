@@ -35,7 +35,8 @@ endif()
 
 file(GLOB_RECURSE AP_UI_INPUTS CONFIGURE_DEPENDS
     "${AP_UI_DIR}/src/*"
-    "${AP_UI_DIR}/public/*")
+    "${AP_UI_DIR}/public/*"
+    "${PROJECT_SOURCE_DIR}/presets/*")
 list(APPEND AP_UI_INPUTS
     "${AP_UI_DIR}/index.html"
     "${AP_UI_DIR}/package.json"

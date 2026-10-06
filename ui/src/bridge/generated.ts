@@ -23,6 +23,11 @@ export interface TimelineClip {
   readonly notes: readonly TimelineNote[];
 }
 
+export interface TimelineEffect {
+  readonly enabled: boolean;
+  readonly values: readonly number[];
+}
+
 export interface TimelineTrack {
   readonly id: number;
   readonly kind: number;
@@ -32,6 +37,7 @@ export interface TimelineTrack {
   readonly muted: boolean;
   readonly soloed: boolean;
   readonly clips: readonly TimelineClip[];
+  readonly effects: readonly TimelineEffect[];
 }
 
 export interface TimelineAsset {
@@ -317,6 +323,17 @@ export interface TrackSetArmed {
   };
 }
 
+export interface TrackSetEffect {
+  readonly type: 'track.setEffect';
+  readonly payload: {
+    readonly track: number;
+    readonly effect: number;
+    readonly enabled: boolean;
+    readonly values: readonly number[];
+    readonly gesture: number;
+  };
+}
+
 export interface TrackImportAudio {
   readonly type: 'track.importAudio';
   readonly payload: {
@@ -417,7 +434,7 @@ export interface ClipEditNote {
   };
 }
 
-export type Intent = AppReady | AudioOpenSettings | ToneSetEnabled | TransportPlay | TransportStop | TransportReturnToStart | TransportSetTempo | TransportSetCountIn | MetronomeSetEnabled | ParamSet | EditUndo | EditRedo | ProjectNew | ProjectOpen | ProjectSave | ProjectSaveAs | ProjectRename | NoteOn | NoteOff | NoteAllOff | InstrumentSelect | SamplerLoad | DrumsSetStep | DrumsClear | DrumsTrigger | DrumsSetPad | DrumsLoadPad | DrumsResetPad | TransportRecord | TransportCapture | TransportSeek | TransportSetLoop | TrackAdd | TrackRemove | TrackRename | TrackSetVolume | TrackSetPan | TrackSetMute | TrackSetSolo | TrackSetArmed | TrackImportAudio | ClipCreate | ClipMove | ClipResize | ClipSplit | ClipRemove | ClipDuplicate | ClipSetLoop | ClipAddNote | ClipRemoveNote | ClipEditNote;
+export type Intent = AppReady | AudioOpenSettings | ToneSetEnabled | TransportPlay | TransportStop | TransportReturnToStart | TransportSetTempo | TransportSetCountIn | MetronomeSetEnabled | ParamSet | EditUndo | EditRedo | ProjectNew | ProjectOpen | ProjectSave | ProjectSaveAs | ProjectRename | NoteOn | NoteOff | NoteAllOff | InstrumentSelect | SamplerLoad | DrumsSetStep | DrumsClear | DrumsTrigger | DrumsSetPad | DrumsLoadPad | DrumsResetPad | TransportRecord | TransportCapture | TransportSeek | TransportSetLoop | TrackAdd | TrackRemove | TrackRename | TrackSetVolume | TrackSetPan | TrackSetMute | TrackSetSolo | TrackSetArmed | TrackSetEffect | TrackImportAudio | ClipCreate | ClipMove | ClipResize | ClipSplit | ClipRemove | ClipDuplicate | ClipSetLoop | ClipAddNote | ClipRemoveNote | ClipEditNote;
 
 // Events: native -> UI
 export interface EngineStatus {
@@ -440,6 +457,7 @@ export interface EngineMeters {
   readonly payload: {
     readonly peak: number;
     readonly inputPeak: number;
+    readonly limiterDb: number;
   };
 }
 
@@ -633,11 +651,21 @@ function isTimelineClip(value: unknown): boolean {
   );
 }
 
+function isTimelineEffect(value: unknown): boolean {
+  if (!isPayload(value)) return false;
+  const payload = value;
+  return (
+    hasOnlyKeys(payload, ['enabled', 'values']) &&
+    typeof payload['enabled'] === 'boolean' &&
+    isNumberArray(payload['values'], -100000, 100000, 8)
+  );
+}
+
 function isTimelineTrack(value: unknown): boolean {
   if (!isPayload(value)) return false;
   const payload = value;
   return (
-    hasOnlyKeys(payload, ['id', 'kind', 'name', 'volumeDb', 'pan', 'muted', 'soloed', 'clips']) &&
+    hasOnlyKeys(payload, ['id', 'kind', 'name', 'volumeDb', 'pan', 'muted', 'soloed', 'clips', 'effects']) &&
     Number.isInteger(payload['id']) && (payload['id'] as number) >= 1 && (payload['id'] as number) <= 2147483647 &&
     Number.isInteger(payload['kind']) && (payload['kind'] as number) >= 0 && (payload['kind'] as number) <= 3 &&
     typeof payload['name'] === 'string' && payload['name'].length <= 256 &&
@@ -645,7 +673,8 @@ function isTimelineTrack(value: unknown): boolean {
     typeof payload['pan'] === 'number' && Number.isFinite(payload['pan']) && payload['pan'] >= -1 && payload['pan'] <= 1 &&
     typeof payload['muted'] === 'boolean' &&
     typeof payload['soloed'] === 'boolean' &&
-    isList(payload['clips'], 512, isTimelineClip)
+    isList(payload['clips'], 512, isTimelineClip) &&
+    isList(payload['effects'], 6, isTimelineEffect)
   );
 }
 
@@ -677,9 +706,10 @@ const eventValidators: Record<NativeEventType, (payload: Payload) => boolean> = 
     typeof payload['error'] === 'string' && payload['error'].length <= 1024 &&
     typeof payload['toneEnabled'] === 'boolean',
   'engine.meters': (payload) =>
-    hasOnlyKeys(payload, ['peak', 'inputPeak']) &&
+    hasOnlyKeys(payload, ['peak', 'inputPeak', 'limiterDb']) &&
     typeof payload['peak'] === 'number' && Number.isFinite(payload['peak']) && payload['peak'] >= 0 && payload['peak'] <= 1 &&
-    typeof payload['inputPeak'] === 'number' && Number.isFinite(payload['inputPeak']) && payload['inputPeak'] >= 0 && payload['inputPeak'] <= 1,
+    typeof payload['inputPeak'] === 'number' && Number.isFinite(payload['inputPeak']) && payload['inputPeak'] >= 0 && payload['inputPeak'] <= 1 &&
+    typeof payload['limiterDb'] === 'number' && Number.isFinite(payload['limiterDb']) && payload['limiterDb'] >= -60 && payload['limiterDb'] <= 0,
   'transport.state': (payload) =>
     hasOnlyKeys(payload, ['playing', 'bpm', 'numerator', 'denominator', 'countInBars', 'metronomeEnabled', 'recording', 'armedTrack', 'captureAvailable', 'loopEnabled', 'loopStart', 'loopEnd']) &&
     typeof payload['playing'] === 'boolean' &&

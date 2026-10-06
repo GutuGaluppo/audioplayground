@@ -1,3 +1,4 @@
+import { EFFECTS } from '../params/generated';
 import type { Intent } from './generated';
 
 /** Mutable mirrors of the generated (read-only) timeline records. */
@@ -26,6 +27,7 @@ interface SimTrack {
   muted: boolean;
   soloed: boolean;
   clips: SimClip[];
+  effects: { enabled: boolean; values: number[] }[];
 }
 
 export interface SimulatedEdit {
@@ -74,6 +76,8 @@ const FAKE_PEAKS = btoa(
 );
 
 const clone = <T>(value: T): T => structuredClone(value);
+const defaultEffects = () =>
+  EFFECTS.map((e) => ({ enabled: false, values: e.parameters.map((p) => p.defaultValue) }));
 const mod = (value: number, divisor: number) => ((value % divisor) + divisor) % divisor;
 const byStart = (a: SimClip, b: SimClip) => a.start - b.start || a.id - b.id;
 const byNote = (a: SimNote, b: SimNote) => a.start - b.start || a.pitch - b.pitch;
@@ -194,9 +198,32 @@ export function createSimulatedTimeline(host: Host) {
               muted: false,
               soloed: false,
               clips: [],
+              effects: defaultEffects(),
             });
             return true;
           });
+          return true;
+        }
+        case 'track.setEffect': {
+          const { track: id, effect, enabled, values, gesture } = intent.payload;
+          const descriptor = EFFECTS[effect];
+          edit(
+            descriptor?.name ?? 'Effect',
+            `track.setEffect:${String(id)}:${String(effect)}`,
+            gesture,
+            (draft) => {
+              const track = draft.find((t) => t.id === id);
+              const slot = track?.effects[effect];
+              if (!descriptor || !slot || values.length !== descriptor.parameters.length)
+                return false;
+              slot.enabled = enabled;
+              slot.values = values.map((v, i) => {
+                const d = descriptor.parameters[i];
+                return d ? Math.min(d.max, Math.max(d.min, v)) : v;
+              });
+              return true;
+            },
+          );
           return true;
         }
         case 'track.remove':
@@ -415,6 +442,7 @@ export function createSimulatedTimeline(host: Host) {
                 muted: false,
                 soloed: false,
                 clips: [],
+                effects: defaultEffects(),
               };
               draft.push(drums);
             }

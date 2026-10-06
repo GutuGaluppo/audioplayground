@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ap/engine/TrackChain.h"
 #include "ap/instruments/SampleBuffer.h"
 #include "ap/model/Project.h"
 
@@ -48,6 +49,10 @@ struct TrackRender
     bool audible = false;
     std::vector<AudioClipRender> audioClips; // sorted by start
     std::vector<NoteClipRender> noteClips;   // sorted by start
+    model::TrackEffects effects = model::defaultTrackEffects();
+    // The track's effect processors, which keep their state (delay lines, reverb tails) across
+    // graphs. Set by Engine::publishRenderGraph; never freed on the audio thread (ADR-005).
+    std::shared_ptr<TrackChain> chain;
 
     bool operator== (const TrackRender&) const = default;
 };

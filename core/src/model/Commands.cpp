@@ -199,6 +199,20 @@ ApplyResult apply (Command& command, Project& project)
                 return applyTrackField (project, c.id, &Track::pan, c.pan, c.previous,
                                         [] (float v) { return finiteClamped (v, -1.0f, 1.0f); });
             },
+            [&project] (SetTrackEffect& c) -> ApplyResult
+            {
+                auto* track = project.findTrack (c.id);
+                const auto value = normaliseEffect (c.effect, c.value);
+                if (track == nullptr || !value)
+                    return ApplyResult::rejected;
+                c.value = *value;
+                auto& slot = track->effects[static_cast<std::size_t> (c.effect)];
+                if (slot == c.value)
+                    return ApplyResult::unchanged;
+                c.previous = slot;
+                slot = c.value;
+                return ApplyResult::applied;
+            },
             [&project] (SetTrackMute& c) -> ApplyResult
             {
                 return applyTrackField (project, c.id, &Track::muted, c.muted, c.previous,
@@ -384,6 +398,11 @@ void revert (const Command& command, Project& project)
                 if (auto* t = project.findTrack (c.id))
                     t->pan = c.previous;
             },
+            [&project] (const SetTrackEffect& c)
+            {
+                if (auto* t = project.findTrack (c.id))
+                    t->effects[static_cast<std::size_t> (c.effect)] = c.previous;
+            },
             [&project] (const SetTrackMute& c)
             {
                 if (auto* t = project.findTrack (c.id))
@@ -444,6 +463,8 @@ std::string_view describe (const Command& command) noexcept
             [] (const RenameTrack&) { return std::string_view ("Rename track"); },
             [] (const SetTrackVolume&) { return std::string_view ("Change volume"); },
             [] (const SetTrackPan&) { return std::string_view ("Change pan"); },
+            [] (const SetTrackEffect& c)
+            { return params::effectDescriptors[static_cast<std::size_t> (c.effect)].name; },
             [] (const SetTrackMute&) { return std::string_view ("Mute track"); },
             [] (const SetTrackSolo&) { return std::string_view ("Solo track"); },
             [] (const SetParameter& c) { return params::descriptor (c.id).name; },
@@ -496,6 +517,8 @@ bool canMerge (const Command& previous, const Command& next) noexcept
             else if constexpr (std::is_same_v<T, SetTrackVolume> || std::is_same_v<T, SetTrackPan>
                                || std::is_same_v<T, RenameTrack>)
                 return p.id == n.id;
+            else if constexpr (std::is_same_v<T, SetTrackEffect>)
+                return p.id == n.id && p.effect == n.effect;
             else if constexpr (std::is_same_v<T, SetClip>)
                 return p.id == n.id && p.edit == n.edit;
             else if constexpr (std::is_same_v<T, SetDrumPad>)
@@ -533,6 +556,8 @@ void merge (Command& previous, const Command& next)
                 p.volumeDb = n->volumeDb;
             else if constexpr (std::is_same_v<T, SetTrackPan>)
                 p.pan = n->pan;
+            else if constexpr (std::is_same_v<T, SetTrackEffect>)
+                p.value = n->value;
             else if constexpr (std::is_same_v<T, SetParameter>)
                 p.value = n->value;
             else if constexpr (std::is_same_v<T, SetClip>)

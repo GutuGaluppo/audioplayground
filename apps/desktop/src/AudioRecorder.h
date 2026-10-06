@@ -38,7 +38,8 @@ public:
     [[nodiscard]] model::TrackId getArmedTrack() const noexcept { return armed; }
 
     // Starts a take on the armed track; it begins with the next played block. latency: the
-    // device's round-trip latency in samples. Returns a message for the user on failure.
+    // device's round-trip latency in samples (the engine's own output latency is added). Returns a message
+    // for the user on failure.
     [[nodiscard]] std::optional<std::string> start (core::Samples latency);
 
     // Ends the take and adds it to the timeline. Returns true if a clip was added.

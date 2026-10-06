@@ -1,0 +1,23 @@
+{
+  "$comment": "Built-in effect presets (guide §17). Values use the units of schema/parameters.json; a value left out takes its default. ids are stable: never rename one after release.",
+  "presets": [
+    { "id": "eq.warm", "processor": "eq", "name": "Warm", "version": 1, "parameters": { "lowFreq": 150, "lowGain": 3, "midFreq": 2500, "midQ": 0.8, "midGain": -2, "highFreq": 9000, "highGain": -3 } },
+    { "id": "eq.bright", "processor": "eq", "name": "Bright", "version": 1, "parameters": { "lowGain": -1.5, "midFreq": 3000, "midQ": 0.7, "midGain": 1.5, "highFreq": 8000, "highGain": 4.5 } },
+    { "id": "eq.telephone", "processor": "eq", "name": "Telephone", "version": 1, "parameters": { "lowFreq": 400, "lowGain": -18, "midFreq": 1500, "midQ": 1.2, "midGain": 6, "highFreq": 3500, "highGain": -18 } },
+    { "id": "compressor.gentle", "processor": "compressor", "name": "Gentle glue", "version": 1, "parameters": { "threshold": -18, "ratio": 2, "attack": 30, "release": 250, "makeup": 2 } },
+    { "id": "compressor.punchy-drums", "processor": "compressor", "name": "Punchy drums", "version": 1, "parameters": { "threshold": -24, "ratio": 4, "attack": 15, "release": 120, "makeup": 5 } },
+    { "id": "compressor.vocal", "processor": "compressor", "name": "Steady vocal", "version": 1, "parameters": { "threshold": -22, "ratio": 3.5, "attack": 5, "release": 150, "makeup": 4 } },
+    { "id": "filter.dark", "processor": "filter", "name": "Dark", "version": 1, "parameters": { "mode": 0, "cutoff": 900, "resonance": 0.71 } },
+    { "id": "filter.thin", "processor": "filter", "name": "Thin", "version": 1, "parameters": { "mode": 1, "cutoff": 600, "resonance": 0.71 } },
+    { "id": "filter.wah", "processor": "filter", "name": "Wah", "version": 1, "parameters": { "mode": 2, "cutoff": 1200, "resonance": 5 } },
+    { "id": "distortion.warm-tape", "processor": "distortion", "name": "Warm tape", "version": 1, "parameters": { "drive": 6, "tone": 60, "output": 0, "mix": 100 } },
+    { "id": "distortion.crunch", "processor": "distortion", "name": "Crunch", "version": 1, "parameters": { "drive": 18, "tone": 65, "output": -2, "mix": 100 } },
+    { "id": "distortion.fuzz", "processor": "distortion", "name": "Fuzz", "version": 1, "parameters": { "drive": 32, "tone": 45, "output": -4, "mix": 85 } },
+    { "id": "delay.slap", "processor": "delay", "name": "Slapback", "version": 1, "parameters": { "time": 110, "feedback": 10, "mix": 25 } },
+    { "id": "delay.space-echo", "processor": "delay", "name": "Space echo", "version": 1, "parameters": { "time": 380, "feedback": 62, "mix": 35 } },
+    { "id": "delay.dotted-eighth", "processor": "delay", "name": "Dotted eighth (120 BPM)", "version": 1, "parameters": { "time": 375, "feedback": 40, "mix": 30 } },
+    { "id": "reverb.room", "processor": "reverb", "name": "Room", "version": 1, "parameters": { "size": 35, "decay": 40, "damping": 55, "mix": 20 } },
+    { "id": "reverb.hall", "processor": "reverb", "name": "Hall", "version": 1, "parameters": { "size": 85, "decay": 80, "damping": 35, "mix": 30 } },
+    { "id": "reverb.ambience", "processor": "reverb", "name": "Ambience", "version": 1, "parameters": { "size": 20, "decay": 25, "damping": 70, "mix": 15 } }
+  ]
+}

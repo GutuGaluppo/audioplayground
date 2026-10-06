@@ -1,5 +1,5 @@
 {
-  "$comment": "Processor parameters (guide \u00a716). IDs are persistence contracts: never rename or reuse one after release. Edit, then run `pnpm codegen`.",
+  "$comment": "Processor parameters (guide §16). IDs are persistence contracts: never rename or reuse one after release. Effect parameters are stored per track (Task 024). Edit, then run `pnpm codegen`.",
   "parameters": [
     {
       "id": "tone.level",
@@ -170,6 +170,304 @@
       "default": 0,
       "curve": "linear",
       "step": 1
+    }
+  ],
+  "effects": [
+    {
+      "id": "eq",
+      "name": "EQ",
+      "parameters": [
+        {
+          "id": "lowFreq",
+          "name": "Low freq",
+          "unit": "Hz",
+          "min": 20,
+          "max": 1000,
+          "default": 120,
+          "curve": "logarithmic",
+          "step": 1
+        },
+        {
+          "id": "lowGain",
+          "name": "Low",
+          "unit": "dB",
+          "min": -18,
+          "max": 18,
+          "default": 0,
+          "curve": "linear",
+          "step": 0.5
+        },
+        {
+          "id": "midFreq",
+          "name": "Mid freq",
+          "unit": "Hz",
+          "min": 100,
+          "max": 10000,
+          "default": 1000,
+          "curve": "logarithmic",
+          "step": 1
+        },
+        {
+          "id": "midQ",
+          "name": "Mid Q",
+          "unit": "",
+          "min": 0.3,
+          "max": 10,
+          "default": 1,
+          "curve": "logarithmic",
+          "step": 0.01
+        },
+        {
+          "id": "midGain",
+          "name": "Mid",
+          "unit": "dB",
+          "min": -18,
+          "max": 18,
+          "default": 0,
+          "curve": "linear",
+          "step": 0.5
+        },
+        {
+          "id": "highFreq",
+          "name": "High freq",
+          "unit": "Hz",
+          "min": 1000,
+          "max": 20000,
+          "default": 8000,
+          "curve": "logarithmic",
+          "step": 1
+        },
+        {
+          "id": "highGain",
+          "name": "High",
+          "unit": "dB",
+          "min": -18,
+          "max": 18,
+          "default": 0,
+          "curve": "linear",
+          "step": 0.5
+        }
+      ]
+    },
+    {
+      "id": "compressor",
+      "name": "Compressor",
+      "parameters": [
+        {
+          "id": "threshold",
+          "name": "Threshold",
+          "unit": "dB",
+          "min": -60,
+          "max": 0,
+          "default": -18,
+          "curve": "linear",
+          "step": 0.5
+        },
+        {
+          "id": "ratio",
+          "name": "Ratio",
+          "unit": ":1",
+          "min": 1,
+          "max": 20,
+          "default": 4,
+          "curve": "logarithmic",
+          "step": 0.1
+        },
+        {
+          "id": "attack",
+          "name": "Attack",
+          "unit": "ms",
+          "min": 0.1,
+          "max": 100,
+          "default": 10,
+          "curve": "logarithmic",
+          "step": 0.1
+        },
+        {
+          "id": "release",
+          "name": "Release",
+          "unit": "ms",
+          "min": 10,
+          "max": 2000,
+          "default": 150,
+          "curve": "logarithmic",
+          "step": 1
+        },
+        {
+          "id": "makeup",
+          "name": "Make-up",
+          "unit": "dB",
+          "min": 0,
+          "max": 24,
+          "default": 0,
+          "curve": "linear",
+          "step": 0.5
+        }
+      ]
+    },
+    {
+      "id": "filter",
+      "name": "Filter",
+      "parameters": [
+        {
+          "id": "mode",
+          "name": "Mode",
+          "unit": "",
+          "min": 0,
+          "max": 2,
+          "default": 0,
+          "curve": "linear",
+          "step": 1
+        },
+        {
+          "id": "cutoff",
+          "name": "Cutoff",
+          "unit": "Hz",
+          "min": 20,
+          "max": 20000,
+          "default": 1000,
+          "curve": "logarithmic",
+          "step": 1
+        },
+        {
+          "id": "resonance",
+          "name": "Resonance",
+          "unit": "",
+          "min": 0.5,
+          "max": 10,
+          "default": 0.71,
+          "curve": "logarithmic",
+          "step": 0.01
+        }
+      ]
+    },
+    {
+      "id": "distortion",
+      "name": "Distortion",
+      "parameters": [
+        {
+          "id": "drive",
+          "name": "Drive",
+          "unit": "dB",
+          "min": 0,
+          "max": 36,
+          "default": 12,
+          "curve": "linear",
+          "step": 0.5
+        },
+        {
+          "id": "tone",
+          "name": "Tone",
+          "unit": "%",
+          "min": 0,
+          "max": 100,
+          "default": 70,
+          "curve": "linear",
+          "step": 1
+        },
+        {
+          "id": "output",
+          "name": "Output",
+          "unit": "dB",
+          "min": -24,
+          "max": 12,
+          "default": 0,
+          "curve": "linear",
+          "step": 0.5
+        },
+        {
+          "id": "mix",
+          "name": "Mix",
+          "unit": "%",
+          "min": 0,
+          "max": 100,
+          "default": 100,
+          "curve": "linear",
+          "step": 1
+        }
+      ]
+    },
+    {
+      "id": "delay",
+      "name": "Delay",
+      "parameters": [
+        {
+          "id": "time",
+          "name": "Time",
+          "unit": "ms",
+          "min": 1,
+          "max": 2000,
+          "default": 375,
+          "curve": "logarithmic",
+          "step": 1
+        },
+        {
+          "id": "feedback",
+          "name": "Feedback",
+          "unit": "%",
+          "min": 0,
+          "max": 95,
+          "default": 35,
+          "curve": "linear",
+          "step": 1
+        },
+        {
+          "id": "mix",
+          "name": "Mix",
+          "unit": "%",
+          "min": 0,
+          "max": 100,
+          "default": 30,
+          "curve": "linear",
+          "step": 1
+        }
+      ]
+    },
+    {
+      "id": "reverb",
+      "name": "Reverb",
+      "parameters": [
+        {
+          "id": "size",
+          "name": "Size",
+          "unit": "%",
+          "min": 0,
+          "max": 100,
+          "default": 60,
+          "curve": "linear",
+          "step": 1
+        },
+        {
+          "id": "decay",
+          "name": "Decay",
+          "unit": "%",
+          "min": 0,
+          "max": 100,
+          "default": 60,
+          "curve": "linear",
+          "step": 1
+        },
+        {
+          "id": "damping",
+          "name": "Damping",
+          "unit": "%",
+          "min": 0,
+          "max": 100,
+          "default": 40,
+          "curve": "linear",
+          "step": 1
+        },
+        {
+          "id": "mix",
+          "name": "Mix",
+          "unit": "%",
+          "min": 0,
+          "max": 100,
+          "default": 25,
+          "curve": "linear",
+          "step": 1
+        }
+      ]
     }
   ]
 }

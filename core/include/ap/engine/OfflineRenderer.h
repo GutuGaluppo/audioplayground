@@ -20,7 +20,8 @@ struct RenderSettings
 using RenderedAudio = std::vector<std::vector<float>>;
 
 // Renders the engine faster than real time by calling process() in blocks, exactly as an audio
-// device would. Used for export and as the harness for golden and determinism tests.
+// device would. Used for export and as the harness for golden and determinism tests. The engine's
+// latency is compensated: the result starts at timeline time 0.
 // Not real-time safe: allocates the output. Calls engine.prepare() first.
 [[nodiscard]] RenderedAudio renderOffline (Engine& engine, const RenderSettings& settings);
 

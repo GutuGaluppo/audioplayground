@@ -239,6 +239,50 @@ Clip parseClip (const Json& json, const Track& track, const Project& project)
     return *normalised;
 }
 
+std::string_view effectValueKey (const params::ParameterDescriptor& descriptor)
+{
+    return descriptor.id.substr (descriptor.id.find ('.') + 1);
+}
+
+// Missing effects and values take their defaults (files written before effects existed load
+// unchanged); anything unknown or out of range is refused.
+TrackEffects parseEffects (const Json& json)
+{
+    if (!json.is_object())
+        invalid ("track effects must be an object");
+    auto effects = defaultTrackEffects();
+    for (const auto& [id, value] : json.items())
+    {
+        std::size_t e = 0;
+        while (e < params::numEffects && params::effectDescriptors[e].id != id)
+            ++e;
+        if (e == params::numEffects)
+            invalid ("unknown track effect");
+        if (!value.is_object())
+            invalid ("a track effect must be an object");
+
+        const auto& descriptor = params::effectDescriptors[e];
+        auto& state = effects[e];
+        for (const auto& [key, field] : value.items())
+        {
+            if (key == "enabled")
+            {
+                state.enabled = boolean (field, "effect enabled");
+                continue;
+            }
+            std::size_t i = 0;
+            while (i < descriptor.numParameters && effectValueKey (descriptor.parameters[i]) != key)
+                ++i;
+            if (i == descriptor.numParameters)
+                invalid ("unknown effect value");
+            const auto& d = descriptor.parameters[i];
+            state.values[i] = static_cast<float> (numberInRange (
+                field, static_cast<double> (d.min), static_cast<double> (d.max), "effect value"));
+        }
+    }
+    return effects;
+}
+
 Track parseTrack (const Json& json, const Project& project)
 {
     if (!json.is_object())
@@ -249,15 +293,26 @@ Track parseTrack (const Json& json, const Project& project)
     if (kind == "audio")
     {
         track.kind = TrackKind::audio;
-        requireExactKeys (json, {"id", "kind", "name", "volumeDb", "pan", "muted", "soloed", "clips"},
-                          "track");
+        if (json.contains ("effects"))
+            requireExactKeys (
+                json, {"id", "kind", "name", "volumeDb", "pan", "muted", "soloed", "clips", "effects"},
+                "track");
+        else
+            requireExactKeys (json, {"id", "kind", "name", "volumeDb", "pan", "muted", "soloed", "clips"},
+                              "track");
     }
     else if (kind == "instrument")
     {
         track.kind = TrackKind::instrument;
-        requireExactKeys (json,
-                          {"id", "kind", "instrument", "name", "volumeDb", "pan", "muted", "soloed", "clips"},
-                          "track");
+        if (json.contains ("effects"))
+            requireExactKeys (json,
+                              {"id", "kind", "instrument", "name", "volumeDb", "pan", "muted", "soloed",
+                               "clips", "effects"},
+                              "track");
+        else
+            requireExactKeys (
+                json, {"id", "kind", "instrument", "name", "volumeDb", "pan", "muted", "soloed", "clips"},
+                "track");
         const auto& instrument = json["instrument"];
         if (instrument == "synth")
             track.instrument = InstrumentKind::synth;
@@ -279,6 +334,8 @@ Track parseTrack (const Json& json, const Project& project)
     track.pan = static_cast<float> (numberInRange (json["pan"], -1.0, 1.0, "track pan"));
     track.muted = boolean (json["muted"], "track mute");
     track.soloed = boolean (json["soloed"], "track solo");
+    if (json.contains ("effects"))
+        track.effects = parseEffects (json["effects"]);
 
     const auto& clips = json["clips"];
     if (!clips.is_array())
@@ -486,6 +543,21 @@ std::string serialiseProject (const Project& project, const ProjectMetadata& met
             clips.push_back (std::move (c));
         }
         json["clips"] = std::move (clips);
+
+        // Effects by id; a value's key is the part of its parameter id after the effect's
+        // ("eq.lowGain" -> "lowGain"). Both are persistence contracts (schema/parameters.json).
+        auto effects = OrderedJson::object();
+        for (std::size_t e = 0; e < params::numEffects; ++e)
+        {
+            const auto& descriptor = params::effectDescriptors[e];
+            const auto& state = track.effects[e];
+            OrderedJson effect;
+            effect["enabled"] = state.enabled;
+            for (std::size_t i = 0; i < descriptor.numParameters; ++i)
+                effect[std::string (effectValueKey (descriptor.parameters[i]))] = state.values[i];
+            effects[std::string (descriptor.id)] = std::move (effect);
+        }
+        json["effects"] = std::move (effects);
         tracks.push_back (std::move (json));
     }
     root["tracks"] = std::move (tracks);

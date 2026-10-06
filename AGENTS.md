@@ -52,6 +52,7 @@ pnpm ui:build
 - Project files and imported audio are untrusted input (ADR-006).
 - Timeline: one track per instrument, clip offsets in flicks, drum patterns are note clips (ADR-007).
 - Recording: the input opens only when a track is armed, never monitored; takes are journalled for crash recovery (ADR-008).
+- Effects: fixed per-track chain, settings in the project, constant engine latency (`Engine::getOutputLatency`) that offline renders and recordings compensate (ADR-009).
 - Never rename parameter IDs or change persisted schemas without a migration and an ADR.
 - New dependency: justify it (guide §29), pin version and hash, and add it to `docs/THIRD_PARTY_LICENSES.md`.
 - First-party C++ builds with warnings as errors. Do not silence warnings to pass CI.

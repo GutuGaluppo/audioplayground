@@ -4,9 +4,10 @@ import { useBridge } from './bridge/BridgeContext';
 import type { EngineStatus } from './bridge/generated';
 import { Notices } from './components/Notices';
 import { ParamSlider } from './components/ParamSlider';
-import { PeakMeter } from './components/PeakMeter';
+import { LimiterLight, PeakMeter } from './components/PeakMeter';
 import { TransportBar } from './components/TransportBar';
 import { PianoRoll } from './editor/PianoRoll';
+import { EffectsPanel } from './effects/EffectsPanel';
 import { Keyboard } from './instrument/Keyboard';
 import { InstrumentArea } from './instrument/InstrumentArea';
 import { useLatest } from './state/latestEvent';
@@ -67,6 +68,7 @@ export function App() {
         <div className="workspace__bottom">
           <InstrumentArea />
           <ClipEditor />
+          <EffectsPanel />
         </div>
       </main>
 
@@ -90,6 +92,7 @@ export function App() {
           </button>
           <ParamSlider id="tone.level" label="Level" />
           <PeakMeter />
+          <LimiterLight />
         </div>
         {bridge.isNative ? (
           <button type="button" className="button button--quiet" onClick={openSettings}>

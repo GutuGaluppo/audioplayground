@@ -99,6 +99,7 @@ bool hasOnlyKeys (const juce::DynamicObject& object, std::initializer_list<const
 
 juce::var toVar (const TimelineNote& m);
 juce::var toVar (const TimelineClip& m);
+juce::var toVar (const TimelineEffect& m);
 juce::var toVar (const TimelineTrack& m);
 juce::var toVar (const TimelineAsset& m);
 
@@ -136,6 +137,14 @@ template <typename Item>
     return juce::var (object);
 }
 
+[[maybe_unused]] juce::var toVar (const TimelineEffect& m)
+{
+    auto* object = new juce::DynamicObject();
+    object->setProperty ("enabled", m.enabled);
+    object->setProperty ("values", toVarArray (m.values));
+    return juce::var (object);
+}
+
 [[maybe_unused]] juce::var toVar (const TimelineTrack& m)
 {
     auto* object = new juce::DynamicObject();
@@ -147,6 +156,7 @@ template <typename Item>
     object->setProperty ("muted", m.muted);
     object->setProperty ("soloed", m.soloed);
     object->setProperty ("clips", toVarList (m.clips));
+    object->setProperty ("effects", toVarList (m.effects));
     return juce::var (object);
 }
 
@@ -639,6 +649,21 @@ std::optional<Intent> parseTrackSetArmed (const juce::var& payloadVar)
     return Intent {message};
 }
 
+std::optional<Intent> parseTrackSetEffect (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"track", "effect", "enabled", "values", "gesture"}))
+        return std::nullopt;
+
+    TrackSetEffect message;
+    if (!readInt (*payload, "track", TrackSetEffect::trackMin, TrackSetEffect::trackMax, message.track)) return std::nullopt;
+    if (!readInt (*payload, "effect", TrackSetEffect::effectMin, TrackSetEffect::effectMax, message.effect)) return std::nullopt;
+    if (!readBool (*payload, "enabled", message.enabled)) return std::nullopt;
+    if (!readFloatArray (*payload, "values", TrackSetEffect::valuesMin, TrackSetEffect::valuesMax, TrackSetEffect::valuesMaxItems, message.values)) return std::nullopt;
+    if (!readInt (*payload, "gesture", TrackSetEffect::gestureMin, TrackSetEffect::gestureMax, message.gesture)) return std::nullopt;
+    return Intent {message};
+}
+
 std::optional<Intent> parseTrackImportAudio (const juce::var& payloadVar)
 {
     const auto* payload = payloadVar.getDynamicObject();
@@ -877,6 +902,8 @@ std::optional<Intent> parseIntent (const juce::var& message)
         return parseTrackSetSolo (payload);
     if (typeName == TrackSetArmed::type)
         return parseTrackSetArmed (payload);
+    if (typeName == TrackSetEffect::type)
+        return parseTrackSetEffect (payload);
     if (typeName == TrackImportAudio::type)
         return parseTrackImportAudio (payload);
     if (typeName == ClipCreate::type)
@@ -926,6 +953,7 @@ juce::var toVar (const Event& event)
                 auto* payload = new juce::DynamicObject();
                 payload->setProperty ("peak", m.peak);
                 payload->setProperty ("inputPeak", m.inputPeak);
+                payload->setProperty ("limiterDb", m.limiterDb);
                 return envelope (EngineMeters::type, payload);
             },
             [] (const TransportState& m) -> juce::var

@@ -213,6 +213,24 @@ void WebUiHost::handle (const ap::bridge::TrackSetArmed& intent)
     sendTransportState();
 }
 
+void WebUiHost::handle (const ap::bridge::TrackSetEffect& intent)
+{
+    const auto effect = static_cast<params::EffectKind> (intent.effect);
+    const auto& descriptor = params::effectDescriptors[static_cast<std::size_t> (intent.effect)];
+    model::EffectState state;
+    state.enabled = intent.enabled;
+    if (intent.values.size() != descriptor.numParameters)
+    {
+        sendTimeline();
+        return;
+    }
+    std::copy (intent.values.begin(), intent.values.end(), state.values.begin());
+    // The model clamps and snaps the values (ADR-003); a rejected edit re-sends the real state.
+    if (!session.perform (model::SetTrackEffect {toTrack (intent.track), effect, state},
+                          toGesture (intent.gesture)))
+        sendTimeline();
+}
+
 void WebUiHost::handle (const ap::bridge::TrackImportAudio& intent)
 {
     const auto* track = session.project().findTrack (toTrack (intent.track));
@@ -447,6 +465,15 @@ void WebUiHost::sendTimeline()
                 c.notes.push_back ({toInt (note.start), std::max (1, toInt (note.length)), note.pitch,
                                     static_cast<double> (note.velocity)});
             t.clips.push_back (std::move (c));
+        }
+        for (std::size_t e = 0; e < params::numEffects; ++e)
+        {
+            const auto& state = track.effects[e];
+            t.effects.push_back (
+                {state.enabled, std::vector<float> (state.values.begin(),
+                                                    state.values.begin()
+                                                        + static_cast<std::ptrdiff_t> (
+                                                            params::effectDescriptors[e].numParameters))});
         }
         event.tracks.push_back (std::move (t));
     }

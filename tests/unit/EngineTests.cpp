@@ -121,7 +121,7 @@ TEST_CASE ("Engine fades out to exact silence after the tone is disabled", "[eng
     engine.process (fadeOut.block());
 
     const auto& left = fadeOut.channel (0);
-    const auto fadeEnd = static_cast<std::size_t> (48000 * 0.02);
+    const auto fadeEnd = static_cast<std::size_t> (48000 * 0.02 + engine.getOutputLatency());
     const std::vector<float> tail (left.begin() + static_cast<std::ptrdiff_t> (fadeEnd), left.end());
     CHECK (peakOf (tail) == 0.0f);
 

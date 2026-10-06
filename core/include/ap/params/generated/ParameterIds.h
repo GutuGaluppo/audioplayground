@@ -71,4 +71,124 @@ inline constexpr std::array<ParameterDescriptor, numParameters> descriptors {{
     {"sampler.mode", "Mode", "", 0.0f, 1.0f, 0.0f, 1.0f, Curve::linear},
 }};
 
+// --- Per-track effects (Task 024) -----------------------------------------------------------
+
+enum class EffectKind : std::uint8_t
+{
+    eq,
+    compressor,
+    filter,
+    distortion,
+    delay,
+    reverb,
+};
+
+inline constexpr std::size_t numEffects = 6;
+inline constexpr std::size_t maxEffectParameters = 7;
+
+struct EffectDescriptor
+{
+    std::string_view id; // persistence contract
+    std::string_view name;
+    std::size_t numParameters;
+    std::array<ParameterDescriptor, maxEffectParameters> parameters; // the first numParameters are used
+};
+
+inline constexpr std::array<EffectDescriptor, numEffects> effectDescriptors {{
+    {"eq", "EQ", 7, {{
+        {"eq.lowFreq", "Low freq", "Hz", 20.0f, 1000.0f, 120.0f, 1.0f, Curve::logarithmic},
+        {"eq.lowGain", "Low", "dB", -18.0f, 18.0f, 0.0f, 0.5f, Curve::linear},
+        {"eq.midFreq", "Mid freq", "Hz", 100.0f, 10000.0f, 1000.0f, 1.0f, Curve::logarithmic},
+        {"eq.midQ", "Mid Q", "", 0.3f, 10.0f, 1.0f, 0.01f, Curve::logarithmic},
+        {"eq.midGain", "Mid", "dB", -18.0f, 18.0f, 0.0f, 0.5f, Curve::linear},
+        {"eq.highFreq", "High freq", "Hz", 1000.0f, 20000.0f, 8000.0f, 1.0f, Curve::logarithmic},
+        {"eq.highGain", "High", "dB", -18.0f, 18.0f, 0.0f, 0.5f, Curve::linear},
+    }}},
+    {"compressor", "Compressor", 5, {{
+        {"compressor.threshold", "Threshold", "dB", -60.0f, 0.0f, -18.0f, 0.5f, Curve::linear},
+        {"compressor.ratio", "Ratio", ":1", 1.0f, 20.0f, 4.0f, 0.1f, Curve::logarithmic},
+        {"compressor.attack", "Attack", "ms", 0.1f, 100.0f, 10.0f, 0.1f, Curve::logarithmic},
+        {"compressor.release", "Release", "ms", 10.0f, 2000.0f, 150.0f, 1.0f, Curve::logarithmic},
+        {"compressor.makeup", "Make-up", "dB", 0.0f, 24.0f, 0.0f, 0.5f, Curve::linear},
+    }}},
+    {"filter", "Filter", 3, {{
+        {"filter.mode", "Mode", "", 0.0f, 2.0f, 0.0f, 1.0f, Curve::linear},
+        {"filter.cutoff", "Cutoff", "Hz", 20.0f, 20000.0f, 1000.0f, 1.0f, Curve::logarithmic},
+        {"filter.resonance", "Resonance", "", 0.5f, 10.0f, 0.71f, 0.01f, Curve::logarithmic},
+    }}},
+    {"distortion", "Distortion", 4, {{
+        {"distortion.drive", "Drive", "dB", 0.0f, 36.0f, 12.0f, 0.5f, Curve::linear},
+        {"distortion.tone", "Tone", "%", 0.0f, 100.0f, 70.0f, 1.0f, Curve::linear},
+        {"distortion.output", "Output", "dB", -24.0f, 12.0f, 0.0f, 0.5f, Curve::linear},
+        {"distortion.mix", "Mix", "%", 0.0f, 100.0f, 100.0f, 1.0f, Curve::linear},
+    }}},
+    {"delay", "Delay", 3, {{
+        {"delay.time", "Time", "ms", 1.0f, 2000.0f, 375.0f, 1.0f, Curve::logarithmic},
+        {"delay.feedback", "Feedback", "%", 0.0f, 95.0f, 35.0f, 1.0f, Curve::linear},
+        {"delay.mix", "Mix", "%", 0.0f, 100.0f, 30.0f, 1.0f, Curve::linear},
+    }}},
+    {"reverb", "Reverb", 4, {{
+        {"reverb.size", "Size", "%", 0.0f, 100.0f, 60.0f, 1.0f, Curve::linear},
+        {"reverb.decay", "Decay", "%", 0.0f, 100.0f, 60.0f, 1.0f, Curve::linear},
+        {"reverb.damping", "Damping", "%", 0.0f, 100.0f, 40.0f, 1.0f, Curve::linear},
+        {"reverb.mix", "Mix", "%", 0.0f, 100.0f, 25.0f, 1.0f, Curve::linear},
+    }}},
+}};
+
+// Value indices of the EQ effect.
+enum class EqParam : std::uint8_t
+{
+    lowFreq,
+    lowGain,
+    midFreq,
+    midQ,
+    midGain,
+    highFreq,
+    highGain,
+};
+
+// Value indices of the Compressor effect.
+enum class CompressorParam : std::uint8_t
+{
+    threshold,
+    ratio,
+    attack,
+    release,
+    makeup,
+};
+
+// Value indices of the Filter effect.
+enum class FilterParam : std::uint8_t
+{
+    mode,
+    cutoff,
+    resonance,
+};
+
+// Value indices of the Distortion effect.
+enum class DistortionParam : std::uint8_t
+{
+    drive,
+    tone,
+    output,
+    mix,
+};
+
+// Value indices of the Delay effect.
+enum class DelayParam : std::uint8_t
+{
+    time,
+    feedback,
+    mix,
+};
+
+// Value indices of the Reverb effect.
+enum class ReverbParam : std::uint8_t
+{
+    size,
+    decay,
+    damping,
+    mix,
+};
+
 } // namespace ap::params

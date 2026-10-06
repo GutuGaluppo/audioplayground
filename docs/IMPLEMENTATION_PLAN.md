@@ -290,7 +290,8 @@ Cada fase termina num **gate**: CI verde (sanitizers inclusos), benchmarks dentr
 | 021 (Distortion) | ✅ Concluída: tanh levemente assimétrico a 4× (dois estágios halfband FIR, latência inteira de 38 amostras), DC blocker, compensação de drive, tom, mix com o seco alinhado; aliasing < −70 dB até 24 dB de drive (sem OS: −16 dB); golden `distortion_sweep_48k`. A cadeia (024) compensa a latência |
 | 022 (Delay) | ✅ Concluída: até 2 s, leitura Hermite com glide de 150 ms (dobra o pitch como fita, sem clique), feedback amortecido (6 kHz) e com saturação suave só na parte realimentada; golden `delay_repeats_48k`. Sync com o tempo fica para depois |
 | 023 (Reverb V1) | ✅ Concluída: estrutura Freeverb (domínio público, reimplementada), 8 combs com amortecimento + 4 allpasses por canal, tamanho deslizando 300 ms, decay/damping/mix suavizados; golden `reverb_hit_48k` |
-| 024 (cadeia de efeitos + limiter + presets) | Próxima: liga os efeitos às faixas (parâmetros por faixa → ADR), compensa a latência da distorção, limiter true-peak no master |
+| 024 (cadeia de efeitos + limiter + presets) | ✅ Concluída (ADR-009): cadeia fixa por faixa (EQ → Comp → Filter → Dist → Delay → Reverb) com liga/desliga em crossfade, configurações no projeto (schema único → C++/TS), latência constante do motor compensada no render offline e na gravação, limiter true-peak −1 dBTP com lookahead, 18 presets JSON, painel de efeitos da faixa selecionada |
+| 025 (export WAV) | Próxima |
 | Escuta dos goldens de FX | ⏳ Precisa de um ouvinte humano (`tests/golden/*.wav`) |
 
 Decisões tomadas durante a execução:

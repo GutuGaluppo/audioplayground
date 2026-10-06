@@ -569,9 +569,10 @@ void WebUiHost::sendTransportPosition (bool force)
 
 void WebUiHost::timerCallback()
 {
-    emit (
-        ap::bridge::EngineMeters {juce::jlimit (0.0, 1.0, static_cast<double> (engine.consumeOutputPeak())),
-                                  juce::jlimit (0.0, 1.0, static_cast<double> (engine.consumeInputPeak()))});
+    emit (ap::bridge::EngineMeters {
+        juce::jlimit (0.0, 1.0, static_cast<double> (engine.consumeOutputPeak())),
+        juce::jlimit (0.0, 1.0, static_cast<double> (engine.consumeInputPeak())),
+        juce::jlimit (-60.0, 0.0, static_cast<double> (engine.consumeLimiterReductionDb()))});
 
     pumpPlayedNotes();
     audioRecorder.poll(); // may end the take by itself (loop wrap, device change, length limit)

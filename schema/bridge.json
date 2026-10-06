@@ -283,6 +283,32 @@
         "type": "bool"
       }
     },
+    "track.setEffect": {
+      "track": {
+        "type": "int",
+        "min": 1,
+        "max": 2147483647
+      },
+      "effect": {
+        "type": "int",
+        "min": 0,
+        "max": 5
+      },
+      "enabled": {
+        "type": "bool"
+      },
+      "values": {
+        "type": "floatArray",
+        "min": -100000,
+        "max": 100000,
+        "maxItems": 8
+      },
+      "gesture": {
+        "type": "int",
+        "min": 0,
+        "max": 2147483647
+      }
+    },
     "track.importAudio": {
       "track": {
         "type": "int",
@@ -527,6 +553,11 @@
         "type": "number",
         "min": 0,
         "max": 1
+      },
+      "limiterDb": {
+        "type": "number",
+        "min": -60,
+        "max": 0
       }
     },
     "transport.state": {
@@ -816,6 +847,22 @@
                     "max": 1
                   }
                 }
+              }
+            }
+          },
+          "effects": {
+            "type": "list",
+            "item": "TimelineEffect",
+            "maxItems": 6,
+            "fields": {
+              "enabled": {
+                "type": "bool"
+              },
+              "values": {
+                "type": "floatArray",
+                "min": -100000,
+                "max": 100000,
+                "maxItems": 8
               }
             }
           }

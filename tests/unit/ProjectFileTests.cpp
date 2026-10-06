@@ -49,6 +49,15 @@ Project sampleProject()
     pattern = withDrumStep (pattern, 0, 0, true);
     pattern = withDrumStep (pattern, 2, 8, true);
     REQUIRE (doc.perform (AddClip {doc.project().tracks[2].id, pattern}));
+
+    auto eq = defaultEffectState (ap::params::EffectKind::eq);
+    eq.enabled = true;
+    eq.values[static_cast<std::size_t> (ap::params::EqParam::midGain)] = -4.5f;
+    REQUIRE (doc.perform (SetTrackEffect {doc.project().tracks[0].id, ap::params::EffectKind::eq, eq}));
+    auto delay = defaultEffectState (ap::params::EffectKind::delay);
+    delay.enabled = true;
+    delay.values[static_cast<std::size_t> (ap::params::DelayParam::time)] = 250.0f;
+    REQUIRE (doc.perform (SetTrackEffect {doc.project().tracks[2].id, ap::params::EffectKind::delay, delay}));
     return doc.project();
 }
 
@@ -80,6 +89,37 @@ TEST_CASE ("A project round-trips through JSON exactly and byte-stably", "[persi
 
     // save -> load -> save produces identical bytes
     CHECK (serialiseProject (std::get<LoadedProject> (loaded).project, metadata) == text);
+}
+
+TEST_CASE ("Track effects load with defaults for anything missing and refuse anything unknown",
+           "[persistence]")
+{
+    // Files written before effects existed have no "effects" key.
+    const auto old = parseProject (mutate (
+        [] (nlohmann::json& json)
+        {
+            for (auto& track : json["tracks"])
+                track.erase ("effects");
+        }));
+    REQUIRE (std::holds_alternative<LoadedProject> (old));
+    for (const auto& track : std::get<LoadedProject> (old).project.tracks)
+        CHECK (track.effects == defaultTrackEffects());
+
+    const auto partial = parseProject (mutate (
+        [] (nlohmann::json& json) { json["tracks"][0]["effects"] = {{"reverb", {{"enabled", true}}}}; }));
+    REQUIRE (std::holds_alternative<LoadedProject> (partial));
+    const auto& effects = std::get<LoadedProject> (partial).project.tracks[0].effects;
+    CHECK (effects[static_cast<std::size_t> (ap::params::EffectKind::reverb)].enabled);
+    CHECK_FALSE (effects[static_cast<std::size_t> (ap::params::EffectKind::eq)].enabled);
+
+    CHECK (std::holds_alternative<LoadError> (parseProject (mutate (
+        [] (nlohmann::json& json) { json["tracks"][0]["effects"]["chorus"] = nlohmann::json::object(); }))));
+    CHECK (std::holds_alternative<LoadError> (parseProject (
+        mutate ([] (nlohmann::json& json) { json["tracks"][0]["effects"]["eq"]["sparkle"] = 1; }))));
+    CHECK (std::holds_alternative<LoadError> (parseProject (
+        mutate ([] (nlohmann::json& json) { json["tracks"][0]["effects"]["delay"]["time"] = 99999; }))));
+    CHECK (std::holds_alternative<LoadError> (parseProject (
+        mutate ([] (nlohmann::json& json) { json["tracks"][0]["effects"]["delay"]["enabled"] = "yes"; }))));
 }
 
 TEST_CASE ("Parameters unknown to this build are preserved", "[persistence]")

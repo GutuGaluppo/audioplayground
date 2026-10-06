@@ -131,15 +131,7 @@ void TimelinePlayer::beginBlock (const RenderGraph* currentGraph, int numSamples
     }
 }
 
-GainRamp TimelinePlayer::instrumentGain (model::InstrumentKind instrument) const noexcept AP_NONBLOCKING
-{
-    const int index = graph != nullptr ? graph->instrumentTrack[static_cast<std::size_t> (instrument)] : -1;
-    if (index >= 0 && static_cast<std::size_t> (index) < gainCount)
-        return gains[static_cast<std::size_t> (index)].ramp;
-    return {};
-}
-
-void TimelinePlayer::segment (core::AudioBlock output, int offset, int length, core::Samples start,
+void TimelinePlayer::segment (const TrackBuses& buses, int offset, int length, core::Samples start,
                               const core::TempoMap& tempoMap) noexcept AP_NONBLOCKING
 {
     if (length <= 0)
@@ -152,9 +144,9 @@ void TimelinePlayer::segment (core::AudioBlock output, int offset, int length, c
         fadeInRemaining = fadeLength;
     }
 
-    renderTail (output, offset, length, tempoMap);
+    renderTail (buses, offset, length, tempoMap);
 
-    renderAudio (output, offset, length, start, tempoMap,
+    renderAudio (buses, offset, length, start, tempoMap,
                  fadeInRemaining > 0 ? Fade {Fade::Kind::in, fadeInRemaining} : Fade {});
     fadeInRemaining = std::max (0, fadeInRemaining - length);
 
@@ -165,7 +157,7 @@ void TimelinePlayer::segment (core::AudioBlock output, int offset, int length, c
     hasExpected = true;
 }
 
-void TimelinePlayer::endBlock (core::AudioBlock output, bool playing,
+void TimelinePlayer::endBlock (const TrackBuses& buses, bool playing,
                                const core::TempoMap& tempoMap) noexcept AP_NONBLOCKING
 {
     if (playing)
@@ -177,7 +169,7 @@ void TimelinePlayer::endBlock (core::AudioBlock output, bool playing,
         hasExpected = false;
         fadeInRemaining = 0;
     }
-    renderTail (output, 0, blockSize, tempoMap);
+    renderTail (buses, 0, blockSize, tempoMap);
 }
 
 void TimelinePlayer::jumpFrom (core::Samples position, int offset) noexcept AP_NONBLOCKING
@@ -187,22 +179,22 @@ void TimelinePlayer::jumpFrom (core::Samples position, int offset) noexcept AP_N
     releaseAllNotes (offset);
 }
 
-void TimelinePlayer::renderTail (core::AudioBlock output, int offset, int length,
+void TimelinePlayer::renderTail (const TrackBuses& buses, int offset, int length,
                                  const core::TempoMap& tempoMap) noexcept AP_NONBLOCKING
 {
     if (tailRemaining <= 0 || length <= 0)
         return;
 
     const int count = std::min (length, tailRemaining);
-    renderAudio (output, offset, count, tailPosition, tempoMap, {Fade::Kind::out, tailRemaining});
+    renderAudio (buses, offset, count, tailPosition, tempoMap, {Fade::Kind::out, tailRemaining});
     tailPosition += count;
     tailRemaining -= count;
 }
 
-void TimelinePlayer::renderAudio (core::AudioBlock output, int offset, int length, core::Samples start,
+void TimelinePlayer::renderAudio (const TrackBuses& buses, int offset, int length, core::Samples start,
                                   const core::TempoMap& tempoMap, Fade jumpFade) noexcept AP_NONBLOCKING
 {
-    if (graph == nullptr || output.isEmpty() || length <= 0)
+    if (graph == nullptr || buses.data == nullptr || length <= 0)
         return;
 
     const auto end = start + length;
@@ -210,10 +202,11 @@ void TimelinePlayer::renderAudio (core::AudioBlock output, int offset, int lengt
         return;
 
     const auto fade = static_cast<core::Samples> (fadeLength);
-    const bool stereo = output.numChannels >= 2;
 
-    for (std::size_t t = 0; t < graph->tracks.size() && t < gainCount; ++t)
+    for (std::size_t t = 0; t < graph->tracks.size() && t < gainCount && t < buses.count; ++t)
     {
+        float* const busLeft = buses.left (t);
+        float* const busRight = buses.right (t);
         const auto& track = graph->tracks[t];
         const auto& ramp = gains[t].ramp;
         if (track.kind != model::TrackKind::audio || track.audioClips.empty() || ramp.isSilent())
@@ -263,15 +256,8 @@ void TimelinePlayer::renderAudio (core::AudioBlock output, int offset, int lengt
                     gain *= static_cast<float> (clipEnd - position) / static_cast<float> (fade + 1);
 
                 const auto frame = static_cast<std::size_t> (firstFrame + (position - clipStart));
-                const float l = left[frame] * gain * ramp.left (index, blockSize);
-                const float r = right[frame] * gain * ramp.right (index, blockSize);
-                if (stereo)
-                {
-                    output.channels[0][index] += l;
-                    output.channels[1][index] += r;
-                }
-                else
-                    output.channels[0][index] += 0.5f * (l + r);
+                busLeft[index] += left[frame] * gain;
+                busRight[index] += right[frame] * gain;
             }
         }
     }

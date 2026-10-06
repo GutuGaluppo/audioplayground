@@ -2,7 +2,19 @@
 
 export type ParamId = 'tone.level' | 'metronome.level' | 'synth.waveform' | 'synth.pitch' | 'synth.detune' | 'synth.cutoff' | 'synth.resonance' | 'synth.attack' | 'synth.decay' | 'synth.sustain' | 'synth.release' | 'synth.volume' | 'sampler.start' | 'sampler.end' | 'sampler.pitch' | 'sampler.gain' | 'sampler.mode';
 
-export interface ParameterDescriptor {
+/** What every value control needs: range, default, step, display unit and curve. */
+export interface ValueDescriptor {
+  readonly id: string;
+  readonly name: string;
+  readonly unit: string;
+  readonly min: number;
+  readonly max: number;
+  readonly defaultValue: number;
+  readonly step: number;
+  readonly curve: 'linear' | 'logarithmic';
+}
+
+export interface ParameterDescriptor extends ValueDescriptor {
   readonly id: ParamId;
   readonly name: string;
   readonly unit: string;
@@ -36,3 +48,78 @@ export const PARAMETERS: Readonly<Record<ParamId, ParameterDescriptor>> = {
 export function isParamId(value: unknown): value is ParamId {
   return typeof value === 'string' && Object.hasOwn(PARAMETERS, value);
 }
+
+export type EffectId = 'eq' | 'compressor' | 'filter' | 'distortion' | 'delay' | 'reverb';
+
+export interface EffectDescriptor {
+  readonly id: EffectId;
+  readonly name: string;
+  /** In value order: track effect values are sent and stored in this order. */
+  readonly parameters: readonly ValueDescriptor[];
+}
+
+/** Per-track effects, in chain order (index = effect number on the bridge). */
+export const EFFECTS: readonly EffectDescriptor[] = [
+  {
+    id: 'eq',
+    name: "EQ",
+    parameters: [
+      { id: 'eq.lowFreq', name: "Low freq", unit: "Hz", min: 20, max: 1000, defaultValue: 120, step: 1, curve: 'logarithmic' },
+      { id: 'eq.lowGain', name: "Low", unit: "dB", min: -18, max: 18, defaultValue: 0, step: 0.5, curve: 'linear' },
+      { id: 'eq.midFreq', name: "Mid freq", unit: "Hz", min: 100, max: 10000, defaultValue: 1000, step: 1, curve: 'logarithmic' },
+      { id: 'eq.midQ', name: "Mid Q", unit: "", min: 0.3, max: 10, defaultValue: 1, step: 0.01, curve: 'logarithmic' },
+      { id: 'eq.midGain', name: "Mid", unit: "dB", min: -18, max: 18, defaultValue: 0, step: 0.5, curve: 'linear' },
+      { id: 'eq.highFreq', name: "High freq", unit: "Hz", min: 1000, max: 20000, defaultValue: 8000, step: 1, curve: 'logarithmic' },
+      { id: 'eq.highGain', name: "High", unit: "dB", min: -18, max: 18, defaultValue: 0, step: 0.5, curve: 'linear' },
+    ],
+  },
+  {
+    id: 'compressor',
+    name: "Compressor",
+    parameters: [
+      { id: 'compressor.threshold', name: "Threshold", unit: "dB", min: -60, max: 0, defaultValue: -18, step: 0.5, curve: 'linear' },
+      { id: 'compressor.ratio', name: "Ratio", unit: ":1", min: 1, max: 20, defaultValue: 4, step: 0.1, curve: 'logarithmic' },
+      { id: 'compressor.attack', name: "Attack", unit: "ms", min: 0.1, max: 100, defaultValue: 10, step: 0.1, curve: 'logarithmic' },
+      { id: 'compressor.release', name: "Release", unit: "ms", min: 10, max: 2000, defaultValue: 150, step: 1, curve: 'logarithmic' },
+      { id: 'compressor.makeup', name: "Make-up", unit: "dB", min: 0, max: 24, defaultValue: 0, step: 0.5, curve: 'linear' },
+    ],
+  },
+  {
+    id: 'filter',
+    name: "Filter",
+    parameters: [
+      { id: 'filter.mode', name: "Mode", unit: "", min: 0, max: 2, defaultValue: 0, step: 1, curve: 'linear' },
+      { id: 'filter.cutoff', name: "Cutoff", unit: "Hz", min: 20, max: 20000, defaultValue: 1000, step: 1, curve: 'logarithmic' },
+      { id: 'filter.resonance', name: "Resonance", unit: "", min: 0.5, max: 10, defaultValue: 0.71, step: 0.01, curve: 'logarithmic' },
+    ],
+  },
+  {
+    id: 'distortion',
+    name: "Distortion",
+    parameters: [
+      { id: 'distortion.drive', name: "Drive", unit: "dB", min: 0, max: 36, defaultValue: 12, step: 0.5, curve: 'linear' },
+      { id: 'distortion.tone', name: "Tone", unit: "%", min: 0, max: 100, defaultValue: 70, step: 1, curve: 'linear' },
+      { id: 'distortion.output', name: "Output", unit: "dB", min: -24, max: 12, defaultValue: 0, step: 0.5, curve: 'linear' },
+      { id: 'distortion.mix', name: "Mix", unit: "%", min: 0, max: 100, defaultValue: 100, step: 1, curve: 'linear' },
+    ],
+  },
+  {
+    id: 'delay',
+    name: "Delay",
+    parameters: [
+      { id: 'delay.time', name: "Time", unit: "ms", min: 1, max: 2000, defaultValue: 375, step: 1, curve: 'logarithmic' },
+      { id: 'delay.feedback', name: "Feedback", unit: "%", min: 0, max: 95, defaultValue: 35, step: 1, curve: 'linear' },
+      { id: 'delay.mix', name: "Mix", unit: "%", min: 0, max: 100, defaultValue: 30, step: 1, curve: 'linear' },
+    ],
+  },
+  {
+    id: 'reverb',
+    name: "Reverb",
+    parameters: [
+      { id: 'reverb.size', name: "Size", unit: "%", min: 0, max: 100, defaultValue: 60, step: 1, curve: 'linear' },
+      { id: 'reverb.decay', name: "Decay", unit: "%", min: 0, max: 100, defaultValue: 60, step: 1, curve: 'linear' },
+      { id: 'reverb.damping', name: "Damping", unit: "%", min: 0, max: 100, defaultValue: 40, step: 1, curve: 'linear' },
+      { id: 'reverb.mix', name: "Mix", unit: "%", min: 0, max: 100, defaultValue: 25, step: 1, curve: 'linear' },
+    ],
+  },
+];
