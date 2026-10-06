@@ -3,6 +3,7 @@
 #include "ap/core/ScopedNoDenormals.h"
 #include "ap/fx/Reverb.h"
 
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <cmath>
 #include <limits>
@@ -130,6 +131,37 @@ TEST_CASE ("Reverb stays bounded at maximum decay, survives broken input, and mo
                                                 morphing.set ({1.0f, 0.6f, 0.4f, 0.5f});
                                         });
     CHECK (test::maxStep (morphed[0]) < 0.1f);
+}
+
+TEST_CASE ("The tail falls by 60 dB in the decay time (Schroeder integration, T20)", "[fx][reverb]")
+{
+    const core::ScopedNoDenormals noDenormals;
+    for (const float decay : {0.3f, 0.6f})
+    {
+        const double expected = Reverb::decaySeconds (decay);
+        auto reverb = prepared ({0.6f, decay, 0.0f, 1.0f});
+        const auto length = static_cast<std::size_t> (std::ceil (2.0 * expected * fs));
+        const auto ir = test::process (reverb, impulse (length));
+
+        // Backward-integrated energy of the impulse response, in dB.
+        std::vector<double> energy (length);
+        double sum = 0.0;
+        for (std::size_t i = length; i-- > 0;)
+        {
+            sum += static_cast<double> (ir[0][i]) * static_cast<double> (ir[0][i]);
+            energy[i] = sum;
+        }
+        const auto levelAt = [&] (double db)
+        {
+            std::size_t i = 0;
+            while (i < length && 10.0 * std::log10 (energy[i] / energy[0]) > db)
+                ++i;
+            return static_cast<double> (i) / fs;
+        };
+        const double rt60 = 3.0 * (levelAt (-25.0) - levelAt (-5.0)); // T20
+        CAPTURE (decay, expected, rt60);
+        CHECK (rt60 == Catch::Approx (expected).epsilon (0.15));
+    }
 }
 
 TEST_CASE ("Reverb render matches the golden file", "[fx][reverb][golden]")

@@ -15,7 +15,7 @@ Every third-party library, algorithm, sample, impulse response, preset source an
 
 | Algorithm | Source | Licence | Where |
 |---|---|---|---|
-| Freeverb structure and tunings (8 combs + 4 all-passes, stereo spread 23) | Jezar at Dreampoint, 2000 | Public domain | `core/src/fx/Reverb.cpp` (no Freeverb code copied) |
+| Feedback delay network reverb (Hadamard mixing, per-line gains for a set decay time, all-pass diffusion) | Stautner & Puckette 1982; Jot & Chaigne 1991 | Published maths, no code | `core/src/fx/Reverb.cpp` (V2; replaced the Freeverb-style V1) |
 | SVF shelf/bell formulation | Andrew Simper (Cytomic), technical paper | Published maths, no code | `core/include/ap/dsp/EqBand.h` |
 | Compressor gain computer and smoothing | Giannoulis, Massberg & Reiss, JAES 2012 | Published maths, no code | `core/src/fx/Compressor.cpp` |
 
