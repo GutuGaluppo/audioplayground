@@ -292,7 +292,8 @@ Cada fase termina num **gate**: CI verde (sanitizers inclusos), benchmarks dentr
 | 023 (Reverb V1) | ✅ Concluída: estrutura Freeverb (domínio público, reimplementada), 8 combs com amortecimento + 4 allpasses por canal, tamanho deslizando 300 ms, decay/damping/mix suavizados; golden `reverb_hit_48k` |
 | 024 (cadeia de efeitos + limiter + presets) | ✅ Concluída (ADR-009): cadeia fixa por faixa (EQ → Comp → Filter → Dist → Delay → Reverb) com liga/desliga em crossfade, configurações no projeto (schema único → C++/TS), latência constante do motor compensada no render offline e na gravação, limiter true-peak −1 dBTP com lookahead, 18 presets JSON, painel de efeitos da faixa selecionada |
 | 025 (export WAV) | ✅ Concluída: segundo motor em background configurado como o ao vivo (mesma função), render da música + cauda dos efeitos até −80 dBFS (máx. 10 s), reamostragem para 44,1/48/96 kHz, WAV 16-bit (dither TPDF) / 24-bit / 32f escrito atomicamente, LUFS integrado (EBU R128) e true peak no aviso final; teste export == tempo real com blocos irregulares |
-| Fase 6 (polimento) | Próxima: aceite da §27 do Guia por alguém que nunca usou uma DAW, onboarding, acessibilidade, assinatura |
+| Fase 6 — partes técnicas | ✅ Acessibilidade (contraste AA testado, alvos de 32 px, clipes pelo teclado, nomes acessíveis testados); primeiro uso (beat pronto + dicas); "Localizar…" para áudio ausente; benchmark do projeto de referência (p99.9 ≈ 30 % do bloco de 128 a 48 kHz; meta 50 %); script de assinatura/notarização macOS (`docs/RELEASING.md`) |
+| Fase 6 — precisa de humanos | ⏳ Aceite da §27 por alguém que nunca usou uma DAW; certificado Developer ID e notarização; assinatura Windows; reverb V2 (FDN) opcional |
 | Escuta dos goldens de FX | ⏳ Precisa de um ouvinte humano (`tests/golden/*.wav`) |
 
 Decisões tomadas durante a execução:
