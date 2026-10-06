@@ -343,3 +343,21 @@ TEST_CASE ("Track effects are clamped, snapped, undoable, and a gesture is one s
     REQUIRE (doc.undo());
     CHECK (doc.project().tracks[0].effects == defaultTrackEffects());
 }
+
+TEST_CASE ("Relinking an asset changes its file for everything that uses it, undoably", "[model]")
+{
+    ProjectDocument doc;
+    REQUIRE (doc.perform (AddAsset {"audio/1-gone.wav", "gone.wav"}));
+    const auto id = doc.project().assets[0].id;
+    REQUIRE (doc.perform (RelinkAsset {id, "audio/2-found.wav", "found.wav"}));
+    CHECK (doc.project().assets[0].relativePath == "audio/2-found.wav");
+    CHECK (doc.project().assets[0].name == "found.wav");
+    CHECK (doc.project().assets[0].id == id);
+    CHECK (doc.undoDescription() == "Locate audio");
+
+    CHECK_FALSE (doc.perform (RelinkAsset {id, "../escape.wav", "x"}));
+    CHECK_FALSE (doc.perform (RelinkAsset {AssetId {99}, "audio/3-x.wav", "x"}));
+
+    REQUIRE (doc.undo());
+    CHECK (doc.project().assets[0].relativePath == "audio/1-gone.wav");
+}

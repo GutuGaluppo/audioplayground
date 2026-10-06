@@ -89,6 +89,7 @@ private:
     void handle (const ap::bridge::TrackSetArmed&);
     void handle (const ap::bridge::TrackSetEffect&);
     void handle (const ap::bridge::TrackImportAudio&);
+    void handle (const ap::bridge::AssetLocate&);
     void handle (const ap::bridge::ClipCreate&);
     void handle (const ap::bridge::ClipMove&);
     void handle (const ap::bridge::ClipResize&);

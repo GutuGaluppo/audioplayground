@@ -607,6 +607,17 @@ struct TrackImportAudio
     bool operator== (const TrackImportAudio&) const = default;
 };
 
+struct AssetLocate
+{
+    static constexpr std::string_view type = "asset.locate";
+    static constexpr int assetMin = 1;
+    static constexpr int assetMax = 2147483647;
+
+    int asset = 0;
+
+    bool operator== (const AssetLocate&) const = default;
+};
+
 struct ClipCreate
 {
     static constexpr std::string_view type = "clip.create";
@@ -1033,7 +1044,7 @@ struct TimelinePeaks
     bool operator== (const TimelinePeaks&) const = default;
 };
 
-using Intent = std::variant<AppReady, AudioOpenSettings, ToneSetEnabled, TransportPlay, TransportStop, TransportReturnToStart, TransportSetTempo, TransportSetCountIn, MetronomeSetEnabled, ParamSet, EditUndo, EditRedo, ProjectNew, ProjectOpen, ProjectSave, ProjectSaveAs, ProjectRename, ProjectExport, ProjectCancelExport, NoteOn, NoteOff, NoteAllOff, InstrumentSelect, SamplerLoad, DrumsSetStep, DrumsClear, DrumsTrigger, DrumsSetPad, DrumsLoadPad, DrumsResetPad, TransportRecord, TransportCapture, TransportSeek, TransportSetLoop, TrackAdd, TrackRemove, TrackRename, TrackSetVolume, TrackSetPan, TrackSetMute, TrackSetSolo, TrackSetArmed, TrackSetEffect, TrackImportAudio, ClipCreate, ClipMove, ClipResize, ClipSplit, ClipRemove, ClipDuplicate, ClipSetLoop, ClipAddNote, ClipRemoveNote, ClipEditNote>;
+using Intent = std::variant<AppReady, AudioOpenSettings, ToneSetEnabled, TransportPlay, TransportStop, TransportReturnToStart, TransportSetTempo, TransportSetCountIn, MetronomeSetEnabled, ParamSet, EditUndo, EditRedo, ProjectNew, ProjectOpen, ProjectSave, ProjectSaveAs, ProjectRename, ProjectExport, ProjectCancelExport, NoteOn, NoteOff, NoteAllOff, InstrumentSelect, SamplerLoad, DrumsSetStep, DrumsClear, DrumsTrigger, DrumsSetPad, DrumsLoadPad, DrumsResetPad, TransportRecord, TransportCapture, TransportSeek, TransportSetLoop, TrackAdd, TrackRemove, TrackRename, TrackSetVolume, TrackSetPan, TrackSetMute, TrackSetSolo, TrackSetArmed, TrackSetEffect, TrackImportAudio, AssetLocate, ClipCreate, ClipMove, ClipResize, ClipSplit, ClipRemove, ClipDuplicate, ClipSetLoop, ClipAddNote, ClipRemoveNote, ClipEditNote>;
 using Event = std::variant<EngineStatus, EngineMeters, TransportState, TransportPosition, ParamValue, HistoryState, ProjectState, ExportState, AppNotice, InstrumentState, SamplerState, DrumsPad, TimelineState, TimelineAssets, TimelinePeaks>;
 
 } // namespace ap::bridge

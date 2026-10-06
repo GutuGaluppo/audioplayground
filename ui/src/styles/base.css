@@ -1537,3 +1537,17 @@ kbd {
   font-family: var(--ap-font-mono);
   font-size: var(--ap-text-xs);
 }
+
+.clip__locate {
+  align-self: start;
+  justify-self: start;
+  min-height: 24px;
+  margin: 0 var(--ap-space-1);
+  padding: 0 var(--ap-space-2);
+  border: 1px solid var(--ap-clip-ink);
+  border-radius: var(--ap-radius-sm);
+  background: rgb(0 0 0 / 35%);
+  color: var(--ap-clip-ink);
+  font-size: var(--ap-text-xs);
+  cursor: pointer;
+}

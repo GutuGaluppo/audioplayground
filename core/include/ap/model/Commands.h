@@ -211,6 +211,23 @@ struct AddAsset
     std::uint64_t previousNextAssetId = 0;
 };
 
+// Points an existing asset at another file in the project (e.g. after "Locate..." found a missing
+// one). Everything using the asset follows.
+struct RelinkAsset
+{
+    RelinkAsset (AssetId asset, std::string path, std::string displayName)
+        : id (asset)
+        , relativePath (std::move (path))
+        , name (std::move (displayName))
+    {
+    }
+
+    AssetId id;
+    std::string relativePath;
+    std::string name;
+    Asset previous; // captured
+};
+
 struct SetSamplerAsset
 {
     explicit SetSamplerAsset (AssetId newAsset) noexcept
@@ -310,10 +327,10 @@ struct SplitClip
     std::uint64_t previousNextClipId = 0;
 };
 
-using Command
-    = std::variant<SetTempo, SetTimeSignature, RenameProject, AddTrack, RemoveTrack, MoveTrack, RenameTrack,
-                   SetTrackVolume, SetTrackPan, SetTrackEffect, SetTrackMute, SetTrackSolo, SetParameter,
-                   AddAsset, SetSamplerAsset, SetDrumPad, AddClip, RemoveClip, SetClip, SplitClip>;
+using Command = std::variant<SetTempo, SetTimeSignature, RenameProject, AddTrack, RemoveTrack, MoveTrack,
+                             RenameTrack, SetTrackVolume, SetTrackPan, SetTrackEffect, SetTrackMute,
+                             SetTrackSolo, SetParameter, AddAsset, RelinkAsset, SetSamplerAsset, SetDrumPad,
+                             AddClip, RemoveClip, SetClip, SplitClip>;
 
 enum class ApplyResult
 {

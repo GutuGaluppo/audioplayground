@@ -227,3 +227,30 @@ TEST_CASE ("A missing clip file is reported once and plays nothing", "[samples][
     CHECK (audio.buffer == nullptr);
     CHECK (f.errors.size() == 1);
 }
+
+TEST_CASE ("A clip whose audio file is missing plays again after locating a replacement", "[samples]")
+{
+    Fixture f;
+    REQUIRE (f.session.perform (model::AddTrack {model::TrackKind::audio}));
+    REQUIRE (f.session.perform (model::AddAsset {"audio/7-gone.wav", "gone.wav"}));
+    const auto asset = f.session.project().assets.back().id;
+    model::Clip clip;
+    clip.length = core::ticksPerQuarterNote;
+    clip.asset = asset;
+    REQUIRE (f.session.perform (model::AddClip {f.session.project().tracks.back().id, clip}));
+    f.loader.sync (48000.0);
+    REQUIRE (f.loader.getClipAudio().at (asset.value).state.missing);
+
+    const auto replacement = toFile (f.temp.path() / "elsewhere" / "found.wav");
+    writeWav (replacement, 48000.0, 1, 4800);
+    REQUIRE (f.loader.relink (asset, replacement));
+    for (int i = 0; i < 500 && !f.loader.getClipAudio().at (asset.value).state.loaded; ++i)
+        juce::MessageManager::getInstance()->runDispatchLoopUntil (10);
+
+    const auto& audio = f.loader.getClipAudio().at (asset.value);
+    CHECK (audio.state.loaded);
+    CHECK_FALSE (audio.state.missing);
+    CHECK (f.session.project().findAsset (asset)->name == "found.wav");
+    CHECK (f.session.document().undoDescription() == "Locate audio");
+    CHECK (replacement.existsAsFile()); // the user's file is copied, never moved
+}

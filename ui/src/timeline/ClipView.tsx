@@ -214,6 +214,23 @@ export function ClipView({
         {clip.loopLength > 0 ? <span aria-label="looped"> ⟳</span> : null}
         {asset?.missing ? ' — missing' : asset?.loading ? ' — loading…' : ''}
       </span>
+      {asset?.missing ? (
+        <button
+          type="button"
+          className="clip__locate"
+          aria-label={`Locate the missing file for ${name}`}
+          title="Choose the file this clip should play"
+          onPointerDown={(event) => {
+            event.stopPropagation(); // not a drag
+          }}
+          onClick={(event) => {
+            event.stopPropagation();
+            bridge.send({ type: 'asset.locate', payload: { asset: asset.id } });
+          }}
+        >
+          Locate…
+        </button>
+      ) : null}
       {audio && asset?.loaded ? (
         <AudioWaveform clip={clip} asset={asset} bpm={bpm} width={width} />
       ) : (

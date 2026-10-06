@@ -334,6 +334,13 @@
         "max": 38400000
       }
     },
+    "asset.locate": {
+      "asset": {
+        "type": "int",
+        "min": 1,
+        "max": 2147483647
+      }
+    },
     "clip.create": {
       "track": {
         "type": "int",

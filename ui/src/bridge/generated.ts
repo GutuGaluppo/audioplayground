@@ -355,6 +355,13 @@ export interface TrackImportAudio {
   };
 }
 
+export interface AssetLocate {
+  readonly type: 'asset.locate';
+  readonly payload: {
+    readonly asset: number;
+  };
+}
+
 export interface ClipCreate {
   readonly type: 'clip.create';
   readonly payload: {
@@ -447,7 +454,7 @@ export interface ClipEditNote {
   };
 }
 
-export type Intent = AppReady | AudioOpenSettings | ToneSetEnabled | TransportPlay | TransportStop | TransportReturnToStart | TransportSetTempo | TransportSetCountIn | MetronomeSetEnabled | ParamSet | EditUndo | EditRedo | ProjectNew | ProjectOpen | ProjectSave | ProjectSaveAs | ProjectRename | ProjectExport | ProjectCancelExport | NoteOn | NoteOff | NoteAllOff | InstrumentSelect | SamplerLoad | DrumsSetStep | DrumsClear | DrumsTrigger | DrumsSetPad | DrumsLoadPad | DrumsResetPad | TransportRecord | TransportCapture | TransportSeek | TransportSetLoop | TrackAdd | TrackRemove | TrackRename | TrackSetVolume | TrackSetPan | TrackSetMute | TrackSetSolo | TrackSetArmed | TrackSetEffect | TrackImportAudio | ClipCreate | ClipMove | ClipResize | ClipSplit | ClipRemove | ClipDuplicate | ClipSetLoop | ClipAddNote | ClipRemoveNote | ClipEditNote;
+export type Intent = AppReady | AudioOpenSettings | ToneSetEnabled | TransportPlay | TransportStop | TransportReturnToStart | TransportSetTempo | TransportSetCountIn | MetronomeSetEnabled | ParamSet | EditUndo | EditRedo | ProjectNew | ProjectOpen | ProjectSave | ProjectSaveAs | ProjectRename | ProjectExport | ProjectCancelExport | NoteOn | NoteOff | NoteAllOff | InstrumentSelect | SamplerLoad | DrumsSetStep | DrumsClear | DrumsTrigger | DrumsSetPad | DrumsLoadPad | DrumsResetPad | TransportRecord | TransportCapture | TransportSeek | TransportSetLoop | TrackAdd | TrackRemove | TrackRename | TrackSetVolume | TrackSetPan | TrackSetMute | TrackSetSolo | TrackSetArmed | TrackSetEffect | TrackImportAudio | AssetLocate | ClipCreate | ClipMove | ClipResize | ClipSplit | ClipRemove | ClipDuplicate | ClipSetLoop | ClipAddNote | ClipRemoveNote | ClipEditNote;
 
 // Events: native -> UI
 export interface EngineStatus {

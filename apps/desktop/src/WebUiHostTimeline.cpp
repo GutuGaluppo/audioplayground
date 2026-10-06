@@ -238,6 +238,11 @@ void WebUiHost::handle (const ap::bridge::TrackImportAudio& intent)
         samples.chooseAndImportClip (track->id, intent.ticks);
 }
 
+void WebUiHost::handle (const ap::bridge::AssetLocate& intent)
+{
+    samples.chooseAndRelink (model::AssetId {static_cast<std::uint64_t> (intent.asset)});
+}
+
 // --- Clips -----------------------------------------------------------------------------------
 
 void WebUiHost::handle (const ap::bridge::ClipCreate& intent)

@@ -699,6 +699,17 @@ std::optional<Intent> parseTrackImportAudio (const juce::var& payloadVar)
     return Intent {message};
 }
 
+std::optional<Intent> parseAssetLocate (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"asset"}))
+        return std::nullopt;
+
+    AssetLocate message;
+    if (!readInt (*payload, "asset", AssetLocate::assetMin, AssetLocate::assetMax, message.asset)) return std::nullopt;
+    return Intent {message};
+}
+
 std::optional<Intent> parseClipCreate (const juce::var& payloadVar)
 {
     const auto* payload = payloadVar.getDynamicObject();
@@ -933,6 +944,8 @@ std::optional<Intent> parseIntent (const juce::var& message)
         return parseTrackSetEffect (payload);
     if (typeName == TrackImportAudio::type)
         return parseTrackImportAudio (payload);
+    if (typeName == AssetLocate::type)
+        return parseAssetLocate (payload);
     if (typeName == ClipCreate::type)
         return parseClipCreate (payload);
     if (typeName == ClipMove::type)

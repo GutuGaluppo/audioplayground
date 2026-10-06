@@ -9,6 +9,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -51,6 +52,12 @@ public:
     // Asks for a file, copies it into the project and adds it as an audio clip at the given
     // timeline position (one undo step).
     void chooseAndImportClip (model::TrackId track, core::Ticks position);
+
+    // Asks for a replacement for a missing audio file, copies it into the project and points the
+    // asset at it (one undo step); every clip, the sampler and drum pads using it reload.
+    void chooseAndRelink (model::AssetId asset);
+    // Same with a given file (no dialog). Returns true if the asset now points at a copy of it.
+    bool relink (model::AssetId asset, const juce::File& source);
 
     // Call when the project changes (open, undo...) or the device sample rate changes.
     void sync (double engineSampleRate);
@@ -117,6 +124,8 @@ private:
     void finishClipImport (model::TrackId track, core::Ticks position, Copied copied,
                            std::shared_ptr<Decoded> result);
     void chooseFile (std::function<void (Copied)> onCopied);
+    [[nodiscard]] std::optional<Copied> copyIntoProject (const juce::File& source);
+    bool finishRelink (model::AssetId asset, Copied copied);
     template <typename Done>
     void decodeInBackground (juce::File file, std::string name, model::AssetId asset, bool overview,
                              Done done);

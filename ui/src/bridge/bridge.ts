@@ -461,6 +461,11 @@ export function createSimulatedBridge(): Bridge {
           queueMicrotask(tick);
           return;
         }
+        case 'asset.locate':
+          queueMicrotask(() => {
+            notice('Locating missing audio opens a file dialog in the desktop app.');
+          });
+          return;
         case 'project.cancelExport':
           exportCancelled = true;
           return;

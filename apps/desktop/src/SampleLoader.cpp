@@ -230,38 +230,47 @@ void SampleLoader::chooseFile (std::function<void (Copied)> onCopied)
         "Choose an audio file", juce::File::getSpecialLocation (juce::File::userMusicDirectory),
         supportedPattern);
 
-    chooser->launchAsync (
-        juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
-        [this, onCopied = std::move (onCopied)] (const juce::FileChooser& fc)
-        {
-            const auto source = fc.getResult();
-            if (source == juce::File())
-                return; // cancelled
+    chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+                          [this, onCopied = std::move (onCopied)] (const juce::FileChooser& fc)
+                          {
+                              const auto source = fc.getResult();
+                              if (source == juce::File())
+                                  return; // cancelled
+                              if (auto copied = copyIntoProject (source))
+                                  onCopied (std::move (*copied));
+                          });
+}
 
-            if (!hasSupportedExtension (source))
-                return error ("That file type is not supported. Use WAV, AIFF or FLAC.");
-            if (source.getSize() > maxFileBytes)
-                return error ("That file is too large to import.");
+std::optional<SampleLoader::Copied> SampleLoader::copyIntoProject (const juce::File& source)
+{
+    if (!hasSupportedExtension (source))
+    {
+        error ("That file type is not supported. Use WAV, AIFF or FLAC.");
+        return std::nullopt;
+    }
+    if (source.getSize() > maxFileBytes)
+    {
+        error ("That file is too large to import.");
+        return std::nullopt;
+    }
 
-            // Copy into the project's audio folder under a safe, unique name.
-            const auto audioDir = juce::File (toJuceString (session.assetRoot().audioDirectory()));
-            audioDir.createDirectory();
-            const auto stem = std::to_string (session.project().nextAssetId) + "-" + safeFileStem (source);
-            const auto extension = source.getFileExtension().toLowerCase().toStdString();
-            auto target = audioDir.getChildFile (stem + extension);
-            for (int n = 2; target.exists(); ++n)
-                target = audioDir.getChildFile (stem + "-" + std::to_string (n) + extension);
+    // Copy into the project's audio folder under a safe, unique name.
+    const auto audioDir = juce::File (toJuceString (session.assetRoot().audioDirectory()));
+    audioDir.createDirectory();
+    const auto stem = std::to_string (session.project().nextAssetId) + "-" + safeFileStem (source);
+    const auto extension = source.getFileExtension().toLowerCase().toStdString();
+    auto target = audioDir.getChildFile (stem + extension);
+    for (int n = 2; target.exists(); ++n)
+        target = audioDir.getChildFile (stem + "-" + std::to_string (n) + extension);
 
-            const auto temporary = target.getSiblingFile (target.getFileName() + ".importing");
-            if (!source.copyFileTo (temporary) || !temporary.moveFileTo (target))
-            {
-                temporary.deleteFile();
-                return error ("Could not copy the file into the project.");
-            }
-
-            onCopied (
-                {target, "audio/" + target.getFileName().toStdString(), source.getFileName().toStdString()});
-        });
+    const auto temporary = target.getSiblingFile (target.getFileName() + ".importing");
+    if (!source.copyFileTo (temporary) || !temporary.moveFileTo (target))
+    {
+        temporary.deleteFile();
+        error ("Could not copy the file into the project.");
+        return std::nullopt;
+    }
+    return Copied {target, "audio/" + target.getFileName().toStdString(), source.getFileName().toStdString()};
 }
 
 void SampleLoader::chooseAndImport (std::size_t slot)
@@ -295,6 +304,38 @@ void SampleLoader::chooseAndImportClip (model::TrackId track, core::Ticks positi
                 [this, track, position, copied = std::move (copied)] (std::shared_ptr<Decoded> result) mutable
                 { finishClipImport (track, position, std::move (copied), std::move (result)); });
         });
+}
+
+void SampleLoader::chooseAndRelink (model::AssetId asset)
+{
+    if (session.project().findAsset (asset) == nullptr)
+        return;
+    chooseFile ([this, asset] (Copied copied) { finishRelink (asset, std::move (copied)); });
+}
+
+bool SampleLoader::relink (model::AssetId asset, const juce::File& source)
+{
+    auto copied = session.project().findAsset (asset) != nullptr ? copyIntoProject (source) : std::nullopt;
+    return copied && finishRelink (asset, std::move (*copied));
+}
+
+bool SampleLoader::finishRelink (model::AssetId asset, Copied copied)
+{
+    // Forget the failed load so the next sync decodes the new file.
+    clipAudio.erase (asset.value);
+    for (auto& slot : slots)
+        if (slot.requested == asset)
+            slot.requested = {};
+
+    if (!session.perform (model::RelinkAsset {asset, copied.relativePath, copied.displayName}))
+    {
+        copied.file.deleteFile();
+        sync (engineRate);
+        error ("Could not use that file for the missing audio.");
+        return false;
+    }
+    sync (engineRate); // start decoding the new file now
+    return true;
 }
 
 void SampleLoader::finishClipImport (model::TrackId track, core::Ticks position, Copied copied,

@@ -223,6 +223,21 @@ ApplyResult apply (Command& command, Project& project)
                 return applyTrackField (project, c.id, &Track::soloed, c.soloed, c.previous,
                                         [] (bool v) { return std::optional<bool> (v); });
             },
+            [&project] (RelinkAsset& c) -> ApplyResult
+            {
+                const auto it = std::find_if (project.assets.begin(), project.assets.end(),
+                                              [&c] (const Asset& a) { return a.id == c.id; });
+                auto name = sanitiseName (c.name, Asset::maxNameLength);
+                if (it == project.assets.end() || !isSafeAssetPath (c.relativePath) || !name)
+                    return ApplyResult::rejected;
+                c.name = std::move (*name);
+                if (it->relativePath == c.relativePath && it->name == c.name)
+                    return ApplyResult::unchanged;
+                c.previous = *it;
+                it->relativePath = c.relativePath;
+                it->name = c.name;
+                return ApplyResult::applied;
+            },
             [&project] (AddAsset& c) -> ApplyResult
             {
                 if (project.assets.size() >= Project::maxAssets || !isSafeAssetPath (c.relativePath))
@@ -413,6 +428,12 @@ void revert (const Command& command, Project& project)
                 if (auto* t = project.findTrack (c.id))
                     t->soloed = c.previous;
             },
+            [&project] (const RelinkAsset& c)
+            {
+                for (auto& asset : project.assets)
+                    if (asset.id == c.id)
+                        asset = c.previous;
+            },
             [&project] (const AddAsset& c)
             {
                 std::erase_if (project.assets, [&c] (const Asset& a) { return a.id == c.created; });
@@ -469,6 +490,7 @@ std::string_view describe (const Command& command) noexcept
             [] (const SetTrackSolo&) { return std::string_view ("Solo track"); },
             [] (const SetParameter& c) { return params::descriptor (c.id).name; },
             [] (const AddAsset&) { return std::string_view ("Import audio"); },
+            [] (const RelinkAsset&) { return std::string_view ("Locate audio"); },
             [] (const SetSamplerAsset&) { return std::string_view ("Change sample"); },
             [] (const SetDrumPad&) { return std::string_view ("Change pad"); },
             [] (const AddClip&) { return std::string_view ("Add clip"); },
