@@ -285,7 +285,8 @@ Cada fase termina num **gate**: CI verde (sanitizers inclusos), benchmarks dentr
 | 014 (captura retroativa) | ✅ Concluída: o engine registra sempre as notas tocadas (relógio de samples + posição); "Capturar" (Shift+C) transforma a última frase (separada por ≥ 4 s de silêncio) em clipes — na posição da timeline se tocada com o transporte rodando, senão no compasso do playhead mantendo o ritmo |
 | 016 (waveforms) | ✅ Concluída: picos de 200/s (≈ 5 ms) calculados no thread de decodificação, enviados uma vez por carregamento (base64, ≤ 10 min), canvas desenha o pico de cada coluna de pixel no zoom atual; visão geral como fallback enquanto carrega. Sem cache em disco: o áudio já é decodificado a cada abertura |
 | 018 (Filter) | ✅ Concluída: SVF TPT estéreo LP/BP/HP, cutoff em escala log e Q suavizados (20 ms), troca de modo com crossfade; golden `filter_sweep_48k`. Liga na cadeia de efeitos na 024 |
-| 019–023 (FX) | Próximas: EQ → Compressor → Distortion → Delay → Reverb V1 |
+| 019 (EQ) | ✅ Concluída: 3 bandas (low shelf, bell, high shelf) com as formulações SVF de Simper — mesmas curvas dos biquads RBJ, mas estáveis e sem cliques sob modulação (desvio deliberado da §3.6); golden `eq_sweep_48k` |
+| 020–023 (FX) | Próximas: Compressor → Distortion → Delay → Reverb V1 |
 | Escuta dos goldens de FX | ⏳ Precisa de um ouvinte humano (`tests/golden/*.wav`) |
 
 Decisões tomadas durante a execução:
