@@ -2,6 +2,7 @@
 // rejected or no-op edit re-sends the timeline so the UI never keeps an optimistic state.
 
 #include "WebUiHost.h"
+#include "ap/dsp/Peaks.h"
 #include "ap/model/ClipEditing.h"
 
 #include <cmath>
@@ -473,6 +474,33 @@ void WebUiHost::sendTimelineAssets()
         event.assets.push_back (std::move (a));
     }
     emit (event);
+}
+
+void WebUiHost::sendTimelinePeaks (bool all)
+{
+    // Detailed peaks are large (up to ~170 kB per asset), so each load is sent once, separately
+    // from the frequent asset updates.
+    if (all)
+        sentPeaks.clear();
+    const auto& audio = samples.getClipAudio();
+    std::erase_if (sentPeaks, [&audio] (const auto& sent) { return audio.count (sent.first) == 0; });
+
+    for (const auto& [id, clipAudio] : audio)
+    {
+        const auto& peaks = clipAudio.state.peaks;
+        if (!clipAudio.state.loaded || peaks.empty())
+            continue;
+        if (const auto it = sentPeaks.find (id); it != sentPeaks.end() && it->second == clipAudio.generation)
+            continue;
+        sentPeaks[id] = clipAudio.generation;
+
+        ap::bridge::TimelinePeaks event;
+        event.asset = toInt (id);
+        event.peaksPerSecond = dsp::peaksPerSecond;
+        event.data = juce::Base64::toBase64 (peaks.data(), peaks.size()).toStdString();
+        if (event.data.size() <= ap::bridge::TimelinePeaks::dataMaxLength)
+            emit (event);
+    }
 }
 
 } // namespace ap::desktop

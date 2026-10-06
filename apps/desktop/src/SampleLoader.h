@@ -34,7 +34,8 @@ public:
         bool missing = false;
         bool loading = false;
         double durationSeconds = 0.0;
-        std::vector<float> overview; // peak per segment, 0..1 (sampler only)
+        std::vector<float> overview;     // peak per segment, 0..1 (sampler and clips)
+        std::vector<std::uint8_t> peaks; // detailed peaks (see dsp::computePeaks), clips only
     };
 
     static constexpr std::int64_t maxFileBytes = 1024LL * 1024 * 1024;

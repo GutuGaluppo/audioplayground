@@ -17,6 +17,7 @@ export function createStores(bridge: Bridge) {
     drumPads: createKeyedEventStore(bridge, 'drums.pad', (pad) => pad.pad),
     timeline: createLatestEventStore(bridge, 'timeline.state'),
     timelineAssets: createLatestEventStore(bridge, 'timeline.assets'),
+    peaks: createKeyedEventStore(bridge, 'timeline.peaks', (event) => event.asset),
     selection: createSelectionStore(),
   };
 }

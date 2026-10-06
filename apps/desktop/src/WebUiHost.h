@@ -11,6 +11,7 @@
 #include "ap/engine/Engine.h"
 
 #include <juce_gui_extra/juce_gui_extra.h>
+#include <map>
 #include <memory>
 
 namespace ap::desktop
@@ -106,6 +107,7 @@ private:
     }
     void sendTimeline();
     void sendTimelineAssets();
+    void sendTimelinePeaks (bool all);
 
     void emit (const ap::bridge::Event& event);
     void sendStatus();
@@ -135,6 +137,7 @@ private:
     bool lastPlaying = false;
     bool lastRecording = false;
     bool lastCaptureAvailable = false;
+    std::map<std::uint64_t, std::uint64_t> sentPeaks; // asset -> load generation already sent
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (WebUiHost)
 };

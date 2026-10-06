@@ -859,6 +859,22 @@
           }
         }
       }
+    },
+    "timeline.peaks": {
+      "asset": {
+        "type": "int",
+        "min": 1,
+        "max": 2147483647
+      },
+      "peaksPerSecond": {
+        "type": "number",
+        "min": 1,
+        "max": 1000
+      },
+      "data": {
+        "type": "string",
+        "maxLength": 180000
+      }
     }
   }
 }

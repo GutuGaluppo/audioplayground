@@ -1,6 +1,7 @@
 #include "SampleLoader.h"
 
 #include "AppPaths.h"
+#include "ap/dsp/Peaks.h"
 #include "ap/dsp/Resampler.h"
 
 #include <cmath>
@@ -72,6 +73,7 @@ struct SampleLoader::Decoded
     double durationSeconds = 0.0;
     std::unique_ptr<instruments::SampleBuffer> buffer;
     std::vector<float> overview;
+    std::vector<std::uint8_t> peaks;
     double rate = 0.0;
 };
 
@@ -121,7 +123,10 @@ std::shared_ptr<SampleLoader::Decoded> decode (const juce::File& file, const std
                 buffer->channels.push_back (dsp::resample (samples, reader->sampleRate, rate));
             }
             if (wantOverview)
+            {
                 result->overview = computeOverview (buffer->channels, SampleLoader::overviewPoints);
+                result->peaks = dsp::computePeaks (buffer->channels, rate);
+            }
             result->durationSeconds = static_cast<double> (length) / reader->sampleRate;
             result->buffer = std::move (buffer);
         }
@@ -334,6 +339,7 @@ void SampleLoader::finishClipImport (model::TrackId track, core::Ticks position,
         entry.state.loaded = true;
         entry.state.durationSeconds = result->durationSeconds;
         entry.state.overview = std::move (result->overview);
+        entry.state.peaks = std::move (result->peaks);
         session.refreshEngine();
         if (onClipAudioChanged)
             onClipAudioChanged();
@@ -439,6 +445,7 @@ void SampleLoader::applyClip (std::uint64_t generation, std::shared_ptr<Decoded>
         entry.state.missing = false;
         entry.state.durationSeconds = result->durationSeconds;
         entry.state.overview = std::move (result->overview);
+        entry.state.peaks = std::move (result->peaks);
     }
 
     session.refreshEngine();

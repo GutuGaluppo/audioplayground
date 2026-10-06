@@ -3,8 +3,14 @@ import { useEffect, useRef } from 'react';
 import { useBridge } from '../bridge/BridgeContext';
 import type { TimelineAsset, TimelineClip, TimelineTrack } from '../bridge/generated';
 import { beginGesture } from '../params/gestures';
+import { useKeyed } from '../state/keyedEvent';
+import { useStores } from '../state/StoresContext';
 import { trackDrag } from './dom';
 import { clipEnd, isAudioClip, kindLabel, MAX_TICKS, noteSpans, PPQ, snap } from './model';
+import { decodePeaks, peakIn } from './peaks';
+
+// Canvas backing stores are limited in size; wider clips stretch the drawing.
+const MAX_CANVAS_WIDTH = 8192;
 
 interface ClipViewProps {
   clip: TimelineClip;
@@ -41,6 +47,8 @@ function AudioWaveform({
   width: number;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const peaksEvent = useKeyed(useStores().peaks, asset.id);
+  const peaks = peaksEvent ? decodePeaks(peaksEvent) : null;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -51,10 +59,11 @@ function AudioWaveform({
         return null; // no canvas support (tests)
       }
     })();
-    if (!canvas || !context || asset.overview.length === 0 || asset.durationSeconds <= 0) return;
+    if (!canvas || !context || asset.durationSeconds <= 0) return;
+    if (!peaks && asset.overview.length === 0) return;
 
     const ratio = window.devicePixelRatio || 1;
-    const w = Math.min(4096, Math.max(1, Math.round(width)));
+    const w = Math.min(MAX_CANVAS_WIDTH, Math.max(1, Math.round(width)));
     const h = canvas.clientHeight || 32;
     canvas.width = Math.round(w * ratio);
     canvas.height = Math.round(h * ratio);
@@ -62,27 +71,31 @@ function AudioWaveform({
     context.clearRect(0, 0, w, h);
     context.fillStyle = getComputedStyle(canvas).getPropertyValue('--clip-ink').trim() || '#c9d4ff';
 
-    // The clip shows [sourceOffset, sourceOffset + its length in seconds] of the file.
+    // The clip shows [sourceOffset, sourceOffset + its length in seconds] of the file. Each pixel
+    // column draws the loudest peak of the audio under it (detailed peaks once they arrive; the
+    // coarse overview until then).
     const seconds = (clip.length * 60) / (bpm * PPQ);
+    const perPixel = seconds / w;
     const points = asset.overview.length;
     const middle = h / 2;
     for (let x = 0; x < w; x++) {
-      const t = clip.sourceOffsetSeconds + ((x + 0.5) / w) * seconds;
-      if (t >= asset.durationSeconds) break;
-      const peak =
-        asset.overview[Math.min(points - 1, Math.floor((t / asset.durationSeconds) * points))] ?? 0;
+      const from = clip.sourceOffsetSeconds + x * perPixel;
+      if (from >= asset.durationSeconds) break;
+      const peak = peaks
+        ? peakIn(peaks, from, from + perPixel)
+        : (asset.overview[
+            Math.min(
+              points - 1,
+              Math.floor(((from + perPixel / 2) / asset.durationSeconds) * points),
+            )
+          ] ?? 0);
+      if (peak <= 0) continue;
       const bar = Math.max(1, peak * (h - 2));
       context.fillRect(x, middle - bar / 2, 1, bar);
     }
-  }, [clip.length, clip.sourceOffsetSeconds, asset, bpm, width]);
+  }, [clip.length, clip.sourceOffsetSeconds, asset, peaks, bpm, width]);
 
-  return (
-    <canvas
-      ref={canvasRef}
-      className="clip__waveform"
-      style={{ width: `${String(Math.min(4096, width))}px` }}
-    />
-  );
+  return <canvas ref={canvasRef} className="clip__waveform" />;
 }
 
 function NotePreview({ clip, pxPerTick }: { clip: TimelineClip; pxPerTick: number }) {

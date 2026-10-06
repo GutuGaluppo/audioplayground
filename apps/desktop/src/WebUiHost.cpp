@@ -161,7 +161,11 @@ WebUiHost::WebUiHost (AudioDeviceHost& hostToUse, engine::Engine& engineToUse, S
         else
             sendDrumPad (slot - 1);
     };
-    samples.onClipAudioChanged = [this] { sendTimelineAssets(); };
+    samples.onClipAudioChanged = [this]
+    {
+        sendTimelineAssets();
+        sendTimelinePeaks (false);
+    };
     samples.onError
         = [this] (const std::string& message) { showNotice (ProjectActions::NoticeLevel::error, message); };
     audioRecorder.onNotice
@@ -214,6 +218,7 @@ void WebUiHost::handle (const ap::bridge::AppReady&)
         sendDrumPad (pad);
     sendTimeline();
     sendTimelineAssets();
+    sendTimelinePeaks (true);
 }
 
 void WebUiHost::handle (const ap::bridge::AudioOpenSettings&)

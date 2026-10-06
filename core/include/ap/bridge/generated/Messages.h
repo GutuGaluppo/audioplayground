@@ -945,7 +945,23 @@ struct TimelineAssets
     bool operator== (const TimelineAssets&) const = default;
 };
 
+struct TimelinePeaks
+{
+    static constexpr std::string_view type = "timeline.peaks";
+    static constexpr int assetMin = 1;
+    static constexpr int assetMax = 2147483647;
+    static constexpr double peaksPerSecondMin = 1.0;
+    static constexpr double peaksPerSecondMax = 1000.0;
+    static constexpr std::size_t dataMaxLength = 180000;
+
+    int asset = 0;
+    double peaksPerSecond = 0.0;
+    std::string data {};
+
+    bool operator== (const TimelinePeaks&) const = default;
+};
+
 using Intent = std::variant<AppReady, AudioOpenSettings, ToneSetEnabled, TransportPlay, TransportStop, TransportReturnToStart, TransportSetTempo, TransportSetCountIn, MetronomeSetEnabled, ParamSet, EditUndo, EditRedo, ProjectNew, ProjectOpen, ProjectSave, ProjectSaveAs, ProjectRename, NoteOn, NoteOff, NoteAllOff, InstrumentSelect, SamplerLoad, DrumsSetStep, DrumsClear, DrumsTrigger, DrumsSetPad, DrumsLoadPad, DrumsResetPad, TransportRecord, TransportCapture, TransportSeek, TransportSetLoop, TrackAdd, TrackRemove, TrackRename, TrackSetVolume, TrackSetPan, TrackSetMute, TrackSetSolo, TrackSetArmed, TrackImportAudio, ClipCreate, ClipMove, ClipResize, ClipSplit, ClipRemove, ClipDuplicate, ClipSetLoop, ClipAddNote, ClipRemoveNote, ClipEditNote>;
-using Event = std::variant<EngineStatus, EngineMeters, TransportState, TransportPosition, ParamValue, HistoryState, ProjectState, AppNotice, InstrumentState, SamplerState, DrumsPad, TimelineState, TimelineAssets>;
+using Event = std::variant<EngineStatus, EngineMeters, TransportState, TransportPosition, ParamValue, HistoryState, ProjectState, AppNotice, InstrumentState, SamplerState, DrumsPad, TimelineState, TimelineAssets, TimelinePeaks>;
 
 } // namespace ap::bridge

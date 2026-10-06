@@ -1025,6 +1025,14 @@ juce::var toVar (const Event& event)
                 auto* payload = new juce::DynamicObject();
                 payload->setProperty ("assets", toVarList (m.assets));
                 return envelope (TimelineAssets::type, payload);
+            },
+            [] (const TimelinePeaks& m) -> juce::var
+            {
+                auto* payload = new juce::DynamicObject();
+                payload->setProperty ("asset", m.asset);
+                payload->setProperty ("peaksPerSecond", m.peaksPerSecond);
+                payload->setProperty ("data", juce::String (m.data));
+                return envelope (TimelinePeaks::type, payload);
             }},
         event);
 }

@@ -3,6 +3,7 @@
 
 add_library(ap_core STATIC
     src/BuildInfo.cpp
+    src/dsp/Peaks.cpp
     src/dsp/Resampler.cpp
     src/io/ProjectFiles.cpp
     src/io/Recordings.cpp

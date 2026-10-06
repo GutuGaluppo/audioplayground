@@ -62,6 +62,17 @@ const FAKE_ASSET = {
   ),
 };
 
+// Detailed peaks (200 per second): a decaying hit on every eighth note at 120 BPM.
+const FAKE_PEAKS = btoa(
+  String.fromCharCode(
+    ...Array.from({ length: 800 }, (_, i) => {
+      const sinceHit = i % 50;
+      const accent = Math.floor(i / 50) % 2 === 0 ? 1 : 0.6;
+      return Math.round(255 * accent * Math.exp(-sinceHit / 12) * (0.8 + 0.2 * Math.sin(i)));
+    }),
+  ),
+);
+
 const clone = <T>(value: T): T => structuredClone(value);
 const mod = (value: number, divisor: number) => ((value % divisor) + divisor) % divisor;
 const byStart = (a: SimClip, b: SimClip) => a.start - b.start || a.id - b.id;
@@ -82,6 +93,11 @@ export function createSimulatedTimeline(host: Host) {
   };
   const sendAssets = () => {
     host.dispatch({ type: 'timeline.assets', payload: { assets: assetsUsed ? [FAKE_ASSET] : [] } });
+    if (assetsUsed)
+      host.dispatch({
+        type: 'timeline.peaks',
+        payload: { asset: FAKE_ASSET.id, peaksPerSecond: 200, data: FAKE_PEAKS },
+      });
   };
 
   // Applies change to a copy; records it for undo if it changed anything.

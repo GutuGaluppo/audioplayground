@@ -552,7 +552,16 @@ export interface TimelineAssets {
   };
 }
 
-export type NativeEvent = EngineStatus | EngineMeters | TransportState | TransportPosition | ParamValue | HistoryState | ProjectState | AppNotice | InstrumentState | SamplerState | DrumsPad | TimelineState | TimelineAssets;
+export interface TimelinePeaks {
+  readonly type: 'timeline.peaks';
+  readonly payload: {
+    readonly asset: number;
+    readonly peaksPerSecond: number;
+    readonly data: string;
+  };
+}
+
+export type NativeEvent = EngineStatus | EngineMeters | TransportState | TransportPosition | ParamValue | HistoryState | ProjectState | AppNotice | InstrumentState | SamplerState | DrumsPad | TimelineState | TimelineAssets | TimelinePeaks;
 export type NativeEventType = NativeEvent['type'];
 
 /** Payload type for each native event type. */
@@ -570,6 +579,7 @@ export interface NativeEventPayloads {
   'drums.pad': DrumsPad['payload'];
   'timeline.state': TimelineState['payload'];
   'timeline.assets': TimelineAssets['payload'];
+  'timeline.peaks': TimelinePeaks['payload'];
 }
 
 type Payload = Record<string, unknown>;
@@ -735,6 +745,11 @@ const eventValidators: Record<NativeEventType, (payload: Payload) => boolean> = 
   'timeline.assets': (payload) =>
     hasOnlyKeys(payload, ['assets']) &&
     isList(payload['assets'], 1024, isTimelineAsset),
+  'timeline.peaks': (payload) =>
+    hasOnlyKeys(payload, ['asset', 'peaksPerSecond', 'data']) &&
+    Number.isInteger(payload['asset']) && (payload['asset'] as number) >= 1 && (payload['asset'] as number) <= 2147483647 &&
+    typeof payload['peaksPerSecond'] === 'number' && Number.isFinite(payload['peaksPerSecond']) && payload['peaksPerSecond'] >= 1 && payload['peaksPerSecond'] <= 1000 &&
+    typeof payload['data'] === 'string' && payload['data'].length <= 180000,
 };
 
 /** Strictly validates a message received from native code. Returns null if it is malformed. */
