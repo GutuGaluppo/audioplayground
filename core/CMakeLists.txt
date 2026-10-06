@@ -7,6 +7,7 @@ add_library(ap_core STATIC
     src/dsp/Resampler.cpp
     src/io/ProjectFiles.cpp
     src/io/Recordings.cpp
+    src/fx/Compressor.cpp
     src/fx/Equalizer.cpp
     src/fx/Filter.cpp
     src/engine/Engine.cpp
