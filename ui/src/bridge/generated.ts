@@ -304,6 +304,14 @@ export interface TrackSetSolo {
   };
 }
 
+export interface TrackSetArmed {
+  readonly type: 'track.setArmed';
+  readonly payload: {
+    readonly track: number;
+    readonly armed: boolean;
+  };
+}
+
 export interface TrackImportAudio {
   readonly type: 'track.importAudio';
   readonly payload: {
@@ -404,7 +412,7 @@ export interface ClipEditNote {
   };
 }
 
-export type Intent = AppReady | AudioOpenSettings | ToneSetEnabled | TransportPlay | TransportStop | TransportReturnToStart | TransportSetTempo | TransportSetCountIn | MetronomeSetEnabled | ParamSet | EditUndo | EditRedo | ProjectNew | ProjectOpen | ProjectSave | ProjectSaveAs | ProjectRename | NoteOn | NoteOff | NoteAllOff | InstrumentSelect | SamplerLoad | DrumsSetStep | DrumsClear | DrumsTrigger | DrumsSetPad | DrumsLoadPad | DrumsResetPad | TransportRecord | TransportSeek | TransportSetLoop | TrackAdd | TrackRemove | TrackRename | TrackSetVolume | TrackSetPan | TrackSetMute | TrackSetSolo | TrackImportAudio | ClipCreate | ClipMove | ClipResize | ClipSplit | ClipRemove | ClipDuplicate | ClipSetLoop | ClipAddNote | ClipRemoveNote | ClipEditNote;
+export type Intent = AppReady | AudioOpenSettings | ToneSetEnabled | TransportPlay | TransportStop | TransportReturnToStart | TransportSetTempo | TransportSetCountIn | MetronomeSetEnabled | ParamSet | EditUndo | EditRedo | ProjectNew | ProjectOpen | ProjectSave | ProjectSaveAs | ProjectRename | NoteOn | NoteOff | NoteAllOff | InstrumentSelect | SamplerLoad | DrumsSetStep | DrumsClear | DrumsTrigger | DrumsSetPad | DrumsLoadPad | DrumsResetPad | TransportRecord | TransportSeek | TransportSetLoop | TrackAdd | TrackRemove | TrackRename | TrackSetVolume | TrackSetPan | TrackSetMute | TrackSetSolo | TrackSetArmed | TrackImportAudio | ClipCreate | ClipMove | ClipResize | ClipSplit | ClipRemove | ClipDuplicate | ClipSetLoop | ClipAddNote | ClipRemoveNote | ClipEditNote;
 
 // Events: native -> UI
 export interface EngineStatus {
@@ -414,6 +422,9 @@ export interface EngineStatus {
     readonly sampleRate: number;
     readonly bufferSize: number;
     readonly outputLatencyMs: number;
+    readonly inputName: string;
+    readonly inputChannels: number;
+    readonly roundTripLatencyMs: number;
     readonly error: string;
     readonly toneEnabled: boolean;
   };
@@ -423,6 +434,7 @@ export interface EngineMeters {
   readonly type: 'engine.meters';
   readonly payload: {
     readonly peak: number;
+    readonly inputPeak: number;
   };
 }
 
@@ -436,6 +448,7 @@ export interface TransportState {
     readonly countInBars: number;
     readonly metronomeEnabled: boolean;
     readonly recording: boolean;
+    readonly armedTrack: number;
     readonly loopEnabled: boolean;
     readonly loopStart: number;
     readonly loopEnd: number;
@@ -637,18 +650,22 @@ function isTimelineAsset(value: unknown): boolean {
 
 const eventValidators: Record<NativeEventType, (payload: Payload) => boolean> = {
   'engine.status': (payload) =>
-    hasOnlyKeys(payload, ['deviceName', 'sampleRate', 'bufferSize', 'outputLatencyMs', 'error', 'toneEnabled']) &&
+    hasOnlyKeys(payload, ['deviceName', 'sampleRate', 'bufferSize', 'outputLatencyMs', 'inputName', 'inputChannels', 'roundTripLatencyMs', 'error', 'toneEnabled']) &&
     typeof payload['deviceName'] === 'string' && payload['deviceName'].length <= 256 &&
     typeof payload['sampleRate'] === 'number' && Number.isFinite(payload['sampleRate']) && payload['sampleRate'] >= 0 && payload['sampleRate'] <= 768000 &&
     Number.isInteger(payload['bufferSize']) && (payload['bufferSize'] as number) >= 0 && (payload['bufferSize'] as number) <= 65536 &&
     typeof payload['outputLatencyMs'] === 'number' && Number.isFinite(payload['outputLatencyMs']) && payload['outputLatencyMs'] >= 0 && payload['outputLatencyMs'] <= 10000 &&
+    typeof payload['inputName'] === 'string' && payload['inputName'].length <= 256 &&
+    Number.isInteger(payload['inputChannels']) && (payload['inputChannels'] as number) >= 0 && (payload['inputChannels'] as number) <= 2 &&
+    typeof payload['roundTripLatencyMs'] === 'number' && Number.isFinite(payload['roundTripLatencyMs']) && payload['roundTripLatencyMs'] >= 0 && payload['roundTripLatencyMs'] <= 10000 &&
     typeof payload['error'] === 'string' && payload['error'].length <= 1024 &&
     typeof payload['toneEnabled'] === 'boolean',
   'engine.meters': (payload) =>
-    hasOnlyKeys(payload, ['peak']) &&
-    typeof payload['peak'] === 'number' && Number.isFinite(payload['peak']) && payload['peak'] >= 0 && payload['peak'] <= 1,
+    hasOnlyKeys(payload, ['peak', 'inputPeak']) &&
+    typeof payload['peak'] === 'number' && Number.isFinite(payload['peak']) && payload['peak'] >= 0 && payload['peak'] <= 1 &&
+    typeof payload['inputPeak'] === 'number' && Number.isFinite(payload['inputPeak']) && payload['inputPeak'] >= 0 && payload['inputPeak'] <= 1,
   'transport.state': (payload) =>
-    hasOnlyKeys(payload, ['playing', 'bpm', 'numerator', 'denominator', 'countInBars', 'metronomeEnabled', 'recording', 'loopEnabled', 'loopStart', 'loopEnd']) &&
+    hasOnlyKeys(payload, ['playing', 'bpm', 'numerator', 'denominator', 'countInBars', 'metronomeEnabled', 'recording', 'armedTrack', 'loopEnabled', 'loopStart', 'loopEnd']) &&
     typeof payload['playing'] === 'boolean' &&
     typeof payload['bpm'] === 'number' && Number.isFinite(payload['bpm']) && payload['bpm'] >= 20 && payload['bpm'] <= 300 &&
     Number.isInteger(payload['numerator']) && (payload['numerator'] as number) >= 1 && (payload['numerator'] as number) <= 32 &&
@@ -656,6 +673,7 @@ const eventValidators: Record<NativeEventType, (payload: Payload) => boolean> = 
     Number.isInteger(payload['countInBars']) && (payload['countInBars'] as number) >= 0 && (payload['countInBars'] as number) <= 4 &&
     typeof payload['metronomeEnabled'] === 'boolean' &&
     typeof payload['recording'] === 'boolean' &&
+    Number.isInteger(payload['armedTrack']) && (payload['armedTrack'] as number) >= 0 && (payload['armedTrack'] as number) <= 2147483647 &&
     typeof payload['loopEnabled'] === 'boolean' &&
     Number.isInteger(payload['loopStart']) && (payload['loopStart'] as number) >= 0 && (payload['loopStart'] as number) <= 38400000 &&
     Number.isInteger(payload['loopEnd']) && (payload['loopEnd'] as number) >= 0 && (payload['loopEnd'] as number) <= 38400000,

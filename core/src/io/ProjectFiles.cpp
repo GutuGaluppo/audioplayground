@@ -1,15 +1,11 @@
 #include "ap/io/ProjectFiles.h"
 
+#include "FileHandles.h"
+
 #include <algorithm>
 #include <atomic>
 #include <cstdio>
 #include <system_error>
-
-#if defined(_WIN32)
-#include <io.h>
-#else
-#include <unistd.h>
-#endif
 
 namespace ap::io
 {
@@ -22,35 +18,16 @@ std::string temporarySuffix()
     return ".tmp-" + std::to_string (counter.fetch_add (1));
 }
 
-bool flushToDisk (std::FILE* file)
-{
-    if (std::fflush (file) != 0)
-        return false;
-#if defined(_WIN32)
-    return _commit (_fileno (file)) == 0;
-#else
-    return fsync (fileno (file)) == 0;
-#endif
-}
+using detail::flushToDisk;
 
 std::FILE* openForWriting (const fs::path& path)
 {
-#if defined(_WIN32)
-    std::FILE* file = nullptr;
-    return _wfopen_s (&file, path.c_str(), L"wb") == 0 ? file : nullptr;
-#else
-    return std::fopen (path.c_str(), "wb");
-#endif
+    return detail::openFile (path, "wb");
 }
 
 std::FILE* openForReading (const fs::path& path)
 {
-#if defined(_WIN32)
-    std::FILE* file = nullptr;
-    return _wfopen_s (&file, path.c_str(), L"rb") == 0 ? file : nullptr;
-#else
-    return std::fopen (path.c_str(), "rb");
-#endif
+    return detail::openFile (path, "rb");
 }
 
 LoadFolderResult loadFile (const fs::path& path)

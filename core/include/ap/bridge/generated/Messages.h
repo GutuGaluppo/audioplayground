@@ -517,6 +517,18 @@ struct TrackSetSolo
     bool operator== (const TrackSetSolo&) const = default;
 };
 
+struct TrackSetArmed
+{
+    static constexpr std::string_view type = "track.setArmed";
+    static constexpr int trackMin = 1;
+    static constexpr int trackMax = 2147483647;
+
+    int track = 0;
+    bool armed = false;
+
+    bool operator== (const TrackSetArmed&) const = default;
+};
+
 struct TrackImportAudio
 {
     static constexpr std::string_view type = "track.importAudio";
@@ -715,12 +727,20 @@ struct EngineStatus
     static constexpr int bufferSizeMax = 65536;
     static constexpr double outputLatencyMsMin = 0.0;
     static constexpr double outputLatencyMsMax = 10000.0;
+    static constexpr std::size_t inputNameMaxLength = 256;
+    static constexpr int inputChannelsMin = 0;
+    static constexpr int inputChannelsMax = 2;
+    static constexpr double roundTripLatencyMsMin = 0.0;
+    static constexpr double roundTripLatencyMsMax = 10000.0;
     static constexpr std::size_t errorMaxLength = 1024;
 
     std::string deviceName {};
     double sampleRate = 0.0;
     int bufferSize = 0;
     double outputLatencyMs = 0.0;
+    std::string inputName {};
+    int inputChannels = 0;
+    double roundTripLatencyMs = 0.0;
     std::string error {};
     bool toneEnabled = false;
 
@@ -732,8 +752,11 @@ struct EngineMeters
     static constexpr std::string_view type = "engine.meters";
     static constexpr double peakMin = 0.0;
     static constexpr double peakMax = 1.0;
+    static constexpr double inputPeakMin = 0.0;
+    static constexpr double inputPeakMax = 1.0;
 
     double peak = 0.0;
+    double inputPeak = 0.0;
 
     bool operator== (const EngineMeters&) const = default;
 };
@@ -749,6 +772,8 @@ struct TransportState
     static constexpr int denominatorMax = 16;
     static constexpr int countInBarsMin = 0;
     static constexpr int countInBarsMax = 4;
+    static constexpr int armedTrackMin = 0;
+    static constexpr int armedTrackMax = 2147483647;
     static constexpr int loopStartMin = 0;
     static constexpr int loopStartMax = 38400000;
     static constexpr int loopEndMin = 0;
@@ -761,6 +786,7 @@ struct TransportState
     int countInBars = 0;
     bool metronomeEnabled = false;
     bool recording = false;
+    int armedTrack = 0;
     bool loopEnabled = false;
     int loopStart = 0;
     int loopEnd = 0;
@@ -911,7 +937,7 @@ struct TimelineAssets
     bool operator== (const TimelineAssets&) const = default;
 };
 
-using Intent = std::variant<AppReady, AudioOpenSettings, ToneSetEnabled, TransportPlay, TransportStop, TransportReturnToStart, TransportSetTempo, TransportSetCountIn, MetronomeSetEnabled, ParamSet, EditUndo, EditRedo, ProjectNew, ProjectOpen, ProjectSave, ProjectSaveAs, ProjectRename, NoteOn, NoteOff, NoteAllOff, InstrumentSelect, SamplerLoad, DrumsSetStep, DrumsClear, DrumsTrigger, DrumsSetPad, DrumsLoadPad, DrumsResetPad, TransportRecord, TransportSeek, TransportSetLoop, TrackAdd, TrackRemove, TrackRename, TrackSetVolume, TrackSetPan, TrackSetMute, TrackSetSolo, TrackImportAudio, ClipCreate, ClipMove, ClipResize, ClipSplit, ClipRemove, ClipDuplicate, ClipSetLoop, ClipAddNote, ClipRemoveNote, ClipEditNote>;
+using Intent = std::variant<AppReady, AudioOpenSettings, ToneSetEnabled, TransportPlay, TransportStop, TransportReturnToStart, TransportSetTempo, TransportSetCountIn, MetronomeSetEnabled, ParamSet, EditUndo, EditRedo, ProjectNew, ProjectOpen, ProjectSave, ProjectSaveAs, ProjectRename, NoteOn, NoteOff, NoteAllOff, InstrumentSelect, SamplerLoad, DrumsSetStep, DrumsClear, DrumsTrigger, DrumsSetPad, DrumsLoadPad, DrumsResetPad, TransportRecord, TransportSeek, TransportSetLoop, TrackAdd, TrackRemove, TrackRename, TrackSetVolume, TrackSetPan, TrackSetMute, TrackSetSolo, TrackSetArmed, TrackImportAudio, ClipCreate, ClipMove, ClipResize, ClipSplit, ClipRemove, ClipDuplicate, ClipSetLoop, ClipAddNote, ClipRemoveNote, ClipEditNote>;
 using Event = std::variant<EngineStatus, EngineMeters, TransportState, TransportPosition, ParamValue, HistoryState, ProjectState, AppNotice, InstrumentState, SamplerState, DrumsPad, TimelineState, TimelineAssets>;
 
 } // namespace ap::bridge

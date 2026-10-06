@@ -280,8 +280,10 @@ Cada fase termina num **gate**: CI verde (sanitizers inclusos), benchmarks dentr
 | Verificação auditiva da Fase 2 (critério de aceite) | ⏳ Precisa de um ouvinte humano |
 | 017 (timeline) | ✅ Concluída: clipes de áudio e de notas, mover/cortar/dividir/duplicar/loop, editor de notas, padrão da bateria como clipe, importação de áudio para a timeline, gravação de notas com compensação de latência, região de loop (ADR-007) |
 | Verificação auditiva da timeline | ⏳ Precisa de um ouvinte humano |
-| 014 (captura retroativa) | Próxima depois da 015: o destino (clipes de notas) já existe |
-| 015–016 (gravação do microfone, waveforms) | Próximas: 015 (gravar áudio em clipe) → 016 (peaks em detalhe; a timeline já mostra uma visão geral) |
+| 015 (gravação de áudio) | ✅ Concluída: armar faixa de áudio (abre a entrada só então), medidor de entrada, ring lock-free → thread de disco → WAV 32f incremental, compensação de latência de ida e volta com precisão de sample, overdub em camadas, recuperação após crash (journal + reparo do cabeçalho) (ADR-008) |
+| Teste de loopback da gravação (erro < 1 ms) e gravação real com microfone | ⏳ Precisa de um humano com o dispositivo |
+| 014 (captura retroativa) | Próxima: o destino (clipes de notas) já existe |
+| 016 (waveforms) | Depois da 014: peaks em detalhe (a timeline já mostra uma visão geral) |
 
 Decisões tomadas durante a execução:
 - JUCE 9.0.3, e não 8.

@@ -98,6 +98,7 @@ export function createSimulatedBridge(): Bridge {
   let beatsElapsed = 0;
   let countInBeatsLeft = 0;
   let recording = false;
+  let armedTrack = 0; // the simulated "microphone" is gentle noise on the input meter
   let loop = { enabled: false, start: 0, end: 0 };
 
   // Minimal stand-in for the native undo history (same merge rule: same gesture and target).
@@ -186,6 +187,9 @@ export function createSimulatedBridge(): Bridge {
         sampleRate: 48000,
         bufferSize: 256,
         outputLatencyMs: 5.3,
+        inputName: armedTrack ? 'Simulated microphone' : '',
+        inputChannels: armedTrack ? 1 : 0,
+        roundTripLatencyMs: armedTrack ? 10.6 : 0,
         error: '',
         toneEnabled,
       },
@@ -203,6 +207,7 @@ export function createSimulatedBridge(): Bridge {
         countInBars,
         metronomeEnabled,
         recording,
+        armedTrack,
         loopEnabled: loop.enabled,
         loopStart: loop.start,
         loopEnd: loop.end,
@@ -224,7 +229,8 @@ export function createSimulatedBridge(): Bridge {
   if (typeof window !== 'undefined') {
     window.setInterval(() => {
       const level = toneEnabled ? Math.pow(10, (params.get('tone.level') ?? -18) / 20) : 0;
-      router.dispatch({ type: 'engine.meters', payload: { peak: level } });
+      const inputPeak = armedTrack ? 0.05 + Math.random() * 0.1 : 0;
+      router.dispatch({ type: 'engine.meters', payload: { peak: level, inputPeak } });
     }, 1000 / 30);
 
     const tick = () => {
@@ -316,6 +322,13 @@ export function createSimulatedBridge(): Bridge {
             playing = true;
           }
           queueMicrotask(sendTransportState);
+          return;
+        case 'track.setArmed':
+          armedTrack = intent.payload.armed ? intent.payload.track : 0;
+          queueMicrotask(() => {
+            sendStatus();
+            sendTransportState();
+          });
           return;
         case 'transport.seek':
           beatsElapsed = Math.floor(intent.payload.ticks / 960);

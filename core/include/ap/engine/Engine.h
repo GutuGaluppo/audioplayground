@@ -6,6 +6,7 @@
 #include "ap/core/SpscQueue.h"
 #include "ap/dsp/LinearSmoothedValue.h"
 #include "ap/dsp/SineOscillator.h"
+#include "ap/engine/InputCapture.h"
 #include "ap/engine/Metronome.h"
 #include "ap/engine/RenderGraph.h"
 #include "ap/engine/TimelinePlayer.h"
@@ -50,7 +51,9 @@ public:
     void prepare (double sampleRate, int maxBlockSize);
     void releaseResources() noexcept;
 
-    void process (core::AudioBlock output) noexcept AP_NONBLOCKING;
+    // input: the device input for the same block (may be empty). It is only metered and, while
+    // recording, captured; it never reaches the output (no input monitoring).
+    void process (core::AudioBlock output, core::InputBlock input = {}) noexcept AP_NONBLOCKING;
 
     void setTestToneEnabled (bool enabled) noexcept;
     void setTestToneFrequency (float hz) noexcept;
@@ -113,6 +116,10 @@ public:
     // Message thread only.
     [[nodiscard]] std::optional<RecordedNote> popRecordedNote() noexcept { return recordedNotes.pop(); }
 
+    // Audio recording: the device input captured while the transport plays (see InputCapture).
+    [[nodiscard]] InputCapture& getInputCapture() noexcept { return inputCapture; }
+    [[nodiscard]] double getSampleRate() const noexcept { return sampleRate; }
+
     // Render structure (message thread). Snapshots are swapped in at the next block boundary;
     // retired ones are freed by collectGarbage(), which must be called periodically.
     void publishRenderGraph (std::unique_ptr<RenderGraph> next) noexcept
@@ -135,19 +142,25 @@ public:
 
     // Highest absolute output sample since the last call. Resets the meter.
     [[nodiscard]] float consumeOutputPeak() noexcept;
+    // Same for the device input (0 while no input is open).
+    [[nodiscard]] float consumeInputPeak() noexcept
+    {
+        return inputPeak.exchange (0.0f, std::memory_order_relaxed);
+    }
 
     // Number of non-finite samples replaced with silence since start (should always be 0).
     [[nodiscard]] int getNonFiniteSampleCount() const noexcept;
 
 private:
-    void processBlock (core::AudioBlock output) noexcept AP_NONBLOCKING;
+    void processBlock (core::AudioBlock output, core::InputBlock input) noexcept AP_NONBLOCKING;
+    void meterInput (core::InputBlock input) noexcept AP_NONBLOCKING;
     void routeLiveNote (const instruments::NoteEvent& note) noexcept AP_NONBLOCKING;
     void handleNote (model::InstrumentKind instrument,
                      const instruments::NoteEvent& note) noexcept AP_NONBLOCKING;
     void renderInstrument (model::InstrumentKind instrument, core::AudioBlock output) noexcept AP_NONBLOCKING;
     void renderTestTone (core::AudioBlock output) noexcept AP_NONBLOCKING;
     void finaliseOutput (core::AudioBlock output) noexcept AP_NONBLOCKING;
-    void updatePeak (float blockPeak) noexcept AP_NONBLOCKING;
+    static void updatePeak (std::atomic<float>& peak, float blockPeak) noexcept AP_NONBLOCKING;
 
     double sampleRate = 48000.0;
     int maxBlock = 512;
@@ -181,7 +194,10 @@ private:
     std::atomic<bool> toneEnabled {false};
     std::atomic<float> toneFrequencyHz {440.0f};
 
+    InputCapture inputCapture;
+
     std::atomic<float> outputPeak {0.0f};
+    std::atomic<float> inputPeak {0.0f};
     std::atomic<int> nonFiniteSamples {0};
 };
 

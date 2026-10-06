@@ -11,7 +11,7 @@ namespace ap::desktop
 
 // Connects the platform audio device to the headless engine.
 //
-// Opens outputs only. Inputs stay closed until recording needs them, so the microphone
+// Opens outputs only. Inputs stay closed until a track is armed for recording, so the microphone
 // permission is never requested at launch (guide §25).
 class AudioDeviceHost final
     : private juce::AudioIODeviceCallback
@@ -27,6 +27,11 @@ public:
         double sampleRate = 0.0;
         int bufferSize = 0;
         double outputLatencyMs = 0.0;
+        int numInputChannels = 0; // open input channels (0 = input closed)
+        juce::String inputName;
+        // What recording compensates: input + output latency reported by the device, plus one
+        // buffer each way (the input of a callback was captured during the previous one).
+        std::int64_t roundTripLatencySamples = 0;
         juce::String error;
     };
 
@@ -39,6 +44,10 @@ public:
     [[nodiscard]] std::unique_ptr<juce::XmlElement> createStateXml() const;
     [[nodiscard]] juce::AudioDeviceManager& getDeviceManager() noexcept { return deviceManager; }
     [[nodiscard]] Status getStatus() const;
+
+    // Message thread. Opens (or closes) up to two channels of the input device; the device restarts.
+    // Returns an error message for the user, or an empty string.
+    juce::String setInputEnabled (bool enabled);
 
     // Called on the message thread whenever the device starts, stops, changes or fails.
     std::function<void()> onStatusChanged;
@@ -66,6 +75,7 @@ private:
 
     mutable juce::CriticalSection errorLock; // never taken on the audio thread
     juce::String lastError;
+    juce::String preferredInput; // input device to reopen (from the saved settings or the dialog)
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioDeviceHost)
 };

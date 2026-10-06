@@ -61,6 +61,16 @@ void WebUiHost::stopTransport()
     engine.getTransport().requestStop();
     if (recorder.isRecording())
         recorder.stop (position);
+    audioRecorder.stop();
+    sendTransportState();
+}
+
+void WebUiHost::disarm()
+{
+    audioRecorder.stop();
+    audioRecorder.setArmedTrack ({});
+    if (const auto error = host.setInputEnabled (false); error.isNotEmpty())
+        showNotice (ProjectActions::NoticeLevel::warning, error.toStdString());
     sendTransportState();
 }
 
@@ -68,11 +78,20 @@ void WebUiHost::stopTransport()
 
 void WebUiHost::handle (const ap::bridge::TransportRecord&)
 {
-    if (recorder.isRecording())
+    if (isRecording())
     {
         stopTransport();
         return;
     }
+
+    // With an armed audio track, the input is recorded too (notes are always recorded).
+    if (audioRecorder.getArmedTrack().isValid())
+        if (const auto error = audioRecorder.start (host.getStatus().roundTripLatencySamples))
+        {
+            showNotice (ProjectActions::NoticeLevel::warning, *error);
+            sendTransportState();
+            return;
+        }
     recorder.start();
     engine.getTransport().requestPlay();
     sendTransportState();
@@ -136,6 +155,35 @@ void WebUiHost::handle (const ap::bridge::TrackSetSolo& intent)
 {
     if (!session.perform (model::SetTrackSolo {toTrack (intent.track), intent.soloed}))
         sendTimeline();
+}
+
+void WebUiHost::handle (const ap::bridge::TrackSetArmed& intent)
+{
+    const auto* track = session.project().findTrack (toTrack (intent.track));
+    if (!intent.armed)
+    {
+        if (audioRecorder.getArmedTrack() == toTrack (intent.track))
+            disarm();
+        else
+            sendTransportState();
+        return;
+    }
+    if (track == nullptr || track->kind != model::TrackKind::audio || isRecording())
+    {
+        sendTransportState();
+        return;
+    }
+
+    // One armed track at a time. Opening the input restarts the device (and asks for the
+    // microphone permission the first time).
+    if (const auto error = host.setInputEnabled (true); error.isNotEmpty())
+    {
+        showNotice (ProjectActions::NoticeLevel::error, error.toStdString());
+        sendTransportState();
+        return;
+    }
+    audioRecorder.setArmedTrack (track->id);
+    sendTransportState();
 }
 
 void WebUiHost::handle (const ap::bridge::TrackImportAudio& intent)

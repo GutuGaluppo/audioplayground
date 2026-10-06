@@ -1029,6 +1029,35 @@ kbd {
   color: #17181b;
 }
 
+.track-header__toggle[data-tone='arm'] {
+  color: var(--ap-record);
+}
+
+.track-header__toggle[data-tone='arm'][aria-pressed='true'] {
+  border-color: var(--ap-record);
+  background: var(--ap-record);
+  color: #17181b;
+}
+
+.track-header__toggle:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.track-header__input {
+  height: 4px;
+}
+
+.track-header__hint {
+  margin: 0;
+  overflow: hidden;
+  color: var(--ap-text-muted);
+  font-size: var(--ap-text-xs);
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .track-header__toggle[data-tone='solo'][aria-pressed='true'] {
   border-color: var(--ap-meter-ok);
   background: var(--ap-meter-ok);

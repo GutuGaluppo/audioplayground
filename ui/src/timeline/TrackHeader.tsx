@@ -2,7 +2,10 @@ import { useRef, useState } from 'react';
 
 import { useBridge } from '../bridge/BridgeContext';
 import type { TimelineTrack } from '../bridge/generated';
+import { PeakMeter } from '../components/PeakMeter';
 import { beginGesture } from '../params/gestures';
+import { useLatest } from '../state/latestEvent';
+import { useStores } from '../state/StoresContext';
 import { kindLabel, TrackKind } from './model';
 
 const KIND_ICONS = ['〰', '◆', '▶', '◼'];
@@ -20,8 +23,12 @@ export function TrackHeader({
   onImport: () => void;
 }) {
   const bridge = useBridge();
+  const transport = useLatest(useStores().transportState);
   const [renaming, setRenaming] = useState(false);
+  const [inputSilent, setInputSilent] = useState(false);
   const gesture = useRef(0);
+  const isAudio = track.kind === TrackKind.audio;
+  const armed = isAudio && transport?.armedTrack === track.id;
 
   const commitName = (name: string) => {
     setRenaming(false);
@@ -68,6 +75,26 @@ export function TrackHeader({
             {track.name}
           </button>
         )}
+        {isAudio ? (
+          <button
+            type="button"
+            className="track-header__toggle"
+            data-tone="arm"
+            aria-pressed={armed}
+            aria-label={`Record into ${track.name}`}
+            title={
+              armed
+                ? 'Armed: Record captures the audio input on this track'
+                : 'Arm for recording (opens the audio input)'
+            }
+            disabled={transport?.recording ?? false}
+            onClick={() => {
+              bridge.send({ type: 'track.setArmed', payload: { track: track.id, armed: !armed } });
+            }}
+          >
+            ●
+          </button>
+        ) : null}
         <button
           type="button"
           className="track-header__toggle"
@@ -161,7 +188,7 @@ export function TrackHeader({
             });
           }}
         />
-        {track.kind === TrackKind.audio ? (
+        {isAudio ? (
           <button
             type="button"
             className="track-header__action"
@@ -183,6 +210,25 @@ export function TrackHeader({
           ×
         </button>
       </div>
+      {armed ? (
+        <>
+          <PeakMeter
+            source="input"
+            label={`${track.name} input level`}
+            className="meter track-header__input"
+            onSilence={setInputSilent}
+          />
+          {inputSilent ? (
+            <p
+              className="track-header__hint"
+              role="status"
+              title="No input signal. Check the microphone permission in your system settings."
+            >
+              No input signal. Check the microphone permission in your system settings.
+            </p>
+          ) : null}
+        </>
+      ) : null}
     </div>
   );
 }

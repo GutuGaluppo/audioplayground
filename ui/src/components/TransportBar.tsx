@@ -91,7 +91,13 @@ export function TransportBar() {
           className="transport__button transport__button--record"
           aria-pressed={recording}
           aria-label={recording ? 'Stop recording' : 'Record'}
-          title={recording ? 'Stop recording' : 'Record what you play (Shift+R)'}
+          title={
+            recording
+              ? 'Stop recording'
+              : state?.armedTrack
+                ? 'Record the audio input and what you play (Shift+R)'
+                : 'Record what you play (Shift+R). Arm an audio track (●) to record audio.'
+          }
           disabled={!state}
           onClick={() => {
             bridge.send({ type: 'transport.record', payload: {} });

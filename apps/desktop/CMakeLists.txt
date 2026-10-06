@@ -68,6 +68,7 @@ add_custom_command(
 set(AP_DESKTOP_SOURCES
     src/AudioDeviceHost.cpp
     src/Main.cpp
+    src/AudioRecorder.cpp
     src/NoteRecorder.cpp
     src/ProjectActions.cpp
     src/SampleLoader.cpp

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "AudioDeviceHost.h"
+#include "AudioRecorder.h"
 #include "NoteRecorder.h"
 #include "ProjectActions.h"
 #include "SampleLoader.h"
@@ -27,7 +28,7 @@ class WebUiHost final
 {
 public:
     WebUiHost (AudioDeviceHost& host, engine::Engine& engine, Session& session, ProjectActions& actions,
-               SampleLoader& samples);
+               SampleLoader& samples, AudioRecorder& audioRecorder);
 
     // Shows a transient message in the UI.
     void showNotice (ProjectActions::NoticeLevel level, const std::string& message);
@@ -77,6 +78,7 @@ private:
     void handle (const ap::bridge::TrackSetPan&);
     void handle (const ap::bridge::TrackSetMute&);
     void handle (const ap::bridge::TrackSetSolo&);
+    void handle (const ap::bridge::TrackSetArmed&);
     void handle (const ap::bridge::TrackImportAudio&);
     void handle (const ap::bridge::ClipCreate&);
     void handle (const ap::bridge::ClipMove&);
@@ -93,6 +95,11 @@ private:
     bool editClip (std::uint64_t clip, model::ClipEdit edit, std::uint64_t gesture,
                    const std::function<model::Clip (const model::Clip&)>& change);
     void stopTransport();
+    void disarm();
+    [[nodiscard]] bool isRecording() const noexcept
+    {
+        return recorder.isRecording() || audioRecorder.isRecording();
+    }
     void sendTimeline();
     void sendTimelineAssets();
 
@@ -115,11 +122,13 @@ private:
     Session& session;
     ProjectActions& actions;
     SampleLoader& samples;
+    AudioRecorder& audioRecorder;
 
     NoteRecorder recorder;
     std::unique_ptr<LockedDownWebView> webView;
     ap::bridge::TransportPosition lastPosition;
     bool lastPlaying = false;
+    bool lastRecording = false;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (WebUiHost)
 };

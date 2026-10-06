@@ -616,6 +616,18 @@ std::optional<Intent> parseTrackSetSolo (const juce::var& payloadVar)
     return Intent {message};
 }
 
+std::optional<Intent> parseTrackSetArmed (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"track", "armed"}))
+        return std::nullopt;
+
+    TrackSetArmed message;
+    if (!readInt (*payload, "track", TrackSetArmed::trackMin, TrackSetArmed::trackMax, message.track)) return std::nullopt;
+    if (!readBool (*payload, "armed", message.armed)) return std::nullopt;
+    return Intent {message};
+}
+
 std::optional<Intent> parseTrackImportAudio (const juce::var& payloadVar)
 {
     const auto* payload = payloadVar.getDynamicObject();
@@ -850,6 +862,8 @@ std::optional<Intent> parseIntent (const juce::var& message)
         return parseTrackSetMute (payload);
     if (typeName == TrackSetSolo::type)
         return parseTrackSetSolo (payload);
+    if (typeName == TrackSetArmed::type)
+        return parseTrackSetArmed (payload);
     if (typeName == TrackImportAudio::type)
         return parseTrackImportAudio (payload);
     if (typeName == ClipCreate::type)
@@ -887,6 +901,9 @@ juce::var toVar (const Event& event)
                 payload->setProperty ("sampleRate", m.sampleRate);
                 payload->setProperty ("bufferSize", m.bufferSize);
                 payload->setProperty ("outputLatencyMs", m.outputLatencyMs);
+                payload->setProperty ("inputName", juce::String (m.inputName));
+                payload->setProperty ("inputChannels", m.inputChannels);
+                payload->setProperty ("roundTripLatencyMs", m.roundTripLatencyMs);
                 payload->setProperty ("error", juce::String (m.error));
                 payload->setProperty ("toneEnabled", m.toneEnabled);
                 return envelope (EngineStatus::type, payload);
@@ -895,6 +912,7 @@ juce::var toVar (const Event& event)
             {
                 auto* payload = new juce::DynamicObject();
                 payload->setProperty ("peak", m.peak);
+                payload->setProperty ("inputPeak", m.inputPeak);
                 return envelope (EngineMeters::type, payload);
             },
             [] (const TransportState& m) -> juce::var
@@ -907,6 +925,7 @@ juce::var toVar (const Event& event)
                 payload->setProperty ("countInBars", m.countInBars);
                 payload->setProperty ("metronomeEnabled", m.metronomeEnabled);
                 payload->setProperty ("recording", m.recording);
+                payload->setProperty ("armedTrack", m.armedTrack);
                 payload->setProperty ("loopEnabled", m.loopEnabled);
                 payload->setProperty ("loopStart", m.loopStart);
                 payload->setProperty ("loopEnd", m.loopEnd);

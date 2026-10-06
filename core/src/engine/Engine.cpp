@@ -34,6 +34,8 @@ void Engine::prepare (double newSampleRate, int maxBlockSize)
     timeline.prepare (sampleRate);
     busStorage.assign (model::numInstrumentKinds * 2 * static_cast<std::size_t> (maxBlock), 0.0f);
 
+    inputCapture.deviceStopped(); // a take never continues across a device restart
+
     toneOscillator.prepare (sampleRate);
     toneGain.reset (sampleRate, gainRampSeconds);
     toneFrequency.reset (sampleRate, frequencyRampSeconds);
@@ -48,12 +50,17 @@ void Engine::prepare (double newSampleRate, int maxBlockSize)
 void Engine::releaseResources() noexcept
 {
     prepared = false;
+    inputCapture.deviceStopped();
 }
 
-void Engine::process (core::AudioBlock output) noexcept AP_NONBLOCKING
+void Engine::process (core::AudioBlock output, core::InputBlock input) noexcept AP_NONBLOCKING
 {
     if (output.isEmpty())
         return;
+    if (input.numSamples < output.numSamples)
+        input = {}; // a mismatched input is never read past its end
+
+    meterInput (input);
 
     const core::ScopedNoDenormals noDenormals;
 
@@ -65,20 +72,26 @@ void Engine::process (core::AudioBlock output) noexcept AP_NONBLOCKING
 
     // Devices may deliver more than they announced: render in pieces the buffers can hold.
     const int channels = std::min (output.numChannels, maxOutputChannels);
+    const int inputChannels = std::min (input.numChannels, core::AudioRing::maxChannels);
     std::array<float*, maxOutputChannels> pointers {};
+    std::array<const float*, core::AudioRing::maxChannels> inputPointers {};
     for (int done = 0; done < output.numSamples;)
     {
         const int length = std::min (maxBlock, output.numSamples - done);
         for (int ch = 0; ch < channels; ++ch)
             pointers[static_cast<std::size_t> (ch)] = output.channels[ch] + done;
-        processBlock ({pointers.data(), channels, length});
+        for (int ch = 0; ch < inputChannels; ++ch)
+            inputPointers[static_cast<std::size_t> (ch)] = input.channels[ch] + done;
+        processBlock ({pointers.data(), channels, length},
+                      input.isEmpty() ? core::InputBlock {}
+                                      : core::InputBlock {inputPointers.data(), inputChannels, length});
         done += length;
     }
 
     finaliseOutput (output);
 }
 
-void Engine::processBlock (core::AudioBlock output) noexcept AP_NONBLOCKING
+void Engine::processBlock (core::AudioBlock output, core::InputBlock input) noexcept AP_NONBLOCKING
 {
     currentGraph = graphs.acquire();
     if (currentGraph != nullptr)
@@ -99,13 +112,15 @@ void Engine::processBlock (core::AudioBlock output) noexcept AP_NONBLOCKING
         routeLiveNote (*note);
 
     const float metronomeGain = decibelsToGain (parameters.get (params::ParamId::metronomeLevel));
-    transport.advance (
-        output.numSamples,
-        [this, output, metronomeGain] (int offset, int length, core::Samples start) noexcept AP_NONBLOCKING
-        {
-            timeline.segment (output, offset, length, start, transport.getTempoMap());
-            metronome.render (output, offset, length, start, transport.getTempoMap(), metronomeGain);
-        });
+    transport.advance (output.numSamples,
+                       [this, output, input, metronomeGain] (int offset, int length,
+                                                             core::Samples start) noexcept AP_NONBLOCKING
+                       {
+                           inputCapture.capture (input, offset, length, start);
+                           timeline.segment (output, offset, length, start, transport.getTempoMap());
+                           metronome.render (output, offset, length, start, transport.getTempoMap(),
+                                             metronomeGain);
+                       });
     const bool playing = transport.isPlayingOnAudioThread();
     timeline.endBlock (output, playing, transport.getTempoMap());
 
@@ -250,14 +265,27 @@ void Engine::finaliseOutput (core::AudioBlock output) noexcept AP_NONBLOCKING
     if (nonFinite > 0)
         nonFiniteSamples.fetch_add (nonFinite, std::memory_order_relaxed);
 
-    updatePeak (blockPeak);
+    updatePeak (outputPeak, blockPeak);
 }
 
-void Engine::updatePeak (float blockPeak) noexcept AP_NONBLOCKING
+void Engine::meterInput (core::InputBlock input) noexcept AP_NONBLOCKING
 {
-    float previous = outputPeak.load (std::memory_order_relaxed);
+    float blockPeak = 0.0f;
+    for (int ch = 0; ch < input.numChannels && input.channels != nullptr; ++ch)
+        for (int i = 0; i < input.numSamples; ++i)
+        {
+            const float sample = std::abs (input.channels[ch][i]);
+            if (sample > blockPeak) // also false for NaN
+                blockPeak = sample;
+        }
+    updatePeak (inputPeak, std::min (blockPeak, 1.0f));
+}
+
+void Engine::updatePeak (std::atomic<float>& peak, float blockPeak) noexcept AP_NONBLOCKING
+{
+    float previous = peak.load (std::memory_order_relaxed);
     while (blockPeak > previous
-           && !outputPeak.compare_exchange_weak (previous, blockPeak, std::memory_order_relaxed))
+           && !peak.compare_exchange_weak (previous, blockPeak, std::memory_order_relaxed))
     {
     }
 }

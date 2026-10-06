@@ -112,12 +112,14 @@ private:
 };
 
 WebUiHost::WebUiHost (AudioDeviceHost& hostToUse, engine::Engine& engineToUse, Session& sessionToUse,
-                      ProjectActions& actionsToUse, SampleLoader& samplesToUse)
+                      ProjectActions& actionsToUse, SampleLoader& samplesToUse,
+                      AudioRecorder& audioRecorderToUse)
     : host (hostToUse)
     , engine (engineToUse)
     , session (sessionToUse)
     , actions (actionsToUse)
     , samples (samplesToUse)
+    , audioRecorder (audioRecorderToUse)
     , recorder (sessionToUse, engineToUse)
 {
     const auto devUrl = developmentServerUrl();
@@ -161,6 +163,8 @@ WebUiHost::WebUiHost (AudioDeviceHost& hostToUse, engine::Engine& engineToUse, S
     samples.onClipAudioChanged = [this] { sendTimelineAssets(); };
     samples.onError
         = [this] (const std::string& message) { showNotice (ProjectActions::NoticeLevel::error, message); };
+    audioRecorder.onNotice
+        = [this] (const std::string& message) { showNotice (ProjectActions::NoticeLevel::warning, message); };
     setSize (1100, 720);
     startTimerHz (meterRefreshHz);
 }
@@ -173,6 +177,7 @@ WebUiHost::~WebUiHost()
     samples.onStateChanged = nullptr;
     samples.onClipAudioChanged = nullptr;
     samples.onError = nullptr;
+    audioRecorder.onNotice = nullptr;
 }
 
 void WebUiHost::resized()
@@ -257,21 +262,29 @@ void WebUiHost::handle (const ap::bridge::EditRedo&)
 
 void WebUiHost::handle (const ap::bridge::ProjectNew&)
 {
+    if (isRecording())
+        stopTransport(); // the take joins the project before it is saved or replaced
     actions.newProject();
 }
 
 void WebUiHost::handle (const ap::bridge::ProjectOpen&)
 {
+    if (isRecording())
+        stopTransport(); // the take joins the project before it is saved or replaced
     actions.openProject();
 }
 
 void WebUiHost::handle (const ap::bridge::ProjectSave&)
 {
+    if (isRecording())
+        stopTransport(); // the take joins the project before it is saved or replaced
     actions.save();
 }
 
 void WebUiHost::handle (const ap::bridge::ProjectSaveAs&)
 {
+    if (isRecording())
+        stopTransport(); // the take joins the project before it is saved or replaced
     actions.saveAs();
 }
 
@@ -398,6 +411,12 @@ void WebUiHost::sendSamplerState()
 
 void WebUiHost::onProjectChanged()
 {
+    // An armed track that no longer exists (deleted, undone, another project) disarms.
+    if (const auto armed = audioRecorder.getArmedTrack(); armed.isValid() && !audioRecorder.isRecording())
+        if (const auto* track = session.project().findTrack (armed);
+            track == nullptr || track->kind != model::TrackKind::audio)
+            disarm();
+
     samples.sync (host.getStatus().sampleRate);
     sendProjectState();
     sendTimeline();
@@ -476,6 +495,13 @@ void WebUiHost::sendStatus()
     event.bufferSize = juce::jlimit (0, ap::bridge::EngineStatus::bufferSizeMax, status.bufferSize);
     event.outputLatencyMs
         = juce::jlimit (0.0, ap::bridge::EngineStatus::outputLatencyMsMax, status.outputLatencyMs);
+    event.inputName = status.inputName.substring (0, 200).toStdString();
+    event.inputChannels = juce::jlimit (0, 2, status.numInputChannels);
+    event.roundTripLatencyMs
+        = status.sampleRate > 0.0
+            ? juce::jlimit (0.0, ap::bridge::EngineStatus::roundTripLatencyMsMax,
+                            1000.0 * static_cast<double> (status.roundTripLatencySamples) / status.sampleRate)
+            : 0.0;
     event.error = status.deviceName.isEmpty() && status.error.isEmpty()
                     ? std::string ("Audio device unavailable. Choose another output device.")
                     : status.error.substring (0, 900).toStdString();
@@ -495,7 +521,10 @@ void WebUiHost::sendTransportState()
     event.denominator = session.project().timeSignature.denominator;
     event.countInBars = transport.getCountInBars();
     event.metronomeEnabled = engine.getMetronome().isEnabled();
-    event.recording = recorder.isRecording();
+    event.recording = isRecording();
+    event.armedTrack = static_cast<int> (
+        std::min<std::uint64_t> (audioRecorder.getArmedTrack().value, std::numeric_limits<int>::max()));
+    lastRecording = event.recording;
     const auto loop = transport.getLoop();
     event.loopEnabled = loop.enabled;
     event.loopStart = static_cast<int> (std::clamp<core::Ticks> (loop.start, 0, model::maxTimelineTicks));
@@ -533,17 +562,23 @@ void WebUiHost::sendTransportPosition (bool force)
 void WebUiHost::timerCallback()
 {
     emit (
-        ap::bridge::EngineMeters {juce::jlimit (0.0, 1.0, static_cast<double> (engine.consumeOutputPeak()))});
+        ap::bridge::EngineMeters {juce::jlimit (0.0, 1.0, static_cast<double> (engine.consumeOutputPeak())),
+                                  juce::jlimit (0.0, 1.0, static_cast<double> (engine.consumeInputPeak()))});
 
     recorder.poll();
+    audioRecorder.poll(); // may end the take by itself (loop wrap, device change, length limit)
 
     // The audio thread may change the playing state (e.g. a device restart); keep the UI in sync.
     if (engine.getTransport().getState().playing != lastPlaying)
     {
         if (lastPlaying && recorder.isRecording())
             recorder.stop (engine.getTransport().getState().positionTicks);
+        if (lastPlaying)
+            audioRecorder.stop();
         sendTransportState();
     }
+    else if (isRecording() != lastRecording)
+        sendTransportState();
 
     sendTransportPosition (false);
 }
@@ -552,13 +587,13 @@ void WebUiHost::showAudioSettings()
 {
     // Temporary native dialog until device selection moves into the web UI.
     auto selector = std::make_unique<juce::AudioDeviceSelectorComponent> (host.getDeviceManager(), 0,
-                                                                          0, // inputs: none until recording
+                                                                          2,     // inputs (for recording)
                                                                           1, 2,  // outputs
                                                                           false, // MIDI in
                                                                           false, // MIDI out
                                                                           true,  // stereo pairs
                                                                           false);
-    selector->setSize (520, 360);
+    selector->setSize (520, 440);
 
     juce::DialogWindow::LaunchOptions dialog;
     dialog.content.setOwned (selector.release());

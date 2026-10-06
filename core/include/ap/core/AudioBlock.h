@@ -18,4 +18,17 @@ struct AudioBlock
     }
 };
 
+// Non-owning, read-only view of planar float audio (device input).
+struct InputBlock
+{
+    const float* const* channels = nullptr;
+    int numChannels = 0;
+    int numSamples = 0;
+
+    [[nodiscard]] bool isEmpty() const noexcept
+    {
+        return channels == nullptr || numChannels <= 0 || numSamples <= 0;
+    }
+};
+
 } // namespace ap::core

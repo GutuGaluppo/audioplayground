@@ -92,12 +92,15 @@ public:
         actions = std::make_unique<ProjectActions> (*session, *settings.getUserSettings());
 
         samples = std::make_unique<SampleLoader> (*session, engine);
-        auto* ui = new WebUiHost (*audioHost, engine, *session, *actions, *samples);
+        audioRecorder = std::make_unique<AudioRecorder> (*session, engine);
+        auto* ui = new WebUiHost (*audioHost, engine, *session, *actions, *samples, *audioRecorder);
         actions->onNotice = [ui] (ProjectActions::NoticeLevel level, const std::string& message)
         { ui->showNotice (level, message); };
         mainWindow = std::make_unique<MainWindow> (getApplicationName(), ui);
 
         actions->restoreLastSession (lock->previousSessionCrashed);
+        if (const auto recovered = audioRecorder->recoverInterrupted())
+            ui->showNotice (ProjectActions::NoticeLevel::info, *recovered);
         samples->sync (audioHost->getStatus().sampleRate);
     }
 
@@ -112,6 +115,7 @@ public:
         // Order matters: the window references the actions, session and host, which reference
         // the engine.
         mainWindow.reset();
+        audioRecorder.reset(); // a take still in progress is kept for recovery
         samples.reset();
         actions.reset();
         session.reset();
@@ -127,6 +131,12 @@ public:
             return;
         }
 
+        // A take in progress joins the project first, so "save changes?" includes it.
+        if (audioRecorder != nullptr && audioRecorder->isRecording())
+        {
+            engine.getTransport().requestStop();
+            audioRecorder->stop();
+        }
         actions->confirmClose ([] { juce::JUCEApplication::getInstance()->quit(); });
     }
 
@@ -138,6 +148,7 @@ private:
     std::unique_ptr<Session> session;
     std::unique_ptr<ProjectActions> actions;
     std::unique_ptr<SampleLoader> samples;
+    std::unique_ptr<AudioRecorder> audioRecorder;
     std::unique_ptr<MainWindow> mainWindow;
 };
 

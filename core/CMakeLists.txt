@@ -5,7 +5,9 @@ add_library(ap_core STATIC
     src/BuildInfo.cpp
     src/dsp/Resampler.cpp
     src/io/ProjectFiles.cpp
+    src/io/Recordings.cpp
     src/engine/Engine.cpp
+    src/engine/InputCapture.cpp
     src/engine/Metronome.cpp
     src/engine/OfflineRenderer.cpp
     src/engine/RenderGraph.cpp

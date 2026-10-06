@@ -30,6 +30,11 @@ void AudioDeviceHost::initialise (const juce::XmlElement* savedState)
     const auto error = deviceManager.initialise (numInputChannels, numOutputChannels, savedState, true);
     setError (error);
 
+    // Saved settings may name an input: remember it, but keep the microphone closed until recording.
+    preferredInput = deviceManager.getAudioDeviceSetup().inputDeviceName;
+    if (preferredInput.isNotEmpty())
+        setInputEnabled (false);
+
     deviceManager.addAudioCallback (this);
 
     // Every MIDI keyboard just works, including ones plugged in later.
@@ -62,6 +67,44 @@ void AudioDeviceHost::handleIncomingMidiMessage (juce::MidiInput*, const juce::M
         engine.sendNoteFromMidi ({NoteEvent::Type::allNotesOff, 0, 0.0f});
 }
 
+juce::String AudioDeviceHost::setInputEnabled (bool enabled)
+{
+    auto setup = deviceManager.getAudioDeviceSetup();
+    if (!enabled)
+    {
+        if (setup.inputDeviceName.isNotEmpty())
+            preferredInput = setup.inputDeviceName;
+        if (setup.inputDeviceName.isEmpty() && setup.inputChannels.isZero())
+            return {};
+        setup.inputDeviceName = {};
+        setup.inputChannels.clear();
+        setup.useDefaultInputChannels = false;
+        return deviceManager.setAudioDeviceSetup (setup, true);
+    }
+
+    auto* type = deviceManager.getCurrentDeviceTypeObject();
+    if (type == nullptr)
+        return "No audio device is available.";
+
+    const auto inputs = type->getDeviceNames (true);
+    juce::String name = setup.inputDeviceName;
+    if (name.isEmpty())
+        name = inputs.contains (preferredInput) ? preferredInput : inputs[type->getDefaultDeviceIndex (true)];
+    if (name.isEmpty())
+        return "No microphone or audio input was found. Connect one, then try again.";
+
+    setup.inputDeviceName = name;
+    setup.useDefaultInputChannels = false;
+    setup.inputChannels.clear();
+    setup.inputChannels.setRange (0, 2, true); // JUCE keeps only the channels the device has
+    const auto error = deviceManager.setAudioDeviceSetup (setup, true);
+    if (error.isNotEmpty())
+        return "Could not open the audio input. " + error;
+    if (getStatus().numInputChannels == 0)
+        return "The audio input \"" + name + "\" could not be opened.";
+    return {};
+}
+
 std::unique_ptr<juce::XmlElement> AudioDeviceHost::createStateXml() const
 {
     return deviceManager.createStateXml();
@@ -82,6 +125,14 @@ AudioDeviceHost::Status AudioDeviceHost::getStatus() const
             status.outputLatencyMs
                 = 1000.0 * static_cast<double> (device->getOutputLatencyInSamples() + status.bufferSize)
                 / status.sampleRate;
+
+        status.numInputChannels = device->getActiveInputChannels().countNumberOfSetBits();
+        if (status.numInputChannels > 0)
+        {
+            status.inputName = deviceManager.getAudioDeviceSetup().inputDeviceName;
+            status.roundTripLatencySamples = device->getInputLatencyInSamples()
+                                           + device->getOutputLatencyInSamples() + 2 * status.bufferSize;
+        }
     }
 
     const juce::ScopedLock lock (errorLock);
@@ -89,12 +140,14 @@ AudioDeviceHost::Status AudioDeviceHost::getStatus() const
     return status;
 }
 
-void AudioDeviceHost::audioDeviceIOCallbackWithContext (const float* const*, int,
+void AudioDeviceHost::audioDeviceIOCallbackWithContext (const float* const* inputChannelData,
+                                                        int numInputChannelsInUse,
                                                         float* const* outputChannelData,
                                                         int numOutputChannelsInUse, int numSamples,
                                                         const juce::AudioIODeviceCallbackContext&)
 {
-    engine.process (core::AudioBlock {outputChannelData, numOutputChannelsInUse, numSamples});
+    engine.process (core::AudioBlock {outputChannelData, numOutputChannelsInUse, numSamples},
+                    core::InputBlock {inputChannelData, numInputChannelsInUse, numSamples});
 }
 
 void AudioDeviceHost::audioDeviceAboutToStart (juce::AudioIODevice* device)
