@@ -20,7 +20,7 @@ jobs:
       matrix:
         os: [macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 70
+    timeout-minutes: 100
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -34,8 +34,14 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: cmake --preset dev
       # Step-level timeouts keep the log if something hangs (a job-level timeout discards it).
-      - run: cmake --build --preset dev --parallel
-        timeout-minutes: 50
+      # One job per core: an unbounded `make -j` on the small macOS runner compiles every JUCE
+      # module at once and swaps (the build hit 50 minutes).
+      - name: Build
+        shell: bash
+        run: |
+          cores=$( (getconf _NPROCESSORS_ONLN || sysctl -n hw.ncpu || echo 4) 2>/dev/null | head -1)
+          cmake --build --preset dev --parallel "${NUMBER_OF_PROCESSORS:-$cores}"
+        timeout-minutes: 75
       - run: ctest --preset dev --timeout 300
         timeout-minutes: 10
 
