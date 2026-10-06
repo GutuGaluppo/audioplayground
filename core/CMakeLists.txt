@@ -9,6 +9,7 @@ add_library(ap_core STATIC
     src/io/ProjectFiles.cpp
     src/io/Recordings.cpp
     src/fx/Compressor.cpp
+    src/fx/Delay.cpp
     src/fx/Distortion.cpp
     src/fx/Equalizer.cpp
     src/fx/Filter.cpp

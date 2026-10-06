@@ -7,6 +7,7 @@ add_executable(ap_unit_tests
     unit/ClipModelTests.cpp
     unit/CompressorTests.cpp
     unit/ConcurrencyTests.cpp
+    unit/DelayTests.cpp
     unit/DistortionTests.cpp
     unit/DrumMachineTests.cpp
     unit/EngineTests.cpp
