@@ -31,6 +31,31 @@ const Asset* Project::findAsset (AssetId id) const noexcept
     return it == assets.end() ? nullptr : &*it;
 }
 
+const Track* Project::findInstrumentTrack (InstrumentKind instrument) const noexcept
+{
+    const auto it = std::find_if (tracks.begin(), tracks.end(), [instrument] (const Track& t)
+                                  { return t.kind == TrackKind::instrument && t.instrument == instrument; });
+    return it == tracks.end() ? nullptr : &*it;
+}
+
+std::optional<Project::ClipLocation> Project::locate (ClipId id) const noexcept
+{
+    for (std::size_t t = 0; t < tracks.size(); ++t)
+    {
+        const auto& clips = tracks[t].clips;
+        for (std::size_t c = 0; c < clips.size(); ++c)
+            if (clips[c].id == id)
+                return ClipLocation {t, c};
+    }
+    return std::nullopt;
+}
+
+const Clip* Project::findClip (ClipId id) const noexcept
+{
+    const auto location = locate (id);
+    return location ? &tracks[location->track].clips[location->clip] : nullptr;
+}
+
 bool isSafeAssetPath (std::string_view path) noexcept
 {
     constexpr std::string_view prefix = "audio/";

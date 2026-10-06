@@ -44,6 +44,18 @@ public:
     void setLoop (bool enabled, core::Ticks start, core::Ticks end) noexcept;
 
     [[nodiscard]] TransportState getState() const noexcept;
+
+    struct Loop
+    {
+        bool enabled = false;
+        core::Ticks start = 0;
+        core::Ticks end = 0;
+    };
+    [[nodiscard]] Loop getLoop() const noexcept
+    {
+        return {loopEnabled.load (std::memory_order_relaxed), loopStartTicks.load (std::memory_order_relaxed),
+                loopEndTicks.load (std::memory_order_relaxed)};
+    }
     [[nodiscard]] double getTempo() const noexcept { return tempoBpm.load (std::memory_order_relaxed); }
     [[nodiscard]] core::TimeSignature getTimeSignature() const noexcept;
     [[nodiscard]] int getCountInBars() const noexcept { return countInBars.load (std::memory_order_relaxed); }
@@ -56,6 +68,7 @@ public:
 
     [[nodiscard]] const core::TempoMap& getTempoMap() const noexcept AP_NONBLOCKING { return tempoMap; }
     [[nodiscard]] bool isPlayingOnAudioThread() const noexcept AP_NONBLOCKING { return playing; }
+    [[nodiscard]] core::Samples getPositionOnAudioThread() const noexcept AP_NONBLOCKING { return position; }
 
 private:
     void syncParameters() noexcept AP_NONBLOCKING;

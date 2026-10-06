@@ -13,6 +13,102 @@ namespace ap::bridge
 
 inline constexpr int protocolVersion = 1;
 
+struct TimelineNote
+{
+    static constexpr int startMin = 0;
+    static constexpr int startMax = 38400000;
+    static constexpr int lengthMin = 1;
+    static constexpr int lengthMax = 38400000;
+    static constexpr int pitchMin = 0;
+    static constexpr int pitchMax = 127;
+    static constexpr double velocityMin = 0.0;
+    static constexpr double velocityMax = 1.0;
+
+    int start = 0;
+    int length = 0;
+    int pitch = 0;
+    double velocity = 0.0;
+
+    bool operator== (const TimelineNote&) const = default;
+};
+
+struct TimelineClip
+{
+    static constexpr int idMin = 1;
+    static constexpr int idMax = 2147483647;
+    static constexpr int startMin = 0;
+    static constexpr int startMax = 38400000;
+    static constexpr int lengthMin = 1;
+    static constexpr int lengthMax = 38400000;
+    static constexpr int assetMin = 0;
+    static constexpr int assetMax = 2147483647;
+    static constexpr double sourceOffsetSecondsMin = 0.0;
+    static constexpr double sourceOffsetSecondsMax = 86400.0;
+    static constexpr int contentOffsetMin = 0;
+    static constexpr int contentOffsetMax = 38400000;
+    static constexpr int loopLengthMin = 0;
+    static constexpr int loopLengthMax = 38400000;
+    static constexpr std::size_t notesMaxItems = 4096;
+
+    int id = 0;
+    int start = 0;
+    int length = 0;
+    int asset = 0;
+    double sourceOffsetSeconds = 0.0;
+    int contentOffset = 0;
+    int loopLength = 0;
+    std::vector<TimelineNote> notes {};
+
+    bool operator== (const TimelineClip&) const = default;
+};
+
+struct TimelineTrack
+{
+    static constexpr int idMin = 1;
+    static constexpr int idMax = 2147483647;
+    static constexpr int kindMin = 0;
+    static constexpr int kindMax = 3;
+    static constexpr std::size_t nameMaxLength = 256;
+    static constexpr double volumeDbMin = -60.0;
+    static constexpr double volumeDbMax = 6.0;
+    static constexpr double panMin = -1.0;
+    static constexpr double panMax = 1.0;
+    static constexpr std::size_t clipsMaxItems = 512;
+
+    int id = 0;
+    int kind = 0;
+    std::string name {};
+    double volumeDb = 0.0;
+    double pan = 0.0;
+    bool muted = false;
+    bool soloed = false;
+    std::vector<TimelineClip> clips {};
+
+    bool operator== (const TimelineTrack&) const = default;
+};
+
+struct TimelineAsset
+{
+    static constexpr int idMin = 1;
+    static constexpr int idMax = 2147483647;
+    static constexpr std::size_t nameMaxLength = 256;
+    static constexpr double durationSecondsMin = 0.0;
+    static constexpr double durationSecondsMax = 100000.0;
+    static constexpr float overviewMin = 0.0f;
+    static constexpr float overviewMax = 1.0f;
+    static constexpr std::size_t overviewMaxItems = 512;
+
+    int id = 0;
+    std::string name {};
+    bool loaded = false;
+    bool missing = false;
+    bool loading = false;
+    double durationSeconds = 0.0;
+    std::vector<float> overview {};
+
+    bool operator== (const TimelineAsset&) const = default;
+};
+
 struct AppReady
 {
     static constexpr std::string_view type = "app.ready";
@@ -209,6 +305,8 @@ struct SamplerLoad
 struct DrumsSetStep
 {
     static constexpr std::string_view type = "drums.setStep";
+    static constexpr int clipMin = 0;
+    static constexpr int clipMax = 2147483647;
     static constexpr int padMin = 0;
     static constexpr int padMax = 15;
     static constexpr int stepMin = 0;
@@ -216,6 +314,7 @@ struct DrumsSetStep
     static constexpr int gestureMin = 0;
     static constexpr int gestureMax = 2147483647;
 
+    int clip = 0;
     int pad = 0;
     int step = 0;
     bool on = false;
@@ -227,6 +326,10 @@ struct DrumsSetStep
 struct DrumsClear
 {
     static constexpr std::string_view type = "drums.clear";
+    static constexpr int clipMin = 1;
+    static constexpr int clipMax = 2147483647;
+
+    int clip = 0;
 
     bool operator== (const DrumsClear&) const = default;
 };
@@ -288,6 +391,320 @@ struct DrumsResetPad
     bool operator== (const DrumsResetPad&) const = default;
 };
 
+struct TransportRecord
+{
+    static constexpr std::string_view type = "transport.record";
+
+    bool operator== (const TransportRecord&) const = default;
+};
+
+struct TransportSeek
+{
+    static constexpr std::string_view type = "transport.seek";
+    static constexpr int ticksMin = 0;
+    static constexpr int ticksMax = 38400000;
+
+    int ticks = 0;
+
+    bool operator== (const TransportSeek&) const = default;
+};
+
+struct TransportSetLoop
+{
+    static constexpr std::string_view type = "transport.setLoop";
+    static constexpr int startMin = 0;
+    static constexpr int startMax = 38400000;
+    static constexpr int endMin = 0;
+    static constexpr int endMax = 38400000;
+
+    bool enabled = false;
+    int start = 0;
+    int end = 0;
+
+    bool operator== (const TransportSetLoop&) const = default;
+};
+
+struct TrackAdd
+{
+    static constexpr std::string_view type = "track.add";
+    static constexpr int kindMin = 0;
+    static constexpr int kindMax = 3;
+
+    int kind = 0;
+
+    bool operator== (const TrackAdd&) const = default;
+};
+
+struct TrackRemove
+{
+    static constexpr std::string_view type = "track.remove";
+    static constexpr int trackMin = 1;
+    static constexpr int trackMax = 2147483647;
+
+    int track = 0;
+
+    bool operator== (const TrackRemove&) const = default;
+};
+
+struct TrackRename
+{
+    static constexpr std::string_view type = "track.rename";
+    static constexpr int trackMin = 1;
+    static constexpr int trackMax = 2147483647;
+    static constexpr std::size_t nameMaxLength = 512;
+
+    int track = 0;
+    std::string name {};
+
+    bool operator== (const TrackRename&) const = default;
+};
+
+struct TrackSetVolume
+{
+    static constexpr std::string_view type = "track.setVolume";
+    static constexpr int trackMin = 1;
+    static constexpr int trackMax = 2147483647;
+    static constexpr double volumeDbMin = -60.0;
+    static constexpr double volumeDbMax = 6.0;
+    static constexpr int gestureMin = 0;
+    static constexpr int gestureMax = 2147483647;
+
+    int track = 0;
+    double volumeDb = 0.0;
+    int gesture = 0;
+
+    bool operator== (const TrackSetVolume&) const = default;
+};
+
+struct TrackSetPan
+{
+    static constexpr std::string_view type = "track.setPan";
+    static constexpr int trackMin = 1;
+    static constexpr int trackMax = 2147483647;
+    static constexpr double panMin = -1.0;
+    static constexpr double panMax = 1.0;
+    static constexpr int gestureMin = 0;
+    static constexpr int gestureMax = 2147483647;
+
+    int track = 0;
+    double pan = 0.0;
+    int gesture = 0;
+
+    bool operator== (const TrackSetPan&) const = default;
+};
+
+struct TrackSetMute
+{
+    static constexpr std::string_view type = "track.setMute";
+    static constexpr int trackMin = 1;
+    static constexpr int trackMax = 2147483647;
+
+    int track = 0;
+    bool muted = false;
+
+    bool operator== (const TrackSetMute&) const = default;
+};
+
+struct TrackSetSolo
+{
+    static constexpr std::string_view type = "track.setSolo";
+    static constexpr int trackMin = 1;
+    static constexpr int trackMax = 2147483647;
+
+    int track = 0;
+    bool soloed = false;
+
+    bool operator== (const TrackSetSolo&) const = default;
+};
+
+struct TrackImportAudio
+{
+    static constexpr std::string_view type = "track.importAudio";
+    static constexpr int trackMin = 1;
+    static constexpr int trackMax = 2147483647;
+    static constexpr int ticksMin = 0;
+    static constexpr int ticksMax = 38400000;
+
+    int track = 0;
+    int ticks = 0;
+
+    bool operator== (const TrackImportAudio&) const = default;
+};
+
+struct ClipCreate
+{
+    static constexpr std::string_view type = "clip.create";
+    static constexpr int trackMin = 1;
+    static constexpr int trackMax = 2147483647;
+    static constexpr int startMin = 0;
+    static constexpr int startMax = 38400000;
+    static constexpr int lengthMin = 1;
+    static constexpr int lengthMax = 38400000;
+
+    int track = 0;
+    int start = 0;
+    int length = 0;
+
+    bool operator== (const ClipCreate&) const = default;
+};
+
+struct ClipMove
+{
+    static constexpr std::string_view type = "clip.move";
+    static constexpr int clipMin = 1;
+    static constexpr int clipMax = 2147483647;
+    static constexpr int trackMin = 1;
+    static constexpr int trackMax = 2147483647;
+    static constexpr int startMin = 0;
+    static constexpr int startMax = 38400000;
+    static constexpr int gestureMin = 0;
+    static constexpr int gestureMax = 2147483647;
+
+    int clip = 0;
+    int track = 0;
+    int start = 0;
+    int gesture = 0;
+
+    bool operator== (const ClipMove&) const = default;
+};
+
+struct ClipResize
+{
+    static constexpr std::string_view type = "clip.resize";
+    static constexpr int clipMin = 1;
+    static constexpr int clipMax = 2147483647;
+    static constexpr int edgeMin = 0;
+    static constexpr int edgeMax = 1;
+    static constexpr int ticksMin = 0;
+    static constexpr int ticksMax = 38400000;
+    static constexpr int gestureMin = 0;
+    static constexpr int gestureMax = 2147483647;
+
+    int clip = 0;
+    int edge = 0;
+    int ticks = 0;
+    int gesture = 0;
+
+    bool operator== (const ClipResize&) const = default;
+};
+
+struct ClipSplit
+{
+    static constexpr std::string_view type = "clip.split";
+    static constexpr int clipMin = 1;
+    static constexpr int clipMax = 2147483647;
+    static constexpr int ticksMin = 0;
+    static constexpr int ticksMax = 38400000;
+
+    int clip = 0;
+    int ticks = 0;
+
+    bool operator== (const ClipSplit&) const = default;
+};
+
+struct ClipRemove
+{
+    static constexpr std::string_view type = "clip.remove";
+    static constexpr int clipMin = 1;
+    static constexpr int clipMax = 2147483647;
+
+    int clip = 0;
+
+    bool operator== (const ClipRemove&) const = default;
+};
+
+struct ClipDuplicate
+{
+    static constexpr std::string_view type = "clip.duplicate";
+    static constexpr int clipMin = 1;
+    static constexpr int clipMax = 2147483647;
+
+    int clip = 0;
+
+    bool operator== (const ClipDuplicate&) const = default;
+};
+
+struct ClipSetLoop
+{
+    static constexpr std::string_view type = "clip.setLoop";
+    static constexpr int clipMin = 1;
+    static constexpr int clipMax = 2147483647;
+
+    int clip = 0;
+    bool enabled = false;
+
+    bool operator== (const ClipSetLoop&) const = default;
+};
+
+struct ClipAddNote
+{
+    static constexpr std::string_view type = "clip.addNote";
+    static constexpr int clipMin = 1;
+    static constexpr int clipMax = 2147483647;
+    static constexpr int startMin = 0;
+    static constexpr int startMax = 38400000;
+    static constexpr int lengthMin = 1;
+    static constexpr int lengthMax = 38400000;
+    static constexpr int pitchMin = 0;
+    static constexpr int pitchMax = 127;
+    static constexpr double velocityMin = 0.01;
+    static constexpr double velocityMax = 1.0;
+
+    int clip = 0;
+    int start = 0;
+    int length = 0;
+    int pitch = 0;
+    double velocity = 0.0;
+
+    bool operator== (const ClipAddNote&) const = default;
+};
+
+struct ClipRemoveNote
+{
+    static constexpr std::string_view type = "clip.removeNote";
+    static constexpr int clipMin = 1;
+    static constexpr int clipMax = 2147483647;
+    static constexpr int startMin = 0;
+    static constexpr int startMax = 38400000;
+    static constexpr int pitchMin = 0;
+    static constexpr int pitchMax = 127;
+
+    int clip = 0;
+    int start = 0;
+    int pitch = 0;
+
+    bool operator== (const ClipRemoveNote&) const = default;
+};
+
+struct ClipEditNote
+{
+    static constexpr std::string_view type = "clip.editNote";
+    static constexpr int clipMin = 1;
+    static constexpr int clipMax = 2147483647;
+    static constexpr int fromStartMin = 0;
+    static constexpr int fromStartMax = 38400000;
+    static constexpr int fromPitchMin = 0;
+    static constexpr int fromPitchMax = 127;
+    static constexpr int startMin = 0;
+    static constexpr int startMax = 38400000;
+    static constexpr int lengthMin = 1;
+    static constexpr int lengthMax = 38400000;
+    static constexpr int pitchMin = 0;
+    static constexpr int pitchMax = 127;
+    static constexpr int gestureMin = 0;
+    static constexpr int gestureMax = 2147483647;
+
+    int clip = 0;
+    int fromStart = 0;
+    int fromPitch = 0;
+    int start = 0;
+    int length = 0;
+    int pitch = 0;
+    int gesture = 0;
+
+    bool operator== (const ClipEditNote&) const = default;
+};
+
 struct EngineStatus
 {
     static constexpr std::string_view type = "engine.status";
@@ -332,6 +749,10 @@ struct TransportState
     static constexpr int denominatorMax = 16;
     static constexpr int countInBarsMin = 0;
     static constexpr int countInBarsMax = 4;
+    static constexpr int loopStartMin = 0;
+    static constexpr int loopStartMax = 38400000;
+    static constexpr int loopEndMin = 0;
+    static constexpr int loopEndMax = 38400000;
 
     bool playing = false;
     double bpm = 0.0;
@@ -339,6 +760,10 @@ struct TransportState
     int denominator = 0;
     int countInBars = 0;
     bool metronomeEnabled = false;
+    bool recording = false;
+    bool loopEnabled = false;
+    int loopStart = 0;
+    int loopEnd = 0;
 
     bool operator== (const TransportState&) const = default;
 };
@@ -350,13 +775,13 @@ struct TransportPosition
     static constexpr int barMax = 100000000;
     static constexpr int beatMin = 1;
     static constexpr int beatMax = 32;
-    static constexpr int stepMin = 0;
-    static constexpr int stepMax = 15;
+    static constexpr int ticksMin = -10000000;
+    static constexpr int ticksMax = 76800000;
 
     int bar = 0;
     int beat = 0;
     bool countingIn = false;
-    int step = 0;
+    int ticks = 0;
 
     bool operator== (const TransportPosition&) const = default;
 };
@@ -444,18 +869,6 @@ struct SamplerState
     bool operator== (const SamplerState&) const = default;
 };
 
-struct DrumsPattern
-{
-    static constexpr std::string_view type = "drums.pattern";
-    static constexpr float stepsMin = 0.0f;
-    static constexpr float stepsMax = 65535.0f;
-    static constexpr std::size_t stepsMaxItems = 16;
-
-    std::vector<float> steps {};
-
-    bool operator== (const DrumsPattern&) const = default;
-};
-
 struct DrumsPad
 {
     static constexpr std::string_view type = "drums.pad";
@@ -478,7 +891,27 @@ struct DrumsPad
     bool operator== (const DrumsPad&) const = default;
 };
 
-using Intent = std::variant<AppReady, AudioOpenSettings, ToneSetEnabled, TransportPlay, TransportStop, TransportReturnToStart, TransportSetTempo, TransportSetCountIn, MetronomeSetEnabled, ParamSet, EditUndo, EditRedo, ProjectNew, ProjectOpen, ProjectSave, ProjectSaveAs, ProjectRename, NoteOn, NoteOff, NoteAllOff, InstrumentSelect, SamplerLoad, DrumsSetStep, DrumsClear, DrumsTrigger, DrumsSetPad, DrumsLoadPad, DrumsResetPad>;
-using Event = std::variant<EngineStatus, EngineMeters, TransportState, TransportPosition, ParamValue, HistoryState, ProjectState, AppNotice, InstrumentState, SamplerState, DrumsPattern, DrumsPad>;
+struct TimelineState
+{
+    static constexpr std::string_view type = "timeline.state";
+    static constexpr std::size_t tracksMaxItems = 64;
+
+    std::vector<TimelineTrack> tracks {};
+
+    bool operator== (const TimelineState&) const = default;
+};
+
+struct TimelineAssets
+{
+    static constexpr std::string_view type = "timeline.assets";
+    static constexpr std::size_t assetsMaxItems = 1024;
+
+    std::vector<TimelineAsset> assets {};
+
+    bool operator== (const TimelineAssets&) const = default;
+};
+
+using Intent = std::variant<AppReady, AudioOpenSettings, ToneSetEnabled, TransportPlay, TransportStop, TransportReturnToStart, TransportSetTempo, TransportSetCountIn, MetronomeSetEnabled, ParamSet, EditUndo, EditRedo, ProjectNew, ProjectOpen, ProjectSave, ProjectSaveAs, ProjectRename, NoteOn, NoteOff, NoteAllOff, InstrumentSelect, SamplerLoad, DrumsSetStep, DrumsClear, DrumsTrigger, DrumsSetPad, DrumsLoadPad, DrumsResetPad, TransportRecord, TransportSeek, TransportSetLoop, TrackAdd, TrackRemove, TrackRename, TrackSetVolume, TrackSetPan, TrackSetMute, TrackSetSolo, TrackImportAudio, ClipCreate, ClipMove, ClipResize, ClipSplit, ClipRemove, ClipDuplicate, ClipSetLoop, ClipAddNote, ClipRemoveNote, ClipEditNote>;
+using Event = std::variant<EngineStatus, EngineMeters, TransportState, TransportPosition, ParamValue, HistoryState, ProjectState, AppNotice, InstrumentState, SamplerState, DrumsPad, TimelineState, TimelineAssets>;
 
 } // namespace ap::bridge

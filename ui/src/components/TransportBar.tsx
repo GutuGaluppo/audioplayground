@@ -5,6 +5,7 @@ import { HistoryControls } from './HistoryControls';
 import { ProjectHeader } from './ProjectHeader';
 import { useLatest } from '../state/latestEvent';
 import { useStores } from '../state/StoresContext';
+import { clipEnd, findClip, ticksPerBar } from '../timeline/model';
 
 const MIN_BPM = 20;
 const MAX_BPM = 300;
@@ -14,15 +15,28 @@ export function TransportBar() {
   const stores = useStores();
   const state = useLatest(stores.transportState);
   const position = useLatest(stores.transportPosition);
+  const timeline = useLatest(stores.timeline);
 
   const playing = state?.playing ?? false;
+  const recording = state?.recording ?? false;
   const [tempoDraft, setTempoDraft] = useState<string | null>(null);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.code !== 'Space' || event.repeat || isInteractive(event.target)) return;
-      event.preventDefault();
-      bridge.send({ type: playing ? 'transport.stop' : 'transport.play', payload: {} });
+      if (event.repeat || isInteractive(event.target)) return;
+      if (event.code === 'Space') {
+        event.preventDefault();
+        bridge.send({ type: playing ? 'transport.stop' : 'transport.play', payload: {} });
+      } else if (
+        event.code === 'KeyR' &&
+        event.shiftKey &&
+        !event.metaKey &&
+        !event.ctrlKey &&
+        !event.altKey
+      ) {
+        event.preventDefault();
+        bridge.send({ type: 'transport.record', payload: {} });
+      }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => {
@@ -71,6 +85,19 @@ export function TransportBar() {
           }}
         >
           <span aria-hidden="true">{playing ? '■' : '▶'}</span>
+        </button>
+        <button
+          type="button"
+          className="transport__button transport__button--record"
+          aria-pressed={recording}
+          aria-label={recording ? 'Stop recording' : 'Record'}
+          title={recording ? 'Stop recording' : 'Record what you play (Shift+R)'}
+          disabled={!state}
+          onClick={() => {
+            bridge.send({ type: 'transport.record', payload: {} });
+          }}
+        >
+          <span aria-hidden="true">●</span>
         </button>
         <span className="transport__divider" aria-hidden="true" />
         <HistoryControls />
@@ -127,6 +154,38 @@ export function TransportBar() {
           }}
         >
           Click
+        </button>
+
+        <button
+          type="button"
+          className="toggle"
+          aria-pressed={state?.loopEnabled ?? false}
+          title="Loop the region shown on the ruler (drag on the ruler to change it)"
+          disabled={!state}
+          onClick={() => {
+            if (!state) return;
+            if (state.loopEnabled || state.loopEnd > state.loopStart) {
+              bridge.send({
+                type: 'transport.setLoop',
+                payload: {
+                  enabled: !state.loopEnabled,
+                  start: state.loopStart,
+                  end: state.loopEnd,
+                },
+              });
+              return;
+            }
+            // No region yet: the selected clip, or the first four bars.
+            const bar = ticksPerBar(state.numerator, state.denominator);
+            const selectedClip = stores.selection.get().clip;
+            const found =
+              selectedClip !== null ? findClip(timeline?.tracks ?? [], selectedClip) : null;
+            const start = found ? found.clip.start : 0;
+            const end = found ? clipEnd(found.clip) : 4 * bar;
+            bridge.send({ type: 'transport.setLoop', payload: { enabled: true, start, end } });
+          }}
+        >
+          Loop
         </button>
 
         <button

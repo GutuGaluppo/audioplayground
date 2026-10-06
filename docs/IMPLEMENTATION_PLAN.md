@@ -104,6 +104,12 @@ As 12 mudanças mais importantes deste plano:
 - Assets referenciados por **ID + hash de conteúdo**, o que permite deduplicar e oferecer relink quando o arquivo some.
 - Sem SQLite no MVP. Reavaliar quando houver biblioteca global de samples.
 
+### ADR-007 — Timeline, faixas e clipes
+- Faixa de áudio com clipes de áudio; faixa de instrumento com clipes de notas, **no máximo uma por instrumento** no MVP (os parâmetros de som continuam globais).
+- Clipes em ticks; o offset dentro do arquivo de áudio fica em *flicks* (exato em qualquer taxa de amostragem); clipes de notas podem repetir o conteúdo em loop.
+- O padrão da bateria é um clipe de notas. Edições não destrutivas e com undo, e edições compostas viram um passo só.
+- Reprodução com precisão de amostra, com fades curtos nas bordas e nos saltos (play, stop, seek, loop).
+
 ---
 
 ## 3. Melhorias por pilar
@@ -208,7 +214,7 @@ Cada fase termina num **gate**: CI verde (sanitizers inclusos), benchmarks dentr
 
 ### Phase 0 — Fundação técnica
 - Repositório, CMake + JUCE fixado, pnpm workspace, CI macOS/Windows (Linux para sanitizers e fuzz)
-- `AGENTS.md`, ADR-001 a ADR-006, `THIRD_PARTY_LICENSES.md`
+- `AGENTS.md`, ADR-001 a ADR-007, `THIRD_PARTY_LICENSES.md`
 - Device manager, callback estável, gerador de tom com smoothing
 - **Renderizador offline** + harness de golden tests + RTSan
 - Shell desktop com WebView exibindo a UI React "hello" via ponte tipada
@@ -265,21 +271,24 @@ Cada fase termina num **gate**: CI verde (sanitizers inclusos), benchmarks dentr
 
 ---
 
-## 5. Progresso (atualizado em 2026-10-05)
+## 5. Progresso (atualizado em 2026-10-06)
 
 | Tarefa | Estado |
 |---|---|
 | 001–009 (Fase 0 e 1: fundação, motor, transporte, parâmetros, modelo/undo, snapshots, salvar/abrir/autosave) | ✅ Concluídas |
 | 010–013 (Fase 2: DSP do synth, synth polifônico + QWERTY/MIDI, sampler + importação, bateria + sequenciador) | ✅ Concluídas |
 | Verificação auditiva da Fase 2 (critério de aceite) | ⏳ Precisa de um ouvinte humano |
-| 014 (captura retroativa) | ↪ Movida para depois da 017: precisa de clipes de notas como destino |
-| 015–017 (gravação, waveforms, timeline) | Próximas. Ordem ajustada: 017 (modelo de clipes + reprodução) → 015 (gravar em clipe) → 016 |
+| 017 (timeline) | ✅ Concluída: clipes de áudio e de notas, mover/cortar/dividir/duplicar/loop, editor de notas, padrão da bateria como clipe, importação de áudio para a timeline, gravação de notas com compensação de latência, região de loop (ADR-007) |
+| Verificação auditiva da timeline | ⏳ Precisa de um ouvinte humano |
+| 014 (captura retroativa) | Próxima depois da 015: o destino (clipes de notas) já existe |
+| 015–016 (gravação do microfone, waveforms) | Próximas: 015 (gravar áudio em clipe) → 016 (peaks em detalhe; a timeline já mostra uma visão geral) |
 
 Decisões tomadas durante a execução:
 - JUCE 9.0.3, e não 8.
 - Kit de bateria sintetizado por código: sem licenças de samples e funciona na primeira abertura.
 - Tolerância dos goldens com funções transcendentais: 1e-4 (−80 dBFS), pela diferença medida entre a libm da Apple e a do Linux/Windows.
-- Schema v1 permanece rascunho até o primeiro release (ADR-006).
+- Schema v1 permanece rascunho até o primeiro release (ADR-006). A 017 removeu `drums.steps` e adicionou `instrument`, `clips` e `nextClipId`.
+- Lei de pan com compensação: faixa centralizada toca em ganho unitário (igual ao instrumento sem faixa).
 
 ## 5.1 Backlog inicial (substitui a §35 do Guia)
 

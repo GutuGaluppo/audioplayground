@@ -1,5 +1,6 @@
 import type { Bridge } from '../bridge/bridge';
 import { createParameterStore } from '../params/parameterStore';
+import { createSelectionStore } from '../timeline/selection';
 import { createKeyedEventStore } from './keyedEvent';
 import { createLatestEventStore } from './latestEvent';
 
@@ -13,8 +14,10 @@ export function createStores(bridge: Bridge) {
     project: createLatestEventStore(bridge, 'project.state'),
     instrument: createLatestEventStore(bridge, 'instrument.state'),
     sampler: createLatestEventStore(bridge, 'sampler.state'),
-    drumPattern: createLatestEventStore(bridge, 'drums.pattern'),
     drumPads: createKeyedEventStore(bridge, 'drums.pad', (pad) => pad.pad),
+    timeline: createLatestEventStore(bridge, 'timeline.state'),
+    timelineAssets: createLatestEventStore(bridge, 'timeline.assets'),
+    selection: createSelectionStore(),
   };
 }
 

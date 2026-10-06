@@ -1,11 +1,22 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { useBridge } from '../bridge/BridgeContext';
+import type { TimelineClip } from '../bridge/generated';
 import { beginGesture } from '../params/gestures';
 import { useKeyed } from '../state/keyedEvent';
 import { useLatest } from '../state/latestEvent';
 import { useStores } from '../state/StoresContext';
-import { hasStep, keyLabelForPad, padForKey } from './drumKeys';
+import {
+  activePatternClip,
+  clipEnd,
+  contentTimeAt,
+  hasDrumStep,
+  PATTERN_TICKS,
+  STEP_TICKS,
+  ticksPerBar,
+} from '../timeline/model';
+import { useSelection } from '../timeline/selection';
+import { keyLabelForPad, padForKey } from './drumKeys';
 
 const PADS = Array.from({ length: 16 }, (_, i) => i);
 const STEPS = Array.from({ length: 16 }, (_, i) => i);
@@ -54,14 +65,14 @@ function PadButton({
 
 function StepRow({
   pad,
-  mask,
+  clip,
   selected,
   playingStep,
   onSelect,
   paint,
 }: {
   pad: number;
-  mask: number;
+  clip: TimelineClip | null;
   selected: boolean;
   playingStep: number | null;
   onSelect: (pad: number) => void;
@@ -70,8 +81,12 @@ function StepRow({
   const bridge = useBridge();
   const info = useKeyed(useStores().drumPads, pad);
 
+  // clip 0: the pattern at the playhead, created on the first step.
   const set = (step: number, on: boolean, gesture: number) => {
-    bridge.send({ type: 'drums.setStep', payload: { pad, step, on, gesture } });
+    bridge.send({
+      type: 'drums.setStep',
+      payload: { clip: clip?.id ?? 0, pad, step, on, gesture },
+    });
   };
 
   return (
@@ -87,7 +102,7 @@ function StepRow({
         {info?.name ?? ''}
       </button>
       {STEPS.map((step) => {
-        const on = hasStep(mask, step);
+        const on = clip !== null && hasDrumStep(clip, pad, step);
         return (
           <button
             key={step}
@@ -212,12 +227,25 @@ function PadControls({ pad }: { pad: number }) {
   );
 }
 
+/** The step under the playhead when it is inside the pattern clip and playing. */
+function currentStep(
+  clip: TimelineClip | null,
+  playing: boolean,
+  position: { ticks: number; countingIn: boolean } | null,
+): number | null {
+  if (!clip || !playing || !position || position.countingIn) return null;
+  if (position.ticks < clip.start || position.ticks >= clipEnd(clip)) return null;
+  const step = Math.floor(contentTimeAt(clip, position.ticks) / STEP_TICKS);
+  return step >= 0 && step * STEP_TICKS < PATTERN_TICKS ? step : null;
+}
+
 export function DrumPanel() {
   const bridge = useBridge();
   const stores = useStores();
-  const pattern = useLatest(stores.drumPattern);
+  const timeline = useLatest(stores.timeline);
   const transport = useLatest(stores.transportState);
   const position = useLatest(stores.transportPosition);
+  const selection = useSelection(stores.selection);
   const [selected, setSelected] = useState(0);
   const paint = useRef<{ on: boolean; gesture: number } | null>(null);
 
@@ -246,17 +274,28 @@ export function DrumPanel() {
     };
   }, [bridge]);
 
-  const playingStep = transport?.playing && position && !position.countingIn ? position.step : null;
+  const playhead = Math.max(0, position?.ticks ?? 0);
+  const clip = activePatternClip(timeline?.tracks ?? [], selection.clip, playhead);
+  const playingStep = currentStep(clip, transport?.playing ?? false, position);
+  const bar = ticksPerBar(transport?.numerator ?? 4, transport?.denominator ?? 4);
 
   return (
     <section className="card drums" aria-label="Drums">
       <div className="sampler__header">
-        <h2 className="card__title">Drums</h2>
+        <h2 className="card__title">
+          Drums
+          <span className="drums__clip">
+            {clip
+              ? ` · pattern at bar ${String(Math.floor(clip.start / bar) + 1)}`
+              : ' · click a step to start a pattern'}
+          </span>
+        </h2>
         <button
           type="button"
           className="button button--quiet"
+          disabled={!clip}
           onClick={() => {
-            bridge.send({ type: 'drums.clear', payload: {} });
+            if (clip) bridge.send({ type: 'drums.clear', payload: { clip: clip.id } });
           }}
         >
           Clear pattern
@@ -277,7 +316,7 @@ export function DrumPanel() {
           <StepRow
             key={pad}
             pad={pad}
-            mask={pattern?.steps[pad] ?? 0}
+            clip={clip}
             selected={pad === selected}
             playingStep={playingStep}
             onSelect={setSelected}

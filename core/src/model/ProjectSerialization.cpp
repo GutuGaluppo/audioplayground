@@ -1,10 +1,13 @@
 #include "ap/model/ProjectSerialization.h"
 
+#include "ap/model/ClipEditing.h"
+
 #include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <ctime>
 #include <initializer_list>
+#include <limits>
 #include <nlohmann/json.hpp>
 #include <set>
 
@@ -156,21 +159,119 @@ bool isParameterIdShape (std::string_view id)
         { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '.'; });
 }
 
-Track parseTrack (const Json& json)
+const char* instrumentName (InstrumentKind instrument) noexcept
 {
-    requireExactKeys (json, {"id", "kind", "name", "volumeDb", "pan", "muted", "soloed"}, "track");
+    switch (instrument)
+    {
+    case InstrumentKind::synth:
+        return "synth";
+    case InstrumentKind::sampler:
+        return "sampler";
+    case InstrumentKind::drums:
+        return "drums";
+    }
+    return "synth";
+}
+
+core::Ticks ticks (const Json& value, core::Ticks min, core::Ticks max, const char* what)
+{
+    if (!value.is_number_integer())
+        invalid (std::string (what) + " must be a whole number");
+    const auto number = value.get<std::int64_t>();
+    if (number < min || number > max)
+        invalid (std::string (what) + " is out of range");
+    return number;
+}
+
+std::uint64_t idOrZero (const Json& value, const char* what)
+{
+    if (!value.is_number_unsigned() && !(value.is_number_integer() && value.get<std::int64_t>() == 0))
+        invalid (std::string (what) + " must be an id or 0");
+    return value.get<std::uint64_t>();
+}
+
+Clip parseClip (const Json& json, const Track& track, const Project& project)
+{
+    Clip clip;
+    if (track.kind == TrackKind::audio)
+    {
+        requireExactKeys (json, {"id", "start", "length", "asset", "sourceOffset"}, "audio clip");
+        clip.asset = AssetId {positiveInteger (json["asset"], "clip asset")};
+        clip.sourceOffset
+            = ticks (json["sourceOffset"], 0, std::numeric_limits<std::int64_t>::max(), "clip source offset");
+    }
+    else
+    {
+        requireExactKeys (json, {"id", "start", "length", "contentOffset", "loopLength", "notes"},
+                          "note clip");
+        clip.contentOffset = ticks (json["contentOffset"], 0, maxTimelineTicks, "clip content offset");
+        clip.loopLength = ticks (json["loopLength"], 0, maxTimelineTicks, "clip loop length");
+
+        const auto& notes = json["notes"];
+        if (!notes.is_array())
+            invalid ("clip notes must be a list");
+        if (notes.size() > Clip::maxNotes)
+            invalid ("too many notes in a clip");
+        clip.notes.reserve (notes.size());
+        for (const auto& note : notes)
+        {
+            if (!note.is_array() || note.size() != 4)
+                invalid ("a note must be [start, length, pitch, velocity]");
+            Note parsed;
+            parsed.start = ticks (note[0], 0, maxTimelineTicks - 1, "note start");
+            parsed.length = ticks (note[1], 1, maxTimelineTicks, "note length");
+            parsed.pitch = static_cast<std::uint8_t> (ticks (note[2], 0, 127, "note pitch"));
+            parsed.velocity = static_cast<float> (
+                numberInRange (note[3], static_cast<double> (Note::minVelocity), 1.0, "note velocity"));
+            clip.notes.push_back (parsed);
+        }
+    }
+
+    clip.id = ClipId {positiveInteger (json["id"], "clip id")};
+    clip.start = ticks (json["start"], 0, maxTimelineTicks, "clip start");
+    clip.length = ticks (json["length"], Clip::minLength, maxTimelineTicks, "clip length");
+
+    const auto id = clip.id;
+    auto normalised = normaliseClip (std::move (clip), track, project);
+    if (!normalised)
+        invalid ("a clip is not valid");
+    normalised->id = id;
+    return *normalised;
+}
+
+Track parseTrack (const Json& json, const Project& project)
+{
+    if (!json.is_object())
+        invalid ("track must be an object");
 
     Track track;
-    track.id = TrackId {positiveInteger (json["id"], "track id")};
-
-    const auto& kind = json["kind"];
+    const auto& kind = member (json, "kind");
     if (kind == "audio")
+    {
         track.kind = TrackKind::audio;
+        requireExactKeys (json, {"id", "kind", "name", "volumeDb", "pan", "muted", "soloed", "clips"},
+                          "track");
+    }
     else if (kind == "instrument")
+    {
         track.kind = TrackKind::instrument;
+        requireExactKeys (json,
+                          {"id", "kind", "instrument", "name", "volumeDb", "pan", "muted", "soloed", "clips"},
+                          "track");
+        const auto& instrument = json["instrument"];
+        if (instrument == "synth")
+            track.instrument = InstrumentKind::synth;
+        else if (instrument == "sampler")
+            track.instrument = InstrumentKind::sampler;
+        else if (instrument == "drums")
+            track.instrument = InstrumentKind::drums;
+        else
+            invalid ("track instrument must be \"synth\", \"sampler\" or \"drums\"");
+    }
     else
         invalid ("track kind must be \"audio\" or \"instrument\"");
 
+    track.id = TrackId {positiveInteger (json["id"], "track id")};
     track.name = name (json["name"], Track::maxNameLength, "track name");
     track.volumeDb
         = static_cast<float> (numberInRange (json["volumeDb"], static_cast<double> (Track::minVolumeDb),
@@ -178,6 +279,16 @@ Track parseTrack (const Json& json)
     track.pan = static_cast<float> (numberInRange (json["pan"], -1.0, 1.0, "track pan"));
     track.muted = boolean (json["muted"], "track mute");
     track.soloed = boolean (json["soloed"], "track solo");
+
+    const auto& clips = json["clips"];
+    if (!clips.is_array())
+        invalid ("track clips must be a list");
+    if (clips.size() > Track::maxClips)
+        invalid ("too many clips on a track");
+    for (const auto& clip : clips)
+        track.clips.push_back (parseClip (clip, track, project));
+    std::sort (track.clips.begin(), track.clips.end(), [] (const Clip& a, const Clip& b)
+               { return a.start != b.start ? a.start < b.start : a.id < b.id; });
     return track;
 }
 
@@ -185,8 +296,8 @@ LoadedProject parseV1 (const Json& root)
 {
     requireExactKeys (root,
                       {"format", "schemaVersion", "name", "createdAt", "updatedAt", "tempo", "timeSignature",
-                       "exportSampleRate", "nextTrackId", "tracks", "parameters", "assets", "nextAssetId",
-                       "samplerAsset", "drums"},
+                       "exportSampleRate", "nextTrackId", "nextClipId", "tracks", "parameters", "assets",
+                       "nextAssetId", "samplerAsset", "drums"},
                       "project");
 
     LoadedProject loaded;
@@ -208,27 +319,6 @@ LoadedProject parseV1 (const Json& root)
 
     project.exportSampleRate
         = numberInRange (root["exportSampleRate"], 8000.0, 384000.0, "export sample rate");
-
-    const auto& tracks = root["tracks"];
-    if (!tracks.is_array())
-        invalid ("tracks must be a list");
-    if (tracks.size() > Project::maxTracks)
-        invalid ("too many tracks");
-
-    std::set<std::uint64_t> ids;
-    std::uint64_t highestId = 0;
-    for (const auto& json : tracks)
-    {
-        auto track = parseTrack (json);
-        if (!ids.insert (track.id.value).second)
-            invalid ("two tracks share the same id");
-        highestId = std::max (highestId, track.id.value);
-        project.tracks.push_back (std::move (track));
-    }
-
-    project.nextTrackId = positiveInteger (root["nextTrackId"], "nextTrackId");
-    if (project.nextTrackId <= highestId)
-        invalid ("nextTrackId must be greater than every track id");
 
     const auto& assets = root["assets"];
     if (!assets.is_array())
@@ -257,30 +347,56 @@ LoadedProject parseV1 (const Json& root)
     if (project.nextAssetId <= highestAssetId)
         invalid ("nextAssetId must be greater than every asset id");
 
-    const auto& samplerAsset = root["samplerAsset"];
-    if (!samplerAsset.is_number_unsigned()
-        && !(samplerAsset.is_number_integer() && samplerAsset.get<std::int64_t>() == 0))
-        invalid ("samplerAsset must be an asset id or 0");
-    project.samplerAsset = AssetId {samplerAsset.get<std::uint64_t>()};
+    const auto& tracks = root["tracks"];
+    if (!tracks.is_array())
+        invalid ("tracks must be a list");
+    if (tracks.size() > Project::maxTracks)
+        invalid ("too many tracks");
+
+    std::set<std::uint64_t> ids;
+    std::set<std::uint64_t> clipIds;
+    std::uint64_t highestId = 0;
+    std::uint64_t highestClipId = 0;
+    for (const auto& json : tracks)
+    {
+        auto track = parseTrack (json, project);
+        if (!ids.insert (track.id.value).second)
+            invalid ("two tracks share the same id");
+        if (track.kind == TrackKind::instrument && project.findInstrumentTrack (track.instrument) != nullptr)
+            invalid ("two tracks play the same instrument");
+        for (const auto& clip : track.clips)
+        {
+            if (!clipIds.insert (clip.id.value).second)
+                invalid ("two clips share the same id");
+            highestClipId = std::max (highestClipId, clip.id.value);
+        }
+        highestId = std::max (highestId, track.id.value);
+        project.tracks.push_back (std::move (track));
+    }
+
+    project.nextTrackId = positiveInteger (root["nextTrackId"], "nextTrackId");
+    if (project.nextTrackId <= highestId)
+        invalid ("nextTrackId must be greater than every track id");
+
+    project.nextClipId = positiveInteger (root["nextClipId"], "nextClipId");
+    if (project.nextClipId <= highestClipId)
+        invalid ("nextClipId must be greater than every clip id");
+
+    project.samplerAsset = AssetId {idOrZero (root["samplerAsset"], "samplerAsset")};
     if (project.samplerAsset.isValid() && project.findAsset (project.samplerAsset) == nullptr)
         invalid ("samplerAsset refers to a missing asset");
 
     const auto& drums = root["drums"];
-    requireExactKeys (drums, {"pads", "steps"}, "drums");
+    requireExactKeys (drums, {"pads"}, "drums");
     const auto& pads = drums["pads"];
-    const auto& steps = drums["steps"];
-    if (!pads.is_array() || pads.size() != DrumKit::numPads || !steps.is_array()
-        || steps.size() != DrumKit::numPads)
-        invalid ("the drum kit must have 16 pads and 16 step rows");
+    if (!pads.is_array() || pads.size() != DrumKit::numPads)
+        invalid ("the drum kit must have 16 pads");
     for (std::size_t i = 0; i < DrumKit::numPads; ++i)
     {
         const auto& json = pads[i];
         requireExactKeys (json, {"sample", "volumeDb", "pitch", "muted"}, "drum pad");
         auto& pad = project.drums.pads[i];
-        const auto& sample = json["sample"];
-        if (!sample.is_number_unsigned() && !(sample.is_number_integer() && sample.get<std::int64_t>() == 0))
-            invalid ("drum pad sample must be an asset id or 0");
-        pad.sample = AssetId {sample.get<std::uint64_t>()};
+        pad.sample = AssetId {idOrZero (json["sample"], "drum pad sample")};
         if (pad.sample.isValid() && project.findAsset (pad.sample) == nullptr)
             invalid ("drum pad refers to a missing asset");
         pad.volumeDb
@@ -290,14 +406,6 @@ LoadedProject parseV1 (const Json& root)
             = static_cast<float> (numberInRange (json["pitch"], -static_cast<double> (DrumPad::maxPitch),
                                                  static_cast<double> (DrumPad::maxPitch), "pad pitch"));
         pad.muted = boolean (json["muted"], "pad mute");
-
-        if (!steps[i].is_number_unsigned()
-            && !(steps[i].is_number_integer() && steps[i].get<std::int64_t>() == 0))
-            invalid ("drum steps must be whole numbers");
-        const auto mask = steps[i].get<std::uint64_t>();
-        if (mask > 0xFFFF)
-            invalid ("drum steps are out of range");
-        project.drums.steps[i] = static_cast<std::uint16_t> (mask);
     }
 
     const auto& parameters = root["parameters"];
@@ -338,6 +446,7 @@ std::string serialiseProject (const Project& project, const ProjectMetadata& met
     root["timeSignature"] = {project.timeSignature.numerator, project.timeSignature.denominator};
     root["exportSampleRate"] = project.exportSampleRate;
     root["nextTrackId"] = project.nextTrackId;
+    root["nextClipId"] = project.nextClipId;
 
     auto tracks = OrderedJson::array();
     for (const auto& track : project.tracks)
@@ -345,11 +454,38 @@ std::string serialiseProject (const Project& project, const ProjectMetadata& met
         OrderedJson json;
         json["id"] = track.id.value;
         json["kind"] = track.kind == TrackKind::audio ? "audio" : "instrument";
+        if (track.kind == TrackKind::instrument)
+            json["instrument"] = instrumentName (track.instrument);
         json["name"] = track.name;
         json["volumeDb"] = track.volumeDb;
         json["pan"] = track.pan;
         json["muted"] = track.muted;
         json["soloed"] = track.soloed;
+
+        auto clips = OrderedJson::array();
+        for (const auto& clip : track.clips)
+        {
+            OrderedJson c;
+            c["id"] = clip.id.value;
+            c["start"] = clip.start;
+            c["length"] = clip.length;
+            if (track.kind == TrackKind::audio)
+            {
+                c["asset"] = clip.asset.value;
+                c["sourceOffset"] = clip.sourceOffset;
+            }
+            else
+            {
+                c["contentOffset"] = clip.contentOffset;
+                c["loopLength"] = clip.loopLength;
+                auto notes = OrderedJson::array();
+                for (const auto& note : clip.notes)
+                    notes.push_back ({note.start, note.length, note.pitch, note.velocity});
+                c["notes"] = std::move (notes);
+            }
+            clips.push_back (std::move (c));
+        }
+        json["clips"] = std::move (clips);
         tracks.push_back (std::move (json));
     }
     root["tracks"] = std::move (tracks);
@@ -375,7 +511,6 @@ std::string serialiseProject (const Project& project, const ProjectMetadata& met
     root["samplerAsset"] = project.samplerAsset.value;
 
     auto pads = OrderedJson::array();
-    auto steps = OrderedJson::array();
     for (std::size_t i = 0; i < DrumKit::numPads; ++i)
     {
         const auto& pad = project.drums.pads[i];
@@ -385,11 +520,9 @@ std::string serialiseProject (const Project& project, const ProjectMetadata& met
         json["pitch"] = pad.pitch;
         json["muted"] = pad.muted;
         pads.push_back (std::move (json));
-        steps.push_back (project.drums.steps[i]);
     }
     OrderedJson drums;
     drums["pads"] = std::move (pads);
-    drums["steps"] = std::move (steps);
     root["drums"] = std::move (drums);
 
     return root.dump (2) + "\n";

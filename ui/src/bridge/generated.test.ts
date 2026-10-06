@@ -46,3 +46,42 @@ describe('parseNativeEvent', () => {
     expect(parseNativeEvent(message)).toBeNull();
   });
 });
+
+describe('parseNativeEvent with lists of records', () => {
+  const note = { start: 0, length: 240, pitch: 60, velocity: 1 };
+  const clip = {
+    id: 1,
+    start: 0,
+    length: 3840,
+    asset: 0,
+    sourceOffsetSeconds: 0,
+    contentOffset: 0,
+    loopLength: 0,
+    notes: [note],
+  };
+  const track = {
+    id: 1,
+    kind: 1,
+    name: 'Synth',
+    volumeDb: 0,
+    pan: 0,
+    muted: false,
+    soloed: false,
+    clips: [clip],
+  };
+  const state = (tracks: unknown) => ({ type: 'timeline.state', payload: { tracks } });
+
+  it('accepts a nested timeline', () => {
+    expect(parseNativeEvent(state([track]))).toEqual(state([track]));
+  });
+
+  it.each([
+    ['a non-array list', 'x'],
+    ['an item with an extra key', [{ ...track, extra: 1 }]],
+    ['a bad nested note', [{ ...track, clips: [{ ...clip, notes: [{ ...note, pitch: 128 }] }] }]],
+    ['a null item', [null]],
+    ['too many items', Array.from({ length: 65 }, () => track)],
+  ])('rejects %s', (_label, tracks) => {
+    expect(parseNativeEvent(state(tracks))).toBeNull();
+  });
+});

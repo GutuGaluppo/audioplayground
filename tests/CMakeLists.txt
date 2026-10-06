@@ -4,6 +4,7 @@ add_executable(ap_unit_tests
     support/Golden.cpp
     support/WavFile.cpp
     unit/BuildInfoTests.cpp
+    unit/ClipModelTests.cpp
     unit/ConcurrencyTests.cpp
     unit/DrumMachineTests.cpp
     unit/EngineTests.cpp
@@ -20,6 +21,7 @@ add_executable(ap_unit_tests
     unit/SineOscillatorTests.cpp
     unit/SynthDspTests.cpp
     unit/SynthTests.cpp
+    unit/TimelinePlaybackTests.cpp
     unit/TransportTests.cpp)
 
 target_include_directories(ap_unit_tests PRIVATE support)
@@ -42,8 +44,10 @@ endif()
 if(AP_BUILD_DESKTOP)
     add_executable(ap_desktop_tests
         desktop/BridgeCodecTests.cpp
+        desktop/NoteRecorderTests.cpp
         desktop/SampleLoaderTests.cpp
         desktop/SessionTests.cpp
+        "${PROJECT_SOURCE_DIR}/apps/desktop/src/NoteRecorder.cpp"
         "${PROJECT_SOURCE_DIR}/apps/desktop/src/SampleLoader.cpp"
         "${PROJECT_SOURCE_DIR}/apps/desktop/src/Session.cpp"
         "${PROJECT_SOURCE_DIR}/apps/desktop/src/generated/BridgeCodec.cpp")
@@ -60,7 +64,7 @@ if(AP_BUILD_DESKTOP)
         juce::juce_recommended_config_flags
         Catch2::Catch2WithMain)
     get_target_property(_ap_test_opts ap_project_options INTERFACE_COMPILE_OPTIONS)
-    set_source_files_properties(desktop/BridgeCodecTests.cpp desktop/SampleLoaderTests.cpp desktop/SessionTests.cpp
+    set_source_files_properties(desktop/BridgeCodecTests.cpp desktop/NoteRecorderTests.cpp desktop/SampleLoaderTests.cpp desktop/SessionTests.cpp
         PROPERTIES COMPILE_OPTIONS "${_ap_test_opts}")
     catch_discover_tests(ap_desktop_tests)
 endif()

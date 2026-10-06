@@ -272,4 +272,94 @@ describe('App', () => {
     await renderApp();
     expect(screen.getByLabelText('Position').textContent).toBe('1.1');
   });
+
+  it('adds tracks from the menu, one per instrument', async () => {
+    await renderApp();
+    fireEvent.click(screen.getByRole('button', { name: '+ Track' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Synth' }));
+    await flush();
+    expect(screen.getByRole('group', { name: 'Synth track' })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: '+ Track' }));
+    expect(screen.getByRole('menuitem', { name: 'Synth' })).toHaveProperty('disabled', true);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Audio' }));
+    await flush();
+    expect(screen.getByRole('group', { name: 'Audio 1 track' })).toBeTruthy();
+  });
+
+  it('creates a clip, edits its notes, and deletes it with undo', async () => {
+    await renderApp();
+    fireEvent.click(screen.getByRole('button', { name: '+ Track' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Synth' }));
+    await flush();
+
+    const lane = document.querySelector<HTMLElement>('[data-lane-track]');
+    if (!lane) throw new Error('no lane');
+    fireEvent.doubleClick(lane, { clientX: 0 });
+    await flush();
+    const clip = screen.getByRole('button', { name: 'Synth clip' });
+
+    fireEvent.pointerDown(clip, { button: 0, clientX: 5, clientY: 5 });
+    fireEvent.pointerUp(window);
+    await flush();
+    expect(clip.getAttribute('aria-pressed')).toBe('true');
+
+    // The piano roll opens for the selected clip; clicking the grid adds a note.
+    const grid = screen.getByRole('grid', { name: 'Notes' });
+    fireEvent.pointerDown(grid, { button: 0, clientX: 0, clientY: 0 });
+    await flush();
+    expect(screen.getAllByRole('gridcell')).toHaveLength(1);
+
+    // Backspace deletes the selected note first, then (nothing selected in the editor) the clip.
+    fireEvent.keyDown(window, { key: 'Backspace' });
+    await flush();
+    expect(screen.queryAllByRole('gridcell')).toHaveLength(0);
+    fireEvent.keyDown(window, { key: 'Backspace' });
+    await flush();
+    expect(screen.queryByRole('button', { name: 'Synth clip' })).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Undo Delete clip' }));
+    await flush();
+    expect(screen.getByRole('button', { name: 'Synth clip' })).toBeTruthy();
+  });
+
+  it('starts a drum pattern from the first step and shows it on the timeline', async () => {
+    await renderApp();
+    fireEvent.click(screen.getByRole('tab', { name: 'Drums' }));
+    await flush();
+    expect(screen.queryByRole('button', { name: 'Drums clip' })).toBeNull();
+
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Kick step 1' }));
+    fireEvent.pointerUp(window);
+    await flush();
+    expect(screen.getByRole('button', { name: 'Drums clip' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Kick step 1' }).getAttribute('aria-pressed')).toBe(
+      'true',
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear pattern' }));
+    await flush();
+    expect(screen.getByRole('button', { name: 'Kick step 1' }).getAttribute('aria-pressed')).toBe(
+      'false',
+    );
+  });
+
+  it('records and loops from the transport', async () => {
+    await renderApp();
+    fireEvent.click(screen.getByRole('button', { name: 'Record' }));
+    await flush();
+    expect(
+      screen.getByRole('button', { name: 'Stop recording' }).getAttribute('aria-pressed'),
+    ).toBe('true');
+    fireEvent.keyDown(window, { code: 'Space' });
+    await flush();
+    expect(screen.getByRole('button', { name: 'Record' }).getAttribute('aria-pressed')).toBe(
+      'false',
+    );
+
+    const loop = screen.getByRole('button', { name: 'Loop' });
+    fireEvent.click(loop);
+    await flush();
+    expect(loop.getAttribute('aria-pressed')).toBe('true');
+  });
 });

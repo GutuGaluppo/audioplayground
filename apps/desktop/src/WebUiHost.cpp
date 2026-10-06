@@ -118,6 +118,7 @@ WebUiHost::WebUiHost (AudioDeviceHost& hostToUse, engine::Engine& engineToUse, S
     , session (sessionToUse)
     , actions (actionsToUse)
     , samples (samplesToUse)
+    , recorder (sessionToUse, engineToUse)
 {
     const auto devUrl = developmentServerUrl();
 
@@ -143,7 +144,10 @@ WebUiHost::WebUiHost (AudioDeviceHost& hostToUse, engine::Engine& engineToUse, S
 
     host.onStatusChanged = [this]
     {
-        samples.sync (host.getStatus().sampleRate);
+        const auto status = host.getStatus();
+        samples.sync (status.sampleRate);
+        engine.setRecordingLatency (
+            static_cast<core::Samples> (std::llround (status.outputLatencyMs * status.sampleRate / 1000.0)));
         sendStatus();
     };
     session.onChanged = [this] { onProjectChanged(); };
@@ -154,6 +158,7 @@ WebUiHost::WebUiHost (AudioDeviceHost& hostToUse, engine::Engine& engineToUse, S
         else
             sendDrumPad (slot - 1);
     };
+    samples.onClipAudioChanged = [this] { sendTimelineAssets(); };
     samples.onError
         = [this] (const std::string& message) { showNotice (ProjectActions::NoticeLevel::error, message); };
     setSize (1100, 720);
@@ -166,6 +171,7 @@ WebUiHost::~WebUiHost()
     host.onStatusChanged = nullptr;
     session.onChanged = nullptr;
     samples.onStateChanged = nullptr;
+    samples.onClipAudioChanged = nullptr;
     samples.onError = nullptr;
 }
 
@@ -198,9 +204,10 @@ void WebUiHost::handle (const ap::bridge::AppReady&)
     sendProjectState();
     sendInstrumentState();
     sendSamplerState();
-    sendDrumPattern();
     for (std::size_t pad = 0; pad < model::DrumKit::numPads; ++pad)
         sendDrumPad (pad);
+    sendTimeline();
+    sendTimelineAssets();
 }
 
 void WebUiHost::handle (const ap::bridge::AudioOpenSettings&)
@@ -319,22 +326,6 @@ void WebUiHost::handle (const ap::bridge::SamplerLoad&)
     samples.chooseAndImport (SampleLoader::samplerSlot);
 }
 
-void WebUiHost::handle (const ap::bridge::DrumsSetStep& intent)
-{
-    auto steps = session.project().drums.steps;
-    auto& row = steps[static_cast<std::size_t> (intent.pad)];
-    const auto bit = static_cast<std::uint16_t> (1u << static_cast<unsigned> (intent.step));
-    row = static_cast<std::uint16_t> (intent.on ? (row | bit) : (row & ~bit));
-    if (!session.perform (model::SetDrumSteps {steps},
-                          static_cast<model::ProjectDocument::GestureId> (intent.gesture)))
-        sendDrumPattern();
-}
-
-void WebUiHost::handle (const ap::bridge::DrumsClear&)
-{
-    session.perform (model::SetDrumSteps {{}});
-}
-
 void WebUiHost::handle (const ap::bridge::DrumsTrigger& intent)
 {
     // Pads play through the same lock-free note queue as the keyboard (GM drum notes).
@@ -366,14 +357,6 @@ void WebUiHost::handle (const ap::bridge::DrumsResetPad& intent)
     auto settings = session.project().drums.pads[pad];
     settings.sample = {};
     session.perform (model::SetDrumPad {pad, settings});
-}
-
-void WebUiHost::sendDrumPattern()
-{
-    ap::bridge::DrumsPattern event;
-    for (const auto steps : session.project().drums.steps)
-        event.steps.push_back (static_cast<float> (steps));
-    emit (event);
 }
 
 void WebUiHost::sendDrumPad (std::size_t pad)
@@ -417,7 +400,7 @@ void WebUiHost::onProjectChanged()
 {
     samples.sync (host.getStatus().sampleRate);
     sendProjectState();
-    sendDrumPattern();
+    sendTimeline();
     for (std::size_t pad = 0; pad < model::DrumKit::numPads; ++pad)
         sendDrumPad (pad);
     sendTransportState();
@@ -452,7 +435,7 @@ void WebUiHost::handle (const ap::bridge::TransportPlay&)
 
 void WebUiHost::handle (const ap::bridge::TransportStop&)
 {
-    engine.getTransport().requestStop();
+    stopTransport();
 }
 
 void WebUiHost::handle (const ap::bridge::TransportReturnToStart&)
@@ -512,6 +495,11 @@ void WebUiHost::sendTransportState()
     event.denominator = session.project().timeSignature.denominator;
     event.countInBars = transport.getCountInBars();
     event.metronomeEnabled = engine.getMetronome().isEnabled();
+    event.recording = recorder.isRecording();
+    const auto loop = transport.getLoop();
+    event.loopEnabled = loop.enabled;
+    event.loopStart = static_cast<int> (std::clamp<core::Ticks> (loop.start, 0, model::maxTimelineTicks));
+    event.loopEnd = static_cast<int> (std::clamp<core::Ticks> (loop.end, 0, model::maxTimelineTicks));
 
     lastPlaying = event.playing;
     emit (event);
@@ -530,9 +518,9 @@ void WebUiHost::sendTransportPosition (bool force)
     event.bar = static_cast<int> (std::clamp<std::int64_t> (
         position.bar, ap::bridge::TransportPosition::barMin, ap::bridge::TransportPosition::barMax));
     event.beat = position.beat;
-    const auto ticks = std::max<core::Ticks> (0, state.positionTicks);
-    event.step = static_cast<int> ((ticks / instruments::DrumMachine::ticksPerStep)
-                                   % instruments::DrumMachine::numSteps);
+    event.ticks = static_cast<int> (std::clamp<core::Ticks> (state.positionTicks,
+                                                             ap::bridge::TransportPosition::ticksMin,
+                                                             ap::bridge::TransportPosition::ticksMax));
     event.countingIn = state.countingIn;
 
     if (force || !(event == lastPosition))
@@ -547,9 +535,15 @@ void WebUiHost::timerCallback()
     emit (
         ap::bridge::EngineMeters {juce::jlimit (0.0, 1.0, static_cast<double> (engine.consumeOutputPeak()))});
 
+    recorder.poll();
+
     // The audio thread may change the playing state (e.g. a device restart); keep the UI in sync.
     if (engine.getTransport().getState().playing != lastPlaying)
+    {
+        if (lastPlaying && recorder.isRecording())
+            recorder.stop (engine.getTransport().getState().positionTicks);
         sendTransportState();
+    }
 
     sendTransportPosition (false);
 }

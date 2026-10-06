@@ -9,11 +9,13 @@ add_library(ap_core STATIC
     src/engine/Metronome.cpp
     src/engine/OfflineRenderer.cpp
     src/engine/RenderGraph.cpp
+    src/engine/TimelinePlayer.cpp
     src/engine/Transport.cpp
     src/instruments/DrumMachine.cpp
     src/instruments/FactoryKit.cpp
     src/instruments/Sampler.cpp
     src/instruments/Synth.cpp
+    src/model/ClipEditing.cpp
     src/model/Commands.cpp
     src/model/Project.cpp
     src/model/ProjectDocument.cpp

@@ -97,6 +97,72 @@ bool hasOnlyKeys (const juce::DynamicObject& object, std::initializer_list<const
     return array;
 }
 
+juce::var toVar (const TimelineNote& m);
+juce::var toVar (const TimelineClip& m);
+juce::var toVar (const TimelineTrack& m);
+juce::var toVar (const TimelineAsset& m);
+
+template <typename Item>
+[[maybe_unused]] juce::var toVarList (const std::vector<Item>& items)
+{
+    juce::Array<juce::var> array;
+    array.ensureStorageAllocated (static_cast<int> (items.size()));
+    for (const auto& item : items)
+        array.add (toVar (item));
+    return array;
+}
+
+[[maybe_unused]] juce::var toVar (const TimelineNote& m)
+{
+    auto* object = new juce::DynamicObject();
+    object->setProperty ("start", m.start);
+    object->setProperty ("length", m.length);
+    object->setProperty ("pitch", m.pitch);
+    object->setProperty ("velocity", m.velocity);
+    return juce::var (object);
+}
+
+[[maybe_unused]] juce::var toVar (const TimelineClip& m)
+{
+    auto* object = new juce::DynamicObject();
+    object->setProperty ("id", m.id);
+    object->setProperty ("start", m.start);
+    object->setProperty ("length", m.length);
+    object->setProperty ("asset", m.asset);
+    object->setProperty ("sourceOffsetSeconds", m.sourceOffsetSeconds);
+    object->setProperty ("contentOffset", m.contentOffset);
+    object->setProperty ("loopLength", m.loopLength);
+    object->setProperty ("notes", toVarList (m.notes));
+    return juce::var (object);
+}
+
+[[maybe_unused]] juce::var toVar (const TimelineTrack& m)
+{
+    auto* object = new juce::DynamicObject();
+    object->setProperty ("id", m.id);
+    object->setProperty ("kind", m.kind);
+    object->setProperty ("name", juce::String (m.name));
+    object->setProperty ("volumeDb", m.volumeDb);
+    object->setProperty ("pan", m.pan);
+    object->setProperty ("muted", m.muted);
+    object->setProperty ("soloed", m.soloed);
+    object->setProperty ("clips", toVarList (m.clips));
+    return juce::var (object);
+}
+
+[[maybe_unused]] juce::var toVar (const TimelineAsset& m)
+{
+    auto* object = new juce::DynamicObject();
+    object->setProperty ("id", m.id);
+    object->setProperty ("name", juce::String (m.name));
+    object->setProperty ("loaded", m.loaded);
+    object->setProperty ("missing", m.missing);
+    object->setProperty ("loading", m.loading);
+    object->setProperty ("durationSeconds", m.durationSeconds);
+    object->setProperty ("overview", toVarArray (m.overview));
+    return juce::var (object);
+}
+
 template <typename... Fns>
 struct Overloaded : Fns...
 {
@@ -359,10 +425,11 @@ std::optional<Intent> parseSamplerLoad (const juce::var& payloadVar)
 std::optional<Intent> parseDrumsSetStep (const juce::var& payloadVar)
 {
     const auto* payload = payloadVar.getDynamicObject();
-    if (payload == nullptr || !hasOnlyKeys (*payload, {"pad", "step", "on", "gesture"}))
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"clip", "pad", "step", "on", "gesture"}))
         return std::nullopt;
 
     DrumsSetStep message;
+    if (!readInt (*payload, "clip", DrumsSetStep::clipMin, DrumsSetStep::clipMax, message.clip)) return std::nullopt;
     if (!readInt (*payload, "pad", DrumsSetStep::padMin, DrumsSetStep::padMax, message.pad)) return std::nullopt;
     if (!readInt (*payload, "step", DrumsSetStep::stepMin, DrumsSetStep::stepMax, message.step)) return std::nullopt;
     if (!readBool (*payload, "on", message.on)) return std::nullopt;
@@ -373,11 +440,11 @@ std::optional<Intent> parseDrumsSetStep (const juce::var& payloadVar)
 std::optional<Intent> parseDrumsClear (const juce::var& payloadVar)
 {
     const auto* payload = payloadVar.getDynamicObject();
-    if (payload == nullptr || !hasOnlyKeys (*payload, {}))
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"clip"}))
         return std::nullopt;
 
     DrumsClear message;
-
+    if (!readInt (*payload, "clip", DrumsClear::clipMin, DrumsClear::clipMax, message.clip)) return std::nullopt;
     return Intent {message};
 }
 
@@ -427,6 +494,269 @@ std::optional<Intent> parseDrumsResetPad (const juce::var& payloadVar)
 
     DrumsResetPad message;
     if (!readInt (*payload, "pad", DrumsResetPad::padMin, DrumsResetPad::padMax, message.pad)) return std::nullopt;
+    return Intent {message};
+}
+
+std::optional<Intent> parseTransportRecord (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {}))
+        return std::nullopt;
+
+    TransportRecord message;
+
+    return Intent {message};
+}
+
+std::optional<Intent> parseTransportSeek (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"ticks"}))
+        return std::nullopt;
+
+    TransportSeek message;
+    if (!readInt (*payload, "ticks", TransportSeek::ticksMin, TransportSeek::ticksMax, message.ticks)) return std::nullopt;
+    return Intent {message};
+}
+
+std::optional<Intent> parseTransportSetLoop (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"enabled", "start", "end"}))
+        return std::nullopt;
+
+    TransportSetLoop message;
+    if (!readBool (*payload, "enabled", message.enabled)) return std::nullopt;
+    if (!readInt (*payload, "start", TransportSetLoop::startMin, TransportSetLoop::startMax, message.start)) return std::nullopt;
+    if (!readInt (*payload, "end", TransportSetLoop::endMin, TransportSetLoop::endMax, message.end)) return std::nullopt;
+    return Intent {message};
+}
+
+std::optional<Intent> parseTrackAdd (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"kind"}))
+        return std::nullopt;
+
+    TrackAdd message;
+    if (!readInt (*payload, "kind", TrackAdd::kindMin, TrackAdd::kindMax, message.kind)) return std::nullopt;
+    return Intent {message};
+}
+
+std::optional<Intent> parseTrackRemove (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"track"}))
+        return std::nullopt;
+
+    TrackRemove message;
+    if (!readInt (*payload, "track", TrackRemove::trackMin, TrackRemove::trackMax, message.track)) return std::nullopt;
+    return Intent {message};
+}
+
+std::optional<Intent> parseTrackRename (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"track", "name"}))
+        return std::nullopt;
+
+    TrackRename message;
+    if (!readInt (*payload, "track", TrackRename::trackMin, TrackRename::trackMax, message.track)) return std::nullopt;
+    if (!readString (*payload, "name", TrackRename::nameMaxLength, message.name)) return std::nullopt;
+    return Intent {message};
+}
+
+std::optional<Intent> parseTrackSetVolume (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"track", "volumeDb", "gesture"}))
+        return std::nullopt;
+
+    TrackSetVolume message;
+    if (!readInt (*payload, "track", TrackSetVolume::trackMin, TrackSetVolume::trackMax, message.track)) return std::nullopt;
+    if (!readNumber (*payload, "volumeDb", TrackSetVolume::volumeDbMin, TrackSetVolume::volumeDbMax, message.volumeDb)) return std::nullopt;
+    if (!readInt (*payload, "gesture", TrackSetVolume::gestureMin, TrackSetVolume::gestureMax, message.gesture)) return std::nullopt;
+    return Intent {message};
+}
+
+std::optional<Intent> parseTrackSetPan (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"track", "pan", "gesture"}))
+        return std::nullopt;
+
+    TrackSetPan message;
+    if (!readInt (*payload, "track", TrackSetPan::trackMin, TrackSetPan::trackMax, message.track)) return std::nullopt;
+    if (!readNumber (*payload, "pan", TrackSetPan::panMin, TrackSetPan::panMax, message.pan)) return std::nullopt;
+    if (!readInt (*payload, "gesture", TrackSetPan::gestureMin, TrackSetPan::gestureMax, message.gesture)) return std::nullopt;
+    return Intent {message};
+}
+
+std::optional<Intent> parseTrackSetMute (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"track", "muted"}))
+        return std::nullopt;
+
+    TrackSetMute message;
+    if (!readInt (*payload, "track", TrackSetMute::trackMin, TrackSetMute::trackMax, message.track)) return std::nullopt;
+    if (!readBool (*payload, "muted", message.muted)) return std::nullopt;
+    return Intent {message};
+}
+
+std::optional<Intent> parseTrackSetSolo (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"track", "soloed"}))
+        return std::nullopt;
+
+    TrackSetSolo message;
+    if (!readInt (*payload, "track", TrackSetSolo::trackMin, TrackSetSolo::trackMax, message.track)) return std::nullopt;
+    if (!readBool (*payload, "soloed", message.soloed)) return std::nullopt;
+    return Intent {message};
+}
+
+std::optional<Intent> parseTrackImportAudio (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"track", "ticks"}))
+        return std::nullopt;
+
+    TrackImportAudio message;
+    if (!readInt (*payload, "track", TrackImportAudio::trackMin, TrackImportAudio::trackMax, message.track)) return std::nullopt;
+    if (!readInt (*payload, "ticks", TrackImportAudio::ticksMin, TrackImportAudio::ticksMax, message.ticks)) return std::nullopt;
+    return Intent {message};
+}
+
+std::optional<Intent> parseClipCreate (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"track", "start", "length"}))
+        return std::nullopt;
+
+    ClipCreate message;
+    if (!readInt (*payload, "track", ClipCreate::trackMin, ClipCreate::trackMax, message.track)) return std::nullopt;
+    if (!readInt (*payload, "start", ClipCreate::startMin, ClipCreate::startMax, message.start)) return std::nullopt;
+    if (!readInt (*payload, "length", ClipCreate::lengthMin, ClipCreate::lengthMax, message.length)) return std::nullopt;
+    return Intent {message};
+}
+
+std::optional<Intent> parseClipMove (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"clip", "track", "start", "gesture"}))
+        return std::nullopt;
+
+    ClipMove message;
+    if (!readInt (*payload, "clip", ClipMove::clipMin, ClipMove::clipMax, message.clip)) return std::nullopt;
+    if (!readInt (*payload, "track", ClipMove::trackMin, ClipMove::trackMax, message.track)) return std::nullopt;
+    if (!readInt (*payload, "start", ClipMove::startMin, ClipMove::startMax, message.start)) return std::nullopt;
+    if (!readInt (*payload, "gesture", ClipMove::gestureMin, ClipMove::gestureMax, message.gesture)) return std::nullopt;
+    return Intent {message};
+}
+
+std::optional<Intent> parseClipResize (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"clip", "edge", "ticks", "gesture"}))
+        return std::nullopt;
+
+    ClipResize message;
+    if (!readInt (*payload, "clip", ClipResize::clipMin, ClipResize::clipMax, message.clip)) return std::nullopt;
+    if (!readInt (*payload, "edge", ClipResize::edgeMin, ClipResize::edgeMax, message.edge)) return std::nullopt;
+    if (!readInt (*payload, "ticks", ClipResize::ticksMin, ClipResize::ticksMax, message.ticks)) return std::nullopt;
+    if (!readInt (*payload, "gesture", ClipResize::gestureMin, ClipResize::gestureMax, message.gesture)) return std::nullopt;
+    return Intent {message};
+}
+
+std::optional<Intent> parseClipSplit (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"clip", "ticks"}))
+        return std::nullopt;
+
+    ClipSplit message;
+    if (!readInt (*payload, "clip", ClipSplit::clipMin, ClipSplit::clipMax, message.clip)) return std::nullopt;
+    if (!readInt (*payload, "ticks", ClipSplit::ticksMin, ClipSplit::ticksMax, message.ticks)) return std::nullopt;
+    return Intent {message};
+}
+
+std::optional<Intent> parseClipRemove (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"clip"}))
+        return std::nullopt;
+
+    ClipRemove message;
+    if (!readInt (*payload, "clip", ClipRemove::clipMin, ClipRemove::clipMax, message.clip)) return std::nullopt;
+    return Intent {message};
+}
+
+std::optional<Intent> parseClipDuplicate (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"clip"}))
+        return std::nullopt;
+
+    ClipDuplicate message;
+    if (!readInt (*payload, "clip", ClipDuplicate::clipMin, ClipDuplicate::clipMax, message.clip)) return std::nullopt;
+    return Intent {message};
+}
+
+std::optional<Intent> parseClipSetLoop (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"clip", "enabled"}))
+        return std::nullopt;
+
+    ClipSetLoop message;
+    if (!readInt (*payload, "clip", ClipSetLoop::clipMin, ClipSetLoop::clipMax, message.clip)) return std::nullopt;
+    if (!readBool (*payload, "enabled", message.enabled)) return std::nullopt;
+    return Intent {message};
+}
+
+std::optional<Intent> parseClipAddNote (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"clip", "start", "length", "pitch", "velocity"}))
+        return std::nullopt;
+
+    ClipAddNote message;
+    if (!readInt (*payload, "clip", ClipAddNote::clipMin, ClipAddNote::clipMax, message.clip)) return std::nullopt;
+    if (!readInt (*payload, "start", ClipAddNote::startMin, ClipAddNote::startMax, message.start)) return std::nullopt;
+    if (!readInt (*payload, "length", ClipAddNote::lengthMin, ClipAddNote::lengthMax, message.length)) return std::nullopt;
+    if (!readInt (*payload, "pitch", ClipAddNote::pitchMin, ClipAddNote::pitchMax, message.pitch)) return std::nullopt;
+    if (!readNumber (*payload, "velocity", ClipAddNote::velocityMin, ClipAddNote::velocityMax, message.velocity)) return std::nullopt;
+    return Intent {message};
+}
+
+std::optional<Intent> parseClipRemoveNote (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"clip", "start", "pitch"}))
+        return std::nullopt;
+
+    ClipRemoveNote message;
+    if (!readInt (*payload, "clip", ClipRemoveNote::clipMin, ClipRemoveNote::clipMax, message.clip)) return std::nullopt;
+    if (!readInt (*payload, "start", ClipRemoveNote::startMin, ClipRemoveNote::startMax, message.start)) return std::nullopt;
+    if (!readInt (*payload, "pitch", ClipRemoveNote::pitchMin, ClipRemoveNote::pitchMax, message.pitch)) return std::nullopt;
+    return Intent {message};
+}
+
+std::optional<Intent> parseClipEditNote (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"clip", "fromStart", "fromPitch", "start", "length", "pitch", "gesture"}))
+        return std::nullopt;
+
+    ClipEditNote message;
+    if (!readInt (*payload, "clip", ClipEditNote::clipMin, ClipEditNote::clipMax, message.clip)) return std::nullopt;
+    if (!readInt (*payload, "fromStart", ClipEditNote::fromStartMin, ClipEditNote::fromStartMax, message.fromStart)) return std::nullopt;
+    if (!readInt (*payload, "fromPitch", ClipEditNote::fromPitchMin, ClipEditNote::fromPitchMax, message.fromPitch)) return std::nullopt;
+    if (!readInt (*payload, "start", ClipEditNote::startMin, ClipEditNote::startMax, message.start)) return std::nullopt;
+    if (!readInt (*payload, "length", ClipEditNote::lengthMin, ClipEditNote::lengthMax, message.length)) return std::nullopt;
+    if (!readInt (*payload, "pitch", ClipEditNote::pitchMin, ClipEditNote::pitchMax, message.pitch)) return std::nullopt;
+    if (!readInt (*payload, "gesture", ClipEditNote::gestureMin, ClipEditNote::gestureMax, message.gesture)) return std::nullopt;
     return Intent {message};
 }
 } // namespace
@@ -500,6 +830,48 @@ std::optional<Intent> parseIntent (const juce::var& message)
         return parseDrumsLoadPad (payload);
     if (typeName == DrumsResetPad::type)
         return parseDrumsResetPad (payload);
+    if (typeName == TransportRecord::type)
+        return parseTransportRecord (payload);
+    if (typeName == TransportSeek::type)
+        return parseTransportSeek (payload);
+    if (typeName == TransportSetLoop::type)
+        return parseTransportSetLoop (payload);
+    if (typeName == TrackAdd::type)
+        return parseTrackAdd (payload);
+    if (typeName == TrackRemove::type)
+        return parseTrackRemove (payload);
+    if (typeName == TrackRename::type)
+        return parseTrackRename (payload);
+    if (typeName == TrackSetVolume::type)
+        return parseTrackSetVolume (payload);
+    if (typeName == TrackSetPan::type)
+        return parseTrackSetPan (payload);
+    if (typeName == TrackSetMute::type)
+        return parseTrackSetMute (payload);
+    if (typeName == TrackSetSolo::type)
+        return parseTrackSetSolo (payload);
+    if (typeName == TrackImportAudio::type)
+        return parseTrackImportAudio (payload);
+    if (typeName == ClipCreate::type)
+        return parseClipCreate (payload);
+    if (typeName == ClipMove::type)
+        return parseClipMove (payload);
+    if (typeName == ClipResize::type)
+        return parseClipResize (payload);
+    if (typeName == ClipSplit::type)
+        return parseClipSplit (payload);
+    if (typeName == ClipRemove::type)
+        return parseClipRemove (payload);
+    if (typeName == ClipDuplicate::type)
+        return parseClipDuplicate (payload);
+    if (typeName == ClipSetLoop::type)
+        return parseClipSetLoop (payload);
+    if (typeName == ClipAddNote::type)
+        return parseClipAddNote (payload);
+    if (typeName == ClipRemoveNote::type)
+        return parseClipRemoveNote (payload);
+    if (typeName == ClipEditNote::type)
+        return parseClipEditNote (payload);
 
     return std::nullopt;
 }
@@ -534,6 +906,10 @@ juce::var toVar (const Event& event)
                 payload->setProperty ("denominator", m.denominator);
                 payload->setProperty ("countInBars", m.countInBars);
                 payload->setProperty ("metronomeEnabled", m.metronomeEnabled);
+                payload->setProperty ("recording", m.recording);
+                payload->setProperty ("loopEnabled", m.loopEnabled);
+                payload->setProperty ("loopStart", m.loopStart);
+                payload->setProperty ("loopEnd", m.loopEnd);
                 return envelope (TransportState::type, payload);
             },
             [] (const TransportPosition& m) -> juce::var
@@ -542,7 +918,7 @@ juce::var toVar (const Event& event)
                 payload->setProperty ("bar", m.bar);
                 payload->setProperty ("beat", m.beat);
                 payload->setProperty ("countingIn", m.countingIn);
-                payload->setProperty ("step", m.step);
+                payload->setProperty ("ticks", m.ticks);
                 return envelope (TransportPosition::type, payload);
             },
             [] (const ParamValue& m) -> juce::var
@@ -593,12 +969,6 @@ juce::var toVar (const Event& event)
                 payload->setProperty ("overview", toVarArray (m.overview));
                 return envelope (SamplerState::type, payload);
             },
-            [] (const DrumsPattern& m) -> juce::var
-            {
-                auto* payload = new juce::DynamicObject();
-                payload->setProperty ("steps", toVarArray (m.steps));
-                return envelope (DrumsPattern::type, payload);
-            },
             [] (const DrumsPad& m) -> juce::var
             {
                 auto* payload = new juce::DynamicObject();
@@ -610,6 +980,18 @@ juce::var toVar (const Event& event)
                 payload->setProperty ("custom", m.custom);
                 payload->setProperty ("missing", m.missing);
                 return envelope (DrumsPad::type, payload);
+            },
+            [] (const TimelineState& m) -> juce::var
+            {
+                auto* payload = new juce::DynamicObject();
+                payload->setProperty ("tracks", toVarList (m.tracks));
+                return envelope (TimelineState::type, payload);
+            },
+            [] (const TimelineAssets& m) -> juce::var
+            {
+                auto* payload = new juce::DynamicObject();
+                payload->setProperty ("assets", toVarList (m.assets));
+                return envelope (TimelineAssets::type, payload);
             }},
         event);
 }

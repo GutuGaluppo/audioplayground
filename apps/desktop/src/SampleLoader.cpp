@@ -4,6 +4,7 @@
 #include "ap/dsp/Resampler.h"
 
 #include <cmath>
+#include <set>
 
 namespace ap::desktop
 {
@@ -66,7 +67,6 @@ std::vector<float> computeOverview (const std::vector<std::vector<float>>& chann
 struct SampleLoader::Decoded
 {
     std::string error; // user-facing; empty on success
-    bool missing = false;
     model::AssetId asset;
     std::string name;
     double durationSeconds = 0.0;
@@ -75,16 +75,102 @@ struct SampleLoader::Decoded
     double rate = 0.0;
 };
 
+namespace
+{
+// Background thread. Never throws; failures become a user-facing message.
+std::shared_ptr<SampleLoader::Decoded> decode (const juce::File& file, const std::string& name,
+                                               model::AssetId asset, double rate, bool wantOverview)
+{
+    auto result = std::make_shared<SampleLoader::Decoded>();
+    result->asset = asset;
+    result->name = name;
+    result->rate = rate;
+
+    juce::AudioFormatManager formats;
+    registerFormats (formats);
+    const std::unique_ptr<juce::AudioFormatReader> reader (formats.createReaderFor (file));
+
+    if (reader == nullptr)
+        result->error = "\"" + name + "\" could not be read. It may be damaged or in an unsupported format.";
+    else if (reader->numChannels < 1 || reader->numChannels > 32 || reader->sampleRate < 8000.0
+             || reader->sampleRate > 384000.0)
+        result->error = "\"" + name + "\" has an unsupported format.";
+    else if (reader->lengthInSamples <= 0
+             || static_cast<double> (reader->lengthInSamples) / reader->sampleRate
+                    > SampleLoader::maxDurationSeconds)
+        result->error = "\"" + name + "\" is empty or longer than 10 minutes.";
+    else
+    {
+        const int channels = static_cast<int> (std::min<unsigned int> (reader->numChannels, 2));
+        const auto length = static_cast<int> (reader->lengthInSamples);
+        juce::AudioBuffer<float> decoded (channels, length);
+        if (!reader->read (&decoded, 0, length, 0, true, channels > 1))
+            result->error = "\"" + name + "\" could not be read completely.";
+        else
+        {
+            auto buffer = std::make_unique<instruments::SampleBuffer>();
+            buffer->assetId = asset.value;
+            buffer->sampleRate = rate;
+            for (int ch = 0; ch < channels; ++ch)
+            {
+                std::vector<float> samples (decoded.getReadPointer (ch),
+                                            decoded.getReadPointer (ch) + length);
+                for (auto& value : samples)
+                    if (!std::isfinite (value))
+                        value = 0.0f;
+                buffer->channels.push_back (dsp::resample (samples, reader->sampleRate, rate));
+            }
+            if (wantOverview)
+                result->overview = computeOverview (buffer->channels, SampleLoader::overviewPoints);
+            result->durationSeconds = static_cast<double> (length) / reader->sampleRate;
+            result->buffer = std::move (buffer);
+        }
+    }
+    return result;
+}
+
+core::Ticks secondsToTicks (double seconds, double tempoBpm)
+{
+    return static_cast<core::Ticks> (
+        std::ceil (seconds * tempoBpm * static_cast<double> (core::ticksPerQuarterNote) / 60.0));
+}
+} // namespace
+
 SampleLoader::SampleLoader (Session& sessionToUse, engine::Engine& engineToUse)
     : session (sessionToUse)
     , engine (engineToUse)
 {
+    session.setAudioLookup (
+        [this] (model::AssetId asset) -> std::shared_ptr<const instruments::SampleBuffer>
+        {
+            const auto it = clipAudio.find (asset.value);
+            return it != clipAudio.end() ? it->second.buffer : nullptr;
+        });
 }
 
 SampleLoader::~SampleLoader()
 {
     *alive = false;
     pool.removeAllJobs (true, 10000);
+    session.setAudioLookup ({});
+}
+
+template <typename Done>
+void SampleLoader::decodeInBackground (juce::File file, std::string name, model::AssetId asset, bool overview,
+                                       Done done)
+{
+    pool.addJob (
+        [stillAlive = alive, file, name = std::move (name), asset, overview, rate = engineRate,
+         done = std::move (done)]() mutable
+        {
+            auto result = decode (file, name, asset, rate, overview);
+            juce::MessageManager::callAsync (
+                [stillAlive, result = std::move (result), done = std::move (done)]() mutable
+                {
+                    if (*stillAlive)
+                        done (std::move (result));
+                });
+        });
 }
 
 void SampleLoader::error (const std::string& message)
@@ -128,17 +214,15 @@ void SampleLoader::publish (std::size_t slot, std::unique_ptr<instruments::Sampl
                                          std::move (buffer)); // nullptr: factory sound
 }
 
-void SampleLoader::chooseAndImport (std::size_t slot)
+void SampleLoader::chooseFile (std::function<void (Copied)> onCopied)
 {
-    if (slot >= numSlots)
-        return;
-
     chooser = std::make_unique<juce::FileChooser> (
-        "Choose a sample", juce::File::getSpecialLocation (juce::File::userMusicDirectory), supportedPattern);
+        "Choose an audio file", juce::File::getSpecialLocation (juce::File::userMusicDirectory),
+        supportedPattern);
 
     chooser->launchAsync (
         juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
-        [this, slot] (const juce::FileChooser& fc)
+        [this, onCopied = std::move (onCopied)] (const juce::FileChooser& fc)
         {
             const auto source = fc.getResult();
             if (source == juce::File())
@@ -165,16 +249,95 @@ void SampleLoader::chooseAndImport (std::size_t slot)
                 return error ("Could not copy the file into the project.");
             }
 
-            const auto relative = "audio/" + target.getFileName().toStdString();
-            const auto displayName = source.getFileName().toStdString();
-            if (!session.perform (model::AddAsset {relative, displayName}))
+            onCopied (
+                {target, "audio/" + target.getFileName().toStdString(), source.getFileName().toStdString()});
+        });
+}
+
+void SampleLoader::chooseAndImport (std::size_t slot)
+{
+    if (slot >= numSlots)
+        return;
+
+    chooseFile (
+        [this, slot] (Copied copied)
+        {
+            if (!session.perform (model::AddAsset {copied.relativePath, copied.displayName}))
             {
-                target.deleteFile();
+                copied.file.deleteFile();
                 return error ("Could not add the file to the project.");
             }
             // sync() (via the session's onChanged) loads it once the slot points at it.
             assign (slot, session.project().assets.back().id);
         });
+}
+
+void SampleLoader::chooseAndImportClip (model::TrackId track, core::Ticks position)
+{
+    chooseFile (
+        [this, track, position] (Copied copied)
+        {
+            // Decode first: the clip's length is the file's duration.
+            const auto file = copied.file;
+            const auto name = copied.displayName;
+            decodeInBackground (
+                file, name, {}, true,
+                [this, track, position, copied = std::move (copied)] (std::shared_ptr<Decoded> result) mutable
+                { finishClipImport (track, position, std::move (copied), std::move (result)); });
+        });
+}
+
+void SampleLoader::finishClipImport (model::TrackId track, core::Ticks position, Copied copied,
+                                     std::shared_ptr<Decoded> result)
+{
+    if (!result->error.empty())
+    {
+        copied.file.deleteFile();
+        return error (result->error);
+    }
+    if (result->rate != engineRate)
+        result->buffer.reset(); // the device changed meanwhile: sync() decodes it again
+
+    model::AssetId asset;
+    const bool added = session.performGroup (
+        "Import audio",
+        [&] (model::ProjectDocument::Group& group)
+        {
+            const auto* addedAsset
+                = group.perform (model::AddAsset {copied.relativePath, copied.displayName});
+            if (addedAsset == nullptr)
+                return;
+            asset = std::get<model::AddAsset> (*addedAsset).created;
+
+            model::Clip clip;
+            clip.start = position;
+            clip.length = std::clamp (secondsToTicks (result->durationSeconds, group.project().tempoBpm),
+                                      model::Clip::minLength, model::maxTimelineTicks - position);
+            clip.asset = asset;
+            (void)group.perform (model::AddClip {track, clip});
+        });
+
+    if (!added || !asset.isValid())
+    {
+        copied.file.deleteFile();
+        return error ("Could not add the audio to the timeline.");
+    }
+
+    // Keep the decoded audio: no second decode for the clip that was just added.
+    if (result->buffer != nullptr)
+    {
+        auto& entry = clipAudio[asset.value];
+        entry.buffer = std::shared_ptr<const instruments::SampleBuffer> (std::move (result->buffer));
+        entry.loadedRate = result->rate;
+        entry.generation = ++clipGeneration;
+        entry.state.name = result->name;
+        entry.state.loaded = true;
+        entry.state.durationSeconds = result->durationSeconds;
+        entry.state.overview = std::move (result->overview);
+        session.refreshEngine();
+        if (onClipAudioChanged)
+            onClipAudioChanged();
+    }
 }
 
 void SampleLoader::sync (double engineSampleRate)
@@ -184,6 +347,104 @@ void SampleLoader::sync (double engineSampleRate)
 
     for (std::size_t slot = 0; slot < numSlots; ++slot)
         syncSlot (slot);
+    syncClipAudio();
+}
+
+std::optional<juce::File> SampleLoader::resolve (model::AssetId asset, std::string& name) const
+{
+    const auto* entry = session.project().findAsset (asset);
+    name = entry != nullptr ? entry->name : std::string ("Sample");
+    const auto path
+        = entry != nullptr ? io::resolveAssetPath (session.assetRoot(), entry->relativePath) : std::nullopt;
+    if (!path)
+        return std::nullopt;
+    const juce::File file (toJuceString (*path));
+    return file.existsAsFile() ? std::optional<juce::File> (file) : std::nullopt;
+}
+
+void SampleLoader::syncClipAudio()
+{
+    std::set<std::uint64_t> wanted;
+    for (const auto& track : session.project().tracks)
+        if (track.kind == model::TrackKind::audio)
+            for (const auto& clip : track.clips)
+                wanted.insert (clip.asset.value);
+
+    bool changed = false;
+    for (auto it = clipAudio.begin(); it != clipAudio.end();)
+    {
+        if (wanted.count (it->first) == 0)
+        {
+            it = clipAudio.erase (it); // the published graph keeps its own reference until replaced
+            changed = true;
+        }
+        else
+            ++it;
+    }
+
+    for (const auto id : wanted)
+    {
+        auto& entry = clipAudio[id];
+        const bool upToDate = entry.state.loading || entry.state.missing || entry.loadedRate == engineRate;
+        if (upToDate)
+            continue;
+
+        entry.generation = ++clipGeneration;
+        std::string name;
+        const auto file = resolve (model::AssetId {id}, name);
+        entry.state.name = name;
+        changed = true;
+        if (!file)
+        {
+            entry.state.missing = true;
+            entry.state.loaded = false;
+            entry.buffer.reset();
+            error ("The audio file \"" + name + "\" is missing from the project folder.");
+            continue;
+        }
+
+        entry.state.loading = true;
+        decodeInBackground (*file, name, model::AssetId {id}, true,
+                            [this, generation = entry.generation] (std::shared_ptr<Decoded> result)
+                            { applyClip (generation, std::move (result)); });
+    }
+
+    if (changed)
+    {
+        session.refreshEngine();
+        if (onClipAudioChanged)
+            onClipAudioChanged();
+    }
+}
+
+void SampleLoader::applyClip (std::uint64_t generation, std::shared_ptr<Decoded> result)
+{
+    const auto it = clipAudio.find (result->asset.value);
+    if (it == clipAudio.end() || it->second.generation != generation)
+        return; // no longer used, or superseded
+
+    auto& entry = it->second;
+    entry.state.loading = false;
+    if (!result->error.empty())
+    {
+        entry.state.missing = true;
+        entry.buffer.reset();
+        error (result->error);
+    }
+    else
+    {
+        entry.buffer = std::shared_ptr<const instruments::SampleBuffer> (std::move (result->buffer));
+        entry.loadedRate = result->rate;
+        entry.state.loaded = true;
+        entry.state.missing = false;
+        entry.state.durationSeconds = result->durationSeconds;
+        entry.state.overview = std::move (result->overview);
+    }
+
+    session.refreshEngine();
+    if (onClipAudioChanged)
+        onClipAudioChanged();
+    syncClipAudio(); // the device rate may have changed while decoding
 }
 
 void SampleLoader::syncSlot (std::size_t slot)
@@ -209,13 +470,9 @@ void SampleLoader::syncSlot (std::size_t slot)
         return;
     }
 
-    const auto* asset = session.project().findAsset (wanted);
-    const auto path
-        = asset != nullptr ? io::resolveAssetPath (session.assetRoot(), asset->relativePath) : std::nullopt;
-    const auto name = asset != nullptr ? asset->name : std::string ("Sample");
-    const juce::File file = path ? juce::File (toJuceString (*path)) : juce::File();
-
-    if (!path || !file.existsAsFile())
+    std::string name;
+    const auto file = resolve (wanted, name);
+    if (!file)
     {
         publish (slot, nullptr); // drum pads fall back to the factory sound; the sampler goes silent
         State missing;
@@ -226,7 +483,7 @@ void SampleLoader::syncSlot (std::size_t slot)
         return;
     }
 
-    startLoad (slot, wanted, file, name);
+    startLoad (slot, wanted, *file, name);
 }
 
 void SampleLoader::startLoad (std::size_t slot, model::AssetId asset, juce::File file, std::string name)
@@ -237,67 +494,9 @@ void SampleLoader::startLoad (std::size_t slot, model::AssetId asset, juce::File
     loading.missing = false;
     setState (slot, std::move (loading));
 
-    const auto jobGeneration = slots[slot].generation;
-    const auto rate = engineRate;
-    const bool wantOverview = slot == samplerSlot;
-    pool.addJob (
-        [this, stillAlive = alive, slot, jobGeneration, rate, wantOverview, asset, file, name]
-        {
-            auto result = std::make_shared<Decoded>();
-            result->asset = asset;
-            result->name = name;
-            result->rate = rate;
-
-            juce::AudioFormatManager formats;
-            registerFormats (formats);
-            const std::unique_ptr<juce::AudioFormatReader> reader (formats.createReaderFor (file));
-
-            const auto fail = [&result] (std::string message) { result->error = std::move (message); };
-
-            if (reader == nullptr)
-                fail ("\"" + name + "\" could not be read. It may be damaged or in an unsupported format.");
-            else if (reader->numChannels < 1 || reader->numChannels > 32 || reader->sampleRate < 8000.0
-                     || reader->sampleRate > 384000.0)
-                fail ("\"" + name + "\" has an unsupported format.");
-            else if (reader->lengthInSamples <= 0
-                     || static_cast<double> (reader->lengthInSamples) / reader->sampleRate
-                            > maxDurationSeconds)
-                fail ("\"" + name + "\" is empty or longer than 10 minutes.");
-            else
-            {
-                const int channels = static_cast<int> (std::min<unsigned int> (reader->numChannels, 2));
-                const auto length = static_cast<int> (reader->lengthInSamples);
-                juce::AudioBuffer<float> decoded (channels, length);
-                if (!reader->read (&decoded, 0, length, 0, true, channels > 1))
-                    fail ("\"" + name + "\" could not be read completely.");
-                else
-                {
-                    auto buffer = std::make_unique<instruments::SampleBuffer>();
-                    buffer->assetId = asset.value;
-                    buffer->sampleRate = rate;
-                    for (int ch = 0; ch < channels; ++ch)
-                    {
-                        std::vector<float> samples (decoded.getReadPointer (ch),
-                                                    decoded.getReadPointer (ch) + length);
-                        for (auto& value : samples)
-                            if (!std::isfinite (value))
-                                value = 0.0f;
-                        buffer->channels.push_back (dsp::resample (samples, reader->sampleRate, rate));
-                    }
-                    if (wantOverview)
-                        result->overview = computeOverview (buffer->channels, overviewPoints);
-                    result->durationSeconds = static_cast<double> (length) / reader->sampleRate;
-                    result->buffer = std::move (buffer);
-                }
-            }
-
-            juce::MessageManager::callAsync (
-                [this, stillAlive, slot, jobGeneration, result]
-                {
-                    if (*stillAlive)
-                        apply (slot, jobGeneration, result);
-                });
-        });
+    decodeInBackground (std::move (file), std::move (name), asset, slot == samplerSlot,
+                        [this, slot, jobGeneration = slots[slot].generation] (std::shared_ptr<Decoded> result)
+                        { apply (slot, jobGeneration, std::move (result)); });
 }
 
 void SampleLoader::apply (std::size_t slot, std::uint64_t jobGeneration, std::shared_ptr<Decoded> result)

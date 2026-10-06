@@ -21,15 +21,18 @@ float decibelsToGain (float db) noexcept AP_NONBLOCKING
 }
 } // namespace
 
-void Engine::prepare (double newSampleRate, int /*maxBlockSize*/)
+void Engine::prepare (double newSampleRate, int maxBlockSize)
 {
     sampleRate = newSampleRate > 0.0 ? newSampleRate : 48000.0;
+    maxBlock = std::clamp (maxBlockSize, 16, 8192);
 
     transport.prepare (sampleRate);
     metronome.prepare (sampleRate);
     synth.prepare (sampleRate);
     sampler.prepare (sampleRate);
     drums.prepare (sampleRate);
+    timeline.prepare (sampleRate);
+    busStorage.assign (model::numInstrumentKinds * 2 * static_cast<std::size_t> (maxBlock), 0.0f);
 
     toneOscillator.prepare (sampleRate);
     toneGain.reset (sampleRate, gainRampSeconds);
@@ -60,57 +63,144 @@ void Engine::process (core::AudioBlock output) noexcept AP_NONBLOCKING
     if (!prepared)
         return;
 
+    // Devices may deliver more than they announced: render in pieces the buffers can hold.
+    const int channels = std::min (output.numChannels, maxOutputChannels);
+    std::array<float*, maxOutputChannels> pointers {};
+    for (int done = 0; done < output.numSamples;)
+    {
+        const int length = std::min (maxBlock, output.numSamples - done);
+        for (int ch = 0; ch < channels; ++ch)
+            pointers[static_cast<std::size_t> (ch)] = output.channels[ch] + done;
+        processBlock ({pointers.data(), channels, length});
+        done += length;
+    }
+
+    finaliseOutput (output);
+}
+
+void Engine::processBlock (core::AudioBlock output) noexcept AP_NONBLOCKING
+{
     currentGraph = graphs.acquire();
     if (currentGraph != nullptr)
         renderedGraphVersion.store (currentGraph->projectVersion, std::memory_order_release);
 
-    const auto route = [this] (const instruments::NoteEvent& note) noexcept AP_NONBLOCKING
-    {
-        switch (routedInstrument)
-        {
-        case LiveInstrument::synth:
-            synth.handle (note);
-            break;
-        case LiveInstrument::sampler:
-            sampler.handle (note);
-            break;
-        case LiveInstrument::drums:
-            drums.handle (note);
-            break;
-        }
-    };
+    timeline.beginBlock (currentGraph, output.numSamples);
 
     const auto target = liveInstrument.load (std::memory_order_relaxed);
     if (target != routedInstrument)
     {
-        route ({instruments::NoteEvent::Type::allNotesOff, 0, 0.0f});
+        routeLiveNote ({instruments::NoteEvent::Type::allNotesOff, 0, 0.0f});
         routedInstrument = target;
     }
 
     while (const auto note = uiNotes.pop())
-        route (*note);
+        routeLiveNote (*note);
     while (const auto note = midiNotes.pop())
-        route (*note);
-
-    // All instruments always render so released notes ring out after switching.
-    synth.render (output, parameters);
-    sampler.render (output, parameters);
+        routeLiveNote (*note);
 
     const float metronomeGain = decibelsToGain (parameters.get (params::ParamId::metronomeLevel));
-    transport.advance (output.numSamples,
-                       [this, output, metronomeGain] (int offset, int length, core::Samples start) noexcept
-                       {
-                           drums.sequence (offset, length, start, transport.getTempoMap());
-                           metronome.render (output, offset, length, start, transport.getTempoMap(),
-                                             metronomeGain);
-                       });
-    drums.render (output);
+    transport.advance (
+        output.numSamples,
+        [this, output, metronomeGain] (int offset, int length, core::Samples start) noexcept AP_NONBLOCKING
+        {
+            timeline.segment (output, offset, length, start, transport.getTempoMap());
+            metronome.render (output, offset, length, start, transport.getTempoMap(), metronomeGain);
+        });
+    const bool playing = transport.isPlayingOnAudioThread();
+    timeline.endBlock (output, playing, transport.getTempoMap());
 
-    if (!transport.isPlayingOnAudioThread())
+    if (!playing)
         metronome.renderTail (output);
 
+    // All instruments always render so released notes ring out after switching.
+    for (std::size_t k = 0; k < model::numInstrumentKinds; ++k)
+        renderInstrument (static_cast<model::InstrumentKind> (k), output);
+
     renderTestTone (output);
-    finaliseOutput (output);
+}
+
+void Engine::routeLiveNote (const instruments::NoteEvent& note) noexcept AP_NONBLOCKING
+{
+    const auto instrument = static_cast<model::InstrumentKind> (routedInstrument);
+    timeline.events (instrument).add (0, note);
+
+    if (note.type != instruments::NoteEvent::Type::allNotesOff && transport.isPlayingOnAudioThread()
+        && recordingNotes.load (std::memory_order_relaxed))
+    {
+        const auto heard
+            = transport.getPositionOnAudioThread() - recordingLatency.load (std::memory_order_relaxed);
+        recordedNotes.push ({transport.getTempoMap().samplesToTicks (heard), note, instrument});
+    }
+}
+
+void Engine::handleNote (model::InstrumentKind instrument,
+                         const instruments::NoteEvent& note) noexcept AP_NONBLOCKING
+{
+    switch (instrument)
+    {
+    case model::InstrumentKind::synth:
+        synth.handle (note);
+        break;
+    case model::InstrumentKind::sampler:
+        sampler.handle (note);
+        break;
+    case model::InstrumentKind::drums:
+        drums.handle (note);
+        break;
+    }
+}
+
+void Engine::renderInstrument (model::InstrumentKind instrument,
+                               core::AudioBlock output) noexcept AP_NONBLOCKING
+{
+    const int n = output.numSamples;
+    const auto k = static_cast<std::size_t> (instrument);
+    float* const left = busStorage.data() + k * 2 * static_cast<std::size_t> (maxBlock);
+    float* const right = left + maxBlock;
+    std::fill_n (left, n, 0.0f);
+    std::fill_n (right, n, 0.0f);
+
+    // Render in chunks between events so every note starts on its exact sample.
+    const auto& events = timeline.events (instrument);
+    int index = 0;
+    for (int position = 0; position < n;)
+    {
+        while (index < events.size() && events[index].offset <= position)
+            handleNote (instrument, events[index++].event);
+
+        const int next = index < events.size() ? std::min (events[index].offset, n) : n;
+        std::array<float*, 2> chunk {left + position, right + position};
+        const core::AudioBlock block {chunk.data(), 2, next - position};
+        switch (instrument)
+        {
+        case model::InstrumentKind::synth:
+            synth.render (block, parameters);
+            break;
+        case model::InstrumentKind::sampler:
+            sampler.render (block, parameters);
+            break;
+        case model::InstrumentKind::drums:
+            drums.render (block);
+            break;
+        }
+        position = next;
+    }
+    while (index < events.size())
+        handleNote (instrument, events[index++].event);
+
+    const auto gain = timeline.instrumentGain (instrument);
+    if (gain.isSilent())
+        return;
+
+    if (output.numChannels >= 2)
+        for (int i = 0; i < n; ++i)
+        {
+            output.channels[0][i] += left[i] * gain.left (i, n);
+            output.channels[1][i] += right[i] * gain.right (i, n);
+        }
+    else
+        for (int i = 0; i < n; ++i)
+            output.channels[0][i] += 0.5f * (left[i] * gain.left (i, n) + right[i] * gain.right (i, n));
 }
 
 void Engine::renderTestTone (core::AudioBlock output) noexcept AP_NONBLOCKING

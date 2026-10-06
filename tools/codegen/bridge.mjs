@@ -25,7 +25,8 @@ const banner = (comment) =>
 // ---------------------------------------------------------------------------------------------
 // Schema loading and validation
 
-const FIELD_TYPES = new Set(['bool', 'int', 'number', 'string', 'floatArray']);
+const FIELD_TYPES = new Set(['bool', 'int', 'number', 'string', 'floatArray', 'list']);
+const RECORD_PATTERN = /^[A-Z][a-zA-Z0-9]*$/;
 const NAME_PATTERN = /^[a-z][a-zA-Z0-9]*\.[a-z][a-zA-Z0-9]*$/;
 const FIELD_PATTERN = /^[a-z][a-zA-Z0-9]*$/;
 
@@ -34,11 +35,44 @@ function fail(message) {
   process.exit(1);
 }
 
+const pendingRecords = new Set();
+
+// Lists hold named records ({ "type": "list", "item": "Name", "maxItems": n, "fields": {...} }).
+// Records may nest. They are only allowed in events: intents stay flat and small.
+function parseFields(owner, fields, records, allowLists) {
+  return Object.entries(fields).map(([fieldName, spec]) => {
+    const where = `${owner}.${fieldName}`;
+    if (!FIELD_PATTERN.test(fieldName) || fieldName === 'type') fail(`${where}: invalid field name`);
+    if (!FIELD_TYPES.has(spec.type)) fail(`${where}: unknown type "${spec.type}"`);
+    if (spec.type === 'string' && !Number.isInteger(spec.maxLength)) fail(`${where}: strings need maxLength`);
+    if (
+      (spec.type === 'int' || spec.type === 'number' || spec.type === 'floatArray') &&
+      !(Number.isFinite(spec.min) && Number.isFinite(spec.max))
+    )
+      fail(`${where}: numbers need finite min and max`);
+    if ((spec.type === 'floatArray' || spec.type === 'list') && !(Number.isInteger(spec.maxItems) && spec.maxItems > 0))
+      fail(`${where}: arrays need a positive maxItems`);
+    if (spec.min > spec.max) fail(`${where}: min > max`);
+    if (spec.type !== 'list') return { name: fieldName, ...spec };
+
+    if (!allowLists) fail(`${where}: lists are only allowed in events`);
+    if (!RECORD_PATTERN.test(spec.item ?? '')) fail(`${where}: lists need an item name like "TrackInfo"`);
+    if (records.has(spec.item) || pendingRecords.has(spec.item))
+      fail(`${where}: record "${spec.item}" is defined twice`);
+    pendingRecords.add(spec.item);
+    // Nested records are registered first, so C++ sees every type before it is used.
+    const recordFields = parseFields(spec.item, spec.fields ?? {}, records, allowLists);
+    records.set(spec.item, { typeName: spec.item, fields: recordFields });
+    return { name: fieldName, type: 'list', item: spec.item, maxItems: spec.maxItems };
+  });
+}
+
 function loadSchema() {
   const schema = JSON.parse(readFileSync(schemaPath, 'utf8'));
   if (!Number.isInteger(schema.protocolVersion) || schema.protocolVersion < 1)
     fail('protocolVersion must be a positive integer');
 
+  const records = new Map(); // insertion order: every record after the records it contains
   const messages = (kind) =>
     Object.entries(schema[kind] ?? {}).map(([name, fields]) => {
       if (!NAME_PATTERN.test(name)) fail(`${kind} name "${name}" must look like "domain.action"`);
@@ -48,37 +82,27 @@ function loadSchema() {
           .split('.')
           .map((part) => part[0].toUpperCase() + part.slice(1))
           .join(''),
-        fields: Object.entries(fields).map(([fieldName, spec]) => {
-          if (!FIELD_PATTERN.test(fieldName)) fail(`${name}.${fieldName}: invalid field name`);
-          if (!FIELD_TYPES.has(spec.type)) fail(`${name}.${fieldName}: unknown type "${spec.type}"`);
-          if (spec.type === 'string' && !Number.isInteger(spec.maxLength))
-            fail(`${name}.${fieldName}: strings need maxLength`);
-          if (
-            (spec.type === 'int' || spec.type === 'number' || spec.type === 'floatArray') &&
-            !(Number.isFinite(spec.min) && Number.isFinite(spec.max))
-          )
-            fail(`${name}.${fieldName}: numbers need finite min and max`);
-          if (spec.type === 'floatArray' && !(Number.isInteger(spec.maxItems) && spec.maxItems > 0))
-            fail(`${name}.${fieldName}: arrays need a positive maxItems`);
-          if (spec.min > spec.max) fail(`${name}.${fieldName}: min > max`);
-          return { name: fieldName, ...spec };
-        }),
+        fields: parseFields(name, fields, records, kind === 'events'),
       };
     });
 
-  return { protocolVersion: schema.protocolVersion, intents: messages('intents'), events: messages('events') };
+  const intents = messages('intents');
+  const events = messages('events');
+  return { protocolVersion: schema.protocolVersion, intents, events, records: [...records.values()] };
 }
 
 // ---------------------------------------------------------------------------------------------
 // C++: JUCE-free message structs (core)
 
 const cppType = { bool: 'bool', int: 'int', number: 'double', string: 'std::string', floatArray: 'std::vector<float>' };
-const cppDefault = { bool: 'false', int: '0', number: '0.0', string: '', floatArray: '' };
+const cppDefault = { bool: 'false', int: '0', number: '0.0', string: '', floatArray: '', list: '' };
+const cppFieldType = (field) => (field.type === 'list' ? `std::vector<${field.item}>` : cppType[field.type]);
 const cppNumber = (value) => (Number.isInteger(value) ? `${value}.0` : `${value}`);
 const cppFloat = (value) => `${cppNumber(value)}f`;
 
 function cppStruct(message) {
-  const lines = [`struct ${message.typeName}`, '{', `    static constexpr std::string_view type = "${message.name}";`];
+  const lines = [`struct ${message.typeName}`, '{'];
+  if (message.name) lines.push(`    static constexpr std::string_view type = "${message.name}";`);
   for (const field of message.fields) {
     if (field.type === 'floatArray') {
       lines.push(`    static constexpr float ${field.name}Min = ${cppFloat(field.min)};`);
@@ -91,11 +115,12 @@ function cppStruct(message) {
       lines.push(`    static constexpr ${cppType[field.type]} ${field.name}Max = ${literal(field.max)};`);
     }
     if (field.type === 'string') lines.push(`    static constexpr std::size_t ${field.name}MaxLength = ${field.maxLength};`);
+    if (field.type === 'list') lines.push(`    static constexpr std::size_t ${field.name}MaxItems = ${field.maxItems};`);
   }
   if (message.fields.length > 0) lines.push('');
   for (const field of message.fields) {
     const init = cppDefault[field.type] === '' ? '{}' : ` = ${cppDefault[field.type]}`;
-    lines.push(`    ${cppType[field.type]} ${field.name}${init === '{}' ? ' {}' : init};`);
+    lines.push(`    ${cppFieldType(field)} ${field.name}${init === '{}' ? ' {}' : init};`);
   }
   lines.push('', `    bool operator== (const ${message.typeName}&) const = default;`, '};');
   return lines.join('\n');
@@ -117,7 +142,7 @@ namespace ap::bridge
 
 inline constexpr int protocolVersion = ${schema.protocolVersion};
 
-${all.map(cppStruct).join('\n\n')}
+${[...schema.records, ...all].map(cppStruct).join('\n\n')}
 
 using Intent = std::variant<${schema.intents.map((m) => m.typeName).join(', ')}>;
 using Event = std::variant<${schema.events.map((m) => m.typeName).join(', ')}>;
@@ -162,13 +187,26 @@ ${message.fields.map((f) => cppFieldReader(message, f)).join('\n')}
 }`;
 }
 
+function cppValue(f) {
+  if (f.type === 'string') return `juce::String (m.${f.name})`;
+  if (f.type === 'floatArray') return `toVarArray (m.${f.name})`;
+  if (f.type === 'list') return `toVarList (m.${f.name})`;
+  return `m.${f.name}`;
+}
+
+function cppRecordWriter(record) {
+  const setters = record.fields.map((f) => `    object->setProperty ("${f.name}", ${cppValue(f)});`).join('\n');
+  return `[[maybe_unused]] juce::var toVar (const ${record.typeName}& m)
+{
+    auto* object = new juce::DynamicObject();
+${setters}
+    return juce::var (object);
+}`;
+}
+
 function cppEventWriter(message) {
   const setters = message.fields
-    .map((f) => {
-      const value =
-        f.type === 'string' ? `juce::String (m.${f.name})` : f.type === 'floatArray' ? `toVarArray (m.${f.name})` : `m.${f.name}`;
-      return `                payload->setProperty ("${f.name}", ${value});`;
-    })
+    .map((f) => `                payload->setProperty ("${f.name}", ${cppValue(f)});`)
     .join('\n');
   return `            [] (const ${message.typeName}& m) -> juce::var
             {
@@ -299,6 +337,20 @@ bool hasOnlyKeys (const juce::DynamicObject& object, std::initializer_list<const
     return array;
 }
 
+${schema.records.map((r) => `juce::var toVar (const ${r.typeName}& m);`).join('\n')}
+
+template <typename Item>
+[[maybe_unused]] juce::var toVarList (const std::vector<Item>& items)
+{
+    juce::Array<juce::var> array;
+    array.ensureStorageAllocated (static_cast<int> (items.size()));
+    for (const auto& item : items)
+        array.add (toVar (item));
+    return array;
+}
+
+${schema.records.map(cppRecordWriter).join('\n\n')}
+
 template <typename... Fns>
 struct Overloaded : Fns...
 {
@@ -351,9 +403,27 @@ ${schema.events.map(cppEventWriter).join(',\n')}},
 // TypeScript
 
 const tsType = { bool: 'boolean', int: 'number', number: 'number', string: 'string', floatArray: 'readonly number[]' };
+const tsFieldType = (field) => (field.type === 'list' ? `readonly ${field.item}[]` : tsType[field.type]);
+
+function tsRecord(record) {
+  const fields = record.fields.map((f) => `  readonly ${f.name}: ${tsFieldType(f)};`).join('\n');
+  return `export interface ${record.typeName} {\n${fields}\n}`;
+}
+
+function tsRecordValidator(record) {
+  const keys = record.fields.map((f) => `'${f.name}'`).join(', ');
+  const checks = record.fields.map((f) => `    ${tsFieldCheck(f)}`).join(' &&\n');
+  return `function is${record.typeName}(value: unknown): boolean {
+  if (!isPayload(value)) return false;
+  const payload = value;
+  return (
+    hasOnlyKeys(payload, [${keys}])${checks ? ` &&\n${checks}` : ''}
+  );
+}`;
+}
 
 function tsInterface(message) {
-  const fields = message.fields.map((f) => `    readonly ${f.name}: ${tsType[f.type]};`).join('\n');
+  const fields = message.fields.map((f) => `    readonly ${f.name}: ${tsFieldType(f)};`).join('\n');
   return `export interface ${message.typeName} {
   readonly type: '${message.name}';
   readonly payload: {${fields ? `\n${fields}\n  ` : ''}};
@@ -373,6 +443,8 @@ function tsFieldCheck(field) {
       return `typeof ${value} === 'string' && ${value}.length <= ${field.maxLength}`;
     case 'floatArray':
       return `isNumberArray(${value}, ${field.min}, ${field.max}, ${field.maxItems})`;
+    case 'list':
+      return `isList(${value}, ${field.maxItems}, is${field.item})`;
     default:
       return fail(`unhandled type ${field.type}`);
   }
@@ -390,6 +462,9 @@ function generateTs(schema) {
 /* eslint-disable */
 
 export const PROTOCOL_VERSION = ${schema.protocolVersion};
+
+// Records used inside events
+${schema.records.map(tsRecord).join('\n\n')}
 
 // Intents: UI -> native
 ${schema.intents.map(tsInterface).join('\n\n')}
@@ -425,6 +500,12 @@ function hasOnlyKeys(payload: Payload, keys: readonly string[]): boolean {
   const actual = Object.keys(payload);
   return actual.length === keys.length && keys.every((key) => Object.hasOwn(payload, key));
 }
+
+function isList(value: unknown, maxItems: number, isItem: (item: unknown) => boolean): boolean {
+  return Array.isArray(value) && value.length <= maxItems && value.every((item: unknown) => isItem(item));
+}
+
+${schema.records.map(tsRecordValidator).join('\n\n')}
 
 const eventValidators: Record<NativeEventType, (payload: Payload) => boolean> = {
 ${schema.events.map(tsEventValidator).join('\n')}

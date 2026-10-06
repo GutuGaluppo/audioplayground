@@ -40,6 +40,25 @@ bool Session::perform (model::Command command, model::ProjectDocument::GestureId
     return afterChange (doc.perform (std::move (command), gesture));
 }
 
+bool Session::performGroup (std::string_view description,
+                            const std::function<void (model::ProjectDocument::Group&)>& edit,
+                            model::ProjectDocument::GestureId gesture)
+{
+    return afterChange (doc.performGroup (description, edit, gesture));
+}
+
+void Session::setAudioLookup (engine::AudioLookup lookup)
+{
+    audioLookup = std::move (lookup);
+    refreshEngine();
+}
+
+void Session::refreshEngine()
+{
+    engine.publishRenderGraph (std::make_unique<engine::RenderGraph> (
+        engine::buildRenderGraph (doc.project(), doc.version(), audioLookup)));
+}
+
 bool Session::undo()
 {
     return afterChange (doc.undo());
@@ -80,12 +99,10 @@ void Session::syncEngine()
     for (std::size_t pad = 0; pad < model::DrumKit::numPads; ++pad)
     {
         const auto& settings = project.drums.pads[pad];
-        drums.setStepMask (static_cast<int> (pad), project.drums.steps[pad]);
         drums.setPad (static_cast<int> (pad), settings.volumeDb, settings.pitch, settings.muted);
     }
 
-    engine.publishRenderGraph (
-        std::make_unique<engine::RenderGraph> (engine::buildRenderGraph (project, doc.version())));
+    refreshEngine();
 }
 
 void Session::loadInto (model::LoadedProject loaded, std::optional<io::ProjectFolder> location,

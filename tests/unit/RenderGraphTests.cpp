@@ -13,19 +13,20 @@ using Catch::Matchers::WithinAbs;
 
 TEST_CASE ("Constant-power pan law", "[graph]")
 {
+    // Compensated: a centred track plays at unity.
     const auto centre = constantPowerPan (0.0f);
-    CHECK_THAT (centre.left, WithinAbs (std::sqrt (0.5), 1.0e-6));
-    CHECK_THAT (centre.right, WithinAbs (std::sqrt (0.5), 1.0e-6));
+    CHECK_THAT (centre.left, WithinAbs (1.0, 1.0e-6));
+    CHECK_THAT (centre.right, WithinAbs (1.0, 1.0e-6));
 
     const auto left = constantPowerPan (-1.0f);
-    CHECK_THAT (left.left, WithinAbs (1.0, 1.0e-6));
+    CHECK_THAT (left.left, WithinAbs (std::sqrt (2.0), 1.0e-6));
     CHECK_THAT (left.right, WithinAbs (0.0, 1.0e-6));
 
     // Power is constant across the whole range.
     for (float pan = -1.0f; pan <= 1.0f; pan += 0.1f)
     {
         const auto g = constantPowerPan (pan);
-        CHECK_THAT (static_cast<double> (g.left * g.left + g.right * g.right), WithinAbs (1.0, 1.0e-5));
+        CHECK_THAT (static_cast<double> (g.left * g.left + g.right * g.right), WithinAbs (2.0, 1.0e-5));
     }
 
     CHECK (constantPowerPan (NAN).left == constantPowerPan (0.0f).left);
@@ -45,7 +46,7 @@ TEST_CASE ("Render graph resolves volume, mute and solo", "[graph]")
         const auto graph = buildRenderGraph (doc.project(), doc.version());
         REQUIRE (graph.tracks.size() == 3);
         CHECK (graph.tracks[0].audible);
-        CHECK_THAT (static_cast<double> (graph.tracks[0].leftGain), WithinAbs (std::sqrt (0.5), 1.0e-6));
+        CHECK_THAT (static_cast<double> (graph.tracks[0].leftGain), WithinAbs (1.0, 1.0e-6));
         CHECK (graph.projectVersion == doc.version());
     }
 

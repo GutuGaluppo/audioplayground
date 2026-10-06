@@ -21,7 +21,3 @@ export function keyLabelForPad(pad: number): string {
   const code = PAD_KEYS[Math.floor(pad / 4)]?.[pad % 4] ?? '';
   return code.replace('Key', '').replace('Digit', '');
 }
-
-export function hasStep(mask: number, step: number): boolean {
-  return (mask & (1 << step)) !== 0;
-}

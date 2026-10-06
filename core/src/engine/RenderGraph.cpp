@@ -11,10 +11,11 @@ PanGains constantPowerPan (float pan) noexcept
 {
     const float clamped = std::isfinite (pan) ? std::clamp (pan, -1.0f, 1.0f) : 0.0f;
     const float angle = (clamped + 1.0f) * std::numbers::pi_v<float> / 4.0f;
-    return {std::cos (angle), std::sin (angle)};
+    return {std::numbers::sqrt2_v<float> * std::cos (angle), std::numbers::sqrt2_v<float> * std::sin (angle)};
 }
 
-RenderGraph buildRenderGraph (const model::Project& project, std::uint64_t projectVersion)
+RenderGraph buildRenderGraph (const model::Project& project, std::uint64_t projectVersion,
+                              const AudioLookup& audio)
 {
     RenderGraph graph;
     graph.projectVersion = projectVersion;
@@ -27,6 +28,8 @@ RenderGraph buildRenderGraph (const model::Project& project, std::uint64_t proje
     {
         TrackRender render;
         render.id = track.id;
+        render.kind = track.kind;
+        render.instrument = track.instrument;
         render.audible
             = !track.muted && (!anySolo || track.soloed) && track.volumeDb > model::Track::minVolumeDb;
 
@@ -38,7 +41,21 @@ RenderGraph buildRenderGraph (const model::Project& project, std::uint64_t proje
             render.rightGain = volume * pan.right;
         }
 
-        graph.tracks.push_back (render);
+        for (const auto& clip : track.clips)
+        {
+            if (track.kind == model::TrackKind::audio)
+                render.audioClips.push_back (
+                    {clip.start, clip.end(), clip.sourceOffset, audio ? audio (clip.asset) : nullptr});
+            else
+                render.noteClips.push_back (
+                    {clip.start, clip.end(), clip.contentOffset, clip.loopLength, clip.notes});
+        }
+
+        if (track.kind == model::TrackKind::instrument)
+            graph.instrumentTrack[static_cast<std::size_t> (track.instrument)]
+                = static_cast<int> (graph.tracks.size());
+
+        graph.tracks.push_back (std::move (render));
     }
 
     return graph;

@@ -93,7 +93,7 @@ TEST_CASE ("Tracks get default names and sanitised custom names", "[model]")
 
     REQUIRE (doc.project().tracks.size() == 3);
     CHECK (doc.project().tracks[0].name == "Audio 1");
-    CHECK (doc.project().tracks[1].name == "Instrument 1");
+    CHECK (doc.project().tracks[1].name == "Synth");
     CHECK (doc.project().tracks[2].name == "Lead Vocal");
 }
 
@@ -296,22 +296,6 @@ TEST_CASE ("isSafeAssetPath accepts only audio/<plain name>", "[model][security]
         INFO (bad);
         CHECK_FALSE (isSafeAssetPath (bad));
     }
-}
-
-TEST_CASE ("Painting drum steps in one gesture is a single undo step", "[model][drums]")
-{
-    ProjectDocument doc;
-    auto steps = doc.project().drums.steps;
-    for (unsigned step = 0; step < 16; step += 4)
-    {
-        steps[0] = static_cast<std::uint16_t> (steps[0] | (1u << step));
-        REQUIRE (doc.perform (SetDrumSteps {steps}, 9));
-    }
-    CHECK (doc.project().drums.steps[0] == 0x1111);
-    CHECK (doc.undoDescription() == "Edit pattern");
-    REQUIRE (doc.undo());
-    CHECK (doc.project().drums.steps[0] == 0);
-    CHECK_FALSE (doc.canUndo());
 }
 
 TEST_CASE ("Drum pad settings are validated and clamped", "[model][drums]")

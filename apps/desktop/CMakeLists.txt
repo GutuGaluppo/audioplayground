@@ -68,10 +68,12 @@ add_custom_command(
 set(AP_DESKTOP_SOURCES
     src/AudioDeviceHost.cpp
     src/Main.cpp
+    src/NoteRecorder.cpp
     src/ProjectActions.cpp
     src/SampleLoader.cpp
     src/Session.cpp
     src/WebUiHost.cpp
+    src/WebUiHostTimeline.cpp
     src/generated/BridgeCodec.cpp)
 
 target_sources(ap_desktop PRIVATE ${AP_DESKTOP_SOURCES} "${AP_EMBEDDED_UI_SOURCE}")

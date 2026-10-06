@@ -1,5 +1,6 @@
 #include "TempDirectory.h"
 #include "ap/io/ProjectFiles.h"
+#include "ap/model/ClipEditing.h"
 #include "ap/model/ProjectDocument.h"
 #include "ap/model/ProjectSerialization.h"
 
@@ -28,11 +29,26 @@ Project sampleProject()
     REQUIRE (doc.perform (SetParameter {ap::params::ParamId::toneLevel, -30.0f}));
     REQUIRE (doc.perform (AddAsset {"audio/1-kick.wav", "kick.wav"}));
     REQUIRE (doc.perform (SetSamplerAsset {doc.project().assets[0].id}));
-    auto steps = doc.project().drums.steps;
-    steps[0] = 0x1111;
-    steps[2] = 0x5555;
-    REQUIRE (doc.perform (SetDrumSteps {steps}));
     REQUIRE (doc.perform (SetDrumPad {1, DrumPad {doc.project().assets[0].id, -6.0f, 2.0f, true}}));
+
+    Clip audio;
+    audio.start = 1920;
+    audio.length = 7680;
+    audio.asset = doc.project().assets[0].id;
+    audio.sourceOffset = 352'800'000; // 0.5 s
+    REQUIRE (doc.perform (AddClip {doc.project().tracks[0].id, audio}));
+
+    Clip melody;
+    melody.length = 3840;
+    melody.contentOffset = 240;
+    melody.notes = {{0, 480, 60, 0.8f}, {480, 240, 64, 1.0f}, {480, 960, 67, 0.5f}};
+    REQUIRE (doc.perform (AddClip {doc.project().tracks[1].id, melody}));
+
+    REQUIRE (doc.perform (AddTrack {InstrumentKind::drums}));
+    auto pattern = makePatternClip (3840, 4 * 3840);
+    pattern = withDrumStep (pattern, 0, 0, true);
+    pattern = withDrumStep (pattern, 2, 8, true);
+    REQUIRE (doc.perform (AddClip {doc.project().tracks[2].id, pattern}));
     return doc.project();
 }
 
@@ -129,8 +145,30 @@ TEST_CASE ("Malformed and hostile project files are rejected", "[persistence][se
         {"sampler asset missing", [] (auto& j) { j["samplerAsset"] = 99; }},
         {"sampler asset negative", [] (auto& j) { j["samplerAsset"] = -1; }},
         {"drum kit too small", [] (auto& j) { j["drums"]["pads"].erase (0); }},
-        {"drum steps too large", [] (auto& j) { j["drums"]["steps"][0] = 70000; }},
-        {"drum steps negative", [] (auto& j) { j["drums"]["steps"][0] = -1; }},
+        {"old drum steps", [] (auto& j) { j["drums"]["steps"] = nlohmann::json::array(); }},
+        {"two tracks for one instrument", [] (auto& j) { j["tracks"][2]["instrument"] = "synth"; }},
+        {"unknown instrument", [] (auto& j) { j["tracks"][1]["instrument"] = "theremin"; }},
+        {"audio track with instrument", [] (auto& j) { j["tracks"][0]["instrument"] = "synth"; }},
+        {"instrument track without instrument", [] (auto& j) { j["tracks"][1].erase ("instrument"); }},
+        {"clips not a list", [] (auto& j) { j["tracks"][0]["clips"] = 3; }},
+        {"duplicate clip ids",
+         [] (auto& j) { j["tracks"][2]["clips"][0]["id"] = j["tracks"][1]["clips"][0]["id"]; }},
+        {"nextClipId too low", [] (auto& j) { j["nextClipId"] = 1; }},
+        {"clip past the end of the timeline",
+         [] (auto& j) { j["tracks"][1]["clips"][0]["start"] = 400000000; }},
+        {"clip too short", [] (auto& j) { j["tracks"][1]["clips"][0]["length"] = 0; }},
+        {"negative clip start", [] (auto& j) { j["tracks"][1]["clips"][0]["start"] = -1; }},
+        {"fractional clip start", [] (auto& j) { j["tracks"][1]["clips"][0]["start"] = 0.5; }},
+        {"audio clip missing asset", [] (auto& j) { j["tracks"][0]["clips"][0]["asset"] = 99; }},
+        {"audio clip negative offset", [] (auto& j) { j["tracks"][0]["clips"][0]["sourceOffset"] = -5; }},
+        {"audio clip with notes",
+         [] (auto& j) { j["tracks"][0]["clips"][0]["notes"] = nlohmann::json::array(); }},
+        {"note clip with asset", [] (auto& j) { j["tracks"][1]["clips"][0]["asset"] = 1; }},
+        {"note pitch out of range", [] (auto& j) { j["tracks"][1]["clips"][0]["notes"][0][2] = 128; }},
+        {"note length zero", [] (auto& j) { j["tracks"][1]["clips"][0]["notes"][0][1] = 0; }},
+        {"note velocity zero", [] (auto& j) { j["tracks"][1]["clips"][0]["notes"][0][3] = 0; }},
+        {"note as object", [] (auto& j) { j["tracks"][1]["clips"][0]["notes"][0] = {{"pitch", 60}}; }},
+        {"loop too short", [] (auto& j) { j["tracks"][2]["clips"][0]["loopLength"] = 1; }},
         {"drum pad missing asset", [] (auto& j) { j["drums"]["pads"][0]["sample"] = 42; }},
         {"drum pad volume too high", [] (auto& j) { j["drums"]["pads"][0]["volumeDb"] = 20; }},
         {"drum pad extra key", [] (auto& j) { j["drums"]["pads"][0]["file"] = "x"; }},

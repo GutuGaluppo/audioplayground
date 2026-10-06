@@ -88,6 +88,11 @@
     },
     "sampler.load": {},
     "drums.setStep": {
+      "clip": {
+        "type": "int",
+        "min": 0,
+        "max": 2147483647
+      },
       "pad": {
         "type": "int",
         "min": 0,
@@ -107,7 +112,13 @@
         "max": 2147483647
       }
     },
-    "drums.clear": {},
+    "drums.clear": {
+      "clip": {
+        "type": "int",
+        "min": 1,
+        "max": 2147483647
+      }
+    },
     "drums.trigger": {
       "pad": {
         "type": "int",
@@ -157,6 +168,298 @@
         "type": "int",
         "min": 0,
         "max": 15
+      }
+    },
+    "transport.record": {},
+    "transport.seek": {
+      "ticks": {
+        "type": "int",
+        "min": 0,
+        "max": 38400000
+      }
+    },
+    "transport.setLoop": {
+      "enabled": {
+        "type": "bool"
+      },
+      "start": {
+        "type": "int",
+        "min": 0,
+        "max": 38400000
+      },
+      "end": {
+        "type": "int",
+        "min": 0,
+        "max": 38400000
+      }
+    },
+    "track.add": {
+      "kind": {
+        "type": "int",
+        "min": 0,
+        "max": 3
+      }
+    },
+    "track.remove": {
+      "track": {
+        "type": "int",
+        "min": 1,
+        "max": 2147483647
+      }
+    },
+    "track.rename": {
+      "track": {
+        "type": "int",
+        "min": 1,
+        "max": 2147483647
+      },
+      "name": {
+        "type": "string",
+        "maxLength": 512
+      }
+    },
+    "track.setVolume": {
+      "track": {
+        "type": "int",
+        "min": 1,
+        "max": 2147483647
+      },
+      "volumeDb": {
+        "type": "number",
+        "min": -60,
+        "max": 6
+      },
+      "gesture": {
+        "type": "int",
+        "min": 0,
+        "max": 2147483647
+      }
+    },
+    "track.setPan": {
+      "track": {
+        "type": "int",
+        "min": 1,
+        "max": 2147483647
+      },
+      "pan": {
+        "type": "number",
+        "min": -1,
+        "max": 1
+      },
+      "gesture": {
+        "type": "int",
+        "min": 0,
+        "max": 2147483647
+      }
+    },
+    "track.setMute": {
+      "track": {
+        "type": "int",
+        "min": 1,
+        "max": 2147483647
+      },
+      "muted": {
+        "type": "bool"
+      }
+    },
+    "track.setSolo": {
+      "track": {
+        "type": "int",
+        "min": 1,
+        "max": 2147483647
+      },
+      "soloed": {
+        "type": "bool"
+      }
+    },
+    "track.importAudio": {
+      "track": {
+        "type": "int",
+        "min": 1,
+        "max": 2147483647
+      },
+      "ticks": {
+        "type": "int",
+        "min": 0,
+        "max": 38400000
+      }
+    },
+    "clip.create": {
+      "track": {
+        "type": "int",
+        "min": 1,
+        "max": 2147483647
+      },
+      "start": {
+        "type": "int",
+        "min": 0,
+        "max": 38400000
+      },
+      "length": {
+        "type": "int",
+        "min": 1,
+        "max": 38400000
+      }
+    },
+    "clip.move": {
+      "clip": {
+        "type": "int",
+        "min": 1,
+        "max": 2147483647
+      },
+      "track": {
+        "type": "int",
+        "min": 1,
+        "max": 2147483647
+      },
+      "start": {
+        "type": "int",
+        "min": 0,
+        "max": 38400000
+      },
+      "gesture": {
+        "type": "int",
+        "min": 0,
+        "max": 2147483647
+      }
+    },
+    "clip.resize": {
+      "clip": {
+        "type": "int",
+        "min": 1,
+        "max": 2147483647
+      },
+      "edge": {
+        "type": "int",
+        "min": 0,
+        "max": 1
+      },
+      "ticks": {
+        "type": "int",
+        "min": 0,
+        "max": 38400000
+      },
+      "gesture": {
+        "type": "int",
+        "min": 0,
+        "max": 2147483647
+      }
+    },
+    "clip.split": {
+      "clip": {
+        "type": "int",
+        "min": 1,
+        "max": 2147483647
+      },
+      "ticks": {
+        "type": "int",
+        "min": 0,
+        "max": 38400000
+      }
+    },
+    "clip.remove": {
+      "clip": {
+        "type": "int",
+        "min": 1,
+        "max": 2147483647
+      }
+    },
+    "clip.duplicate": {
+      "clip": {
+        "type": "int",
+        "min": 1,
+        "max": 2147483647
+      }
+    },
+    "clip.setLoop": {
+      "clip": {
+        "type": "int",
+        "min": 1,
+        "max": 2147483647
+      },
+      "enabled": {
+        "type": "bool"
+      }
+    },
+    "clip.addNote": {
+      "clip": {
+        "type": "int",
+        "min": 1,
+        "max": 2147483647
+      },
+      "start": {
+        "type": "int",
+        "min": 0,
+        "max": 38400000
+      },
+      "length": {
+        "type": "int",
+        "min": 1,
+        "max": 38400000
+      },
+      "pitch": {
+        "type": "int",
+        "min": 0,
+        "max": 127
+      },
+      "velocity": {
+        "type": "number",
+        "min": 0.01,
+        "max": 1
+      }
+    },
+    "clip.removeNote": {
+      "clip": {
+        "type": "int",
+        "min": 1,
+        "max": 2147483647
+      },
+      "start": {
+        "type": "int",
+        "min": 0,
+        "max": 38400000
+      },
+      "pitch": {
+        "type": "int",
+        "min": 0,
+        "max": 127
+      }
+    },
+    "clip.editNote": {
+      "clip": {
+        "type": "int",
+        "min": 1,
+        "max": 2147483647
+      },
+      "fromStart": {
+        "type": "int",
+        "min": 0,
+        "max": 38400000
+      },
+      "fromPitch": {
+        "type": "int",
+        "min": 0,
+        "max": 127
+      },
+      "start": {
+        "type": "int",
+        "min": 0,
+        "max": 38400000
+      },
+      "length": {
+        "type": "int",
+        "min": 1,
+        "max": 38400000
+      },
+      "pitch": {
+        "type": "int",
+        "min": 0,
+        "max": 127
+      },
+      "gesture": {
+        "type": "int",
+        "min": 0,
+        "max": 2147483647
       }
     }
   },
@@ -222,6 +525,22 @@
       },
       "metronomeEnabled": {
         "type": "bool"
+      },
+      "recording": {
+        "type": "bool"
+      },
+      "loopEnabled": {
+        "type": "bool"
+      },
+      "loopStart": {
+        "type": "int",
+        "min": 0,
+        "max": 38400000
+      },
+      "loopEnd": {
+        "type": "int",
+        "min": 0,
+        "max": 38400000
       }
     },
     "transport.position": {
@@ -238,10 +557,10 @@
       "countingIn": {
         "type": "bool"
       },
-      "step": {
+      "ticks": {
         "type": "int",
-        "min": 0,
-        "max": 15
+        "min": -10000000,
+        "max": 76800000
       }
     },
     "param.value": {
@@ -327,14 +646,6 @@
         "maxItems": 512
       }
     },
-    "drums.pattern": {
-      "steps": {
-        "type": "floatArray",
-        "min": 0,
-        "max": 65535,
-        "maxItems": 16
-      }
-    },
     "drums.pad": {
       "pad": {
         "type": "int",
@@ -363,6 +674,152 @@
       },
       "missing": {
         "type": "bool"
+      }
+    },
+    "timeline.state": {
+      "tracks": {
+        "type": "list",
+        "item": "TimelineTrack",
+        "maxItems": 64,
+        "fields": {
+          "id": {
+            "type": "int",
+            "min": 1,
+            "max": 2147483647
+          },
+          "kind": {
+            "type": "int",
+            "min": 0,
+            "max": 3
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 256
+          },
+          "volumeDb": {
+            "type": "number",
+            "min": -60,
+            "max": 6
+          },
+          "pan": {
+            "type": "number",
+            "min": -1,
+            "max": 1
+          },
+          "muted": {
+            "type": "bool"
+          },
+          "soloed": {
+            "type": "bool"
+          },
+          "clips": {
+            "type": "list",
+            "item": "TimelineClip",
+            "maxItems": 512,
+            "fields": {
+              "id": {
+                "type": "int",
+                "min": 1,
+                "max": 2147483647
+              },
+              "start": {
+                "type": "int",
+                "min": 0,
+                "max": 38400000
+              },
+              "length": {
+                "type": "int",
+                "min": 1,
+                "max": 38400000
+              },
+              "asset": {
+                "type": "int",
+                "min": 0,
+                "max": 2147483647
+              },
+              "sourceOffsetSeconds": {
+                "type": "number",
+                "min": 0,
+                "max": 86400
+              },
+              "contentOffset": {
+                "type": "int",
+                "min": 0,
+                "max": 38400000
+              },
+              "loopLength": {
+                "type": "int",
+                "min": 0,
+                "max": 38400000
+              },
+              "notes": {
+                "type": "list",
+                "item": "TimelineNote",
+                "maxItems": 4096,
+                "fields": {
+                  "start": {
+                    "type": "int",
+                    "min": 0,
+                    "max": 38400000
+                  },
+                  "length": {
+                    "type": "int",
+                    "min": 1,
+                    "max": 38400000
+                  },
+                  "pitch": {
+                    "type": "int",
+                    "min": 0,
+                    "max": 127
+                  },
+                  "velocity": {
+                    "type": "number",
+                    "min": 0,
+                    "max": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "timeline.assets": {
+      "assets": {
+        "type": "list",
+        "item": "TimelineAsset",
+        "maxItems": 1024,
+        "fields": {
+          "id": {
+            "type": "int",
+            "min": 1,
+            "max": 2147483647
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 256
+          },
+          "loaded": {
+            "type": "bool"
+          },
+          "missing": {
+            "type": "bool"
+          },
+          "loading": {
+            "type": "bool"
+          },
+          "durationSeconds": {
+            "type": "number",
+            "min": 0,
+            "max": 100000
+          },
+          "overview": {
+            "type": "floatArray",
+            "min": 0,
+            "max": 1,
+            "maxItems": 512
+          }
+        }
       }
     }
   }

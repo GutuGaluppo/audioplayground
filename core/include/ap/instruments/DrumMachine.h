@@ -15,28 +15,25 @@
 namespace ap::instruments
 {
 
-// 4x4 pad drum machine with a 16-step sequencer (guide §13.2).
+// 4x4 pad drum machine (guide §13.2). Patterns are note clips on the drum track (ADR-007): the
+// engine plays them sample-accurately by rendering in chunks between hits.
 //
 // - Every pad plays the factory sound unless a user sample is loaded into it.
-// - Steps are sixteenth notes, triggered sample-accurately inside each block.
 // - Closed hat chokes open hat.
-// - Threading: set*() any thread (atomics); loadPadSample/collectGarbage message thread;
-//   trigger/handle/sequence/render audio thread.
+// - Threading: setPad() any thread (atomics); loadPadSample/collectGarbage message thread;
+//   trigger/handle/render audio thread.
 class DrumMachine
 {
 public:
     static constexpr int numPads = 16;
-    static constexpr int numSteps = 16;
     static constexpr int maxVoices = 32;
     static constexpr int firstMidiNote = 36; // GM kick; pads map to notes 36..51
-    static constexpr core::Ticks ticksPerStep = core::ticksPerQuarterNote / 4;
     static constexpr float minVolumeDb = -60.0f;
     static constexpr float maxVolumeDb = 6.0f;
 
     void prepare (double sampleRate); // builds the factory kit (allocates)
 
     // --- Any thread -------------------------------------------------------------------------
-    void setStepMask (int pad, std::uint16_t steps) noexcept;
     void setPad (int pad, float volumeDb, float pitchSemitones, bool muted) noexcept;
 
     // --- Message thread ---------------------------------------------------------------------
@@ -46,10 +43,6 @@ public:
     // --- Audio thread -----------------------------------------------------------------------
     void trigger (int pad, float velocity, int delaySamples = 0) noexcept AP_NONBLOCKING;
     void handle (const NoteEvent& event) noexcept AP_NONBLOCKING;
-
-    // Schedules the steps that fall inside one transport segment (see Transport::advance).
-    void sequence (int offset, int length, core::Samples startSample,
-                   const core::TempoMap& tempoMap) noexcept AP_NONBLOCKING;
 
     void render (core::AudioBlock output) noexcept AP_NONBLOCKING;
 
@@ -73,7 +66,6 @@ private:
 
     struct Pad
     {
-        std::atomic<std::uint16_t> steps {0};
         std::atomic<float> volumeDb {0.0f};
         std::atomic<float> pitch {0.0f};
         std::atomic<bool> muted {false};

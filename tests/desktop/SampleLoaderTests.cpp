@@ -162,3 +162,68 @@ TEST_CASE ("Clearing the sampler asset silences it", "[samples]")
     CHECK (f.engine.getSamplerAssetId() == 0);
     CHECK_FALSE (f.loader.getState().loaded);
 }
+
+TEST_CASE ("Audio clips get their file decoded and played; unused audio is released", "[samples][timeline]")
+{
+    Fixture f;
+    writeWav (toFile (f.folder.audioDirectory() / "1-tone.wav"), 44100.0, 1, 44100);
+    REQUIRE (f.session.perform (model::AddTrack {model::TrackKind::audio}));
+    const auto track = f.session.project().tracks.back().id;
+    REQUIRE (f.session.perform (model::AddAsset {"audio/1-tone.wav", "tone.wav"}));
+    const auto asset = f.session.project().assets.back().id;
+    REQUIRE_FALSE (f.session.saveAs (f.folder).has_value());
+
+    model::Clip clip;
+    clip.length = core::ticksPerQuarterNote;
+    clip.asset = asset;
+    REQUIRE (f.session.perform (model::AddClip {track, clip}));
+
+    int changes = 0;
+    f.loader.onClipAudioChanged = [&changes] { ++changes; };
+    f.loader.sync (48000.0);
+    for (int i = 0; i < 200 && !f.loader.getClipAudio().at (asset.value).state.loaded; ++i)
+        juce::MessageManager::getInstance()->runDispatchLoopUntil (10);
+
+    const auto& audio = f.loader.getClipAudio().at (asset.value);
+    REQUIRE (audio.state.loaded);
+    REQUIRE (audio.buffer != nullptr);
+    CHECK (audio.buffer->sampleRate == 48000.0);
+    CHECK (audio.buffer->frames() == 48000);
+    CHECK (audio.state.overview.size() == desktop::SampleLoader::overviewPoints);
+    CHECK (changes >= 1);
+
+    // The engine plays it.
+    f.engine.getTransport().requestPlay();
+    test::TestBuffer buffer (2, 256);
+    float peak = 0.0f;
+    for (int b = 0; b < 20; ++b)
+    {
+        f.engine.process (buffer.block());
+        for (const float s : buffer.channel (0))
+            peak = std::max (peak, std::abs (s));
+    }
+    CHECK (peak > 0.4f);
+
+    // Deleting the clip releases the audio.
+    REQUIRE (f.session.perform (model::RemoveClip {f.session.project().tracks.back().clips.front().id}));
+    f.loader.sync (48000.0);
+    CHECK (f.loader.getClipAudio().empty());
+}
+
+TEST_CASE ("A missing clip file is reported once and plays nothing", "[samples][timeline]")
+{
+    Fixture f;
+    REQUIRE (f.session.perform (model::AddTrack {model::TrackKind::audio}));
+    REQUIRE (f.session.perform (model::AddAsset {"audio/1-gone.wav", "gone.wav"}));
+    model::Clip clip;
+    clip.length = core::ticksPerQuarterNote;
+    clip.asset = f.session.project().assets.back().id;
+    REQUIRE (f.session.perform (model::AddClip {f.session.project().tracks.back().id, clip}));
+
+    f.loader.sync (48000.0);
+    f.loader.sync (48000.0);
+    const auto& audio = f.loader.getClipAudio().at (clip.asset.value);
+    CHECK (audio.state.missing);
+    CHECK (audio.buffer == nullptr);
+    CHECK (f.errors.size() == 1);
+}

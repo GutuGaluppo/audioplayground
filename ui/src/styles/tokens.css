@@ -30,6 +30,16 @@
   --ap-meter-ok: #4cc38a;
   --ap-meter-hot: #f2c94c;
   --ap-meter-clip: #ff5c5c;
+  --ap-record: #ff4d4d;
+
+  /* Clip colours by track kind; ink is the text and drawing on top of them. */
+  --ap-clip-audio: #2f7f78;
+  --ap-clip-synth: #3e5fc0;
+  --ap-clip-sampler: #7a4cc0;
+  --ap-clip-drums: #b8692c;
+  --ap-clip-ink: #f1f3ff;
+  --ap-grid-bar: rgb(255 255 255 / 9%);
+  --ap-grid-beat: rgb(255 255 255 / 4%);
 
   color-scheme: dark;
 }
@@ -41,6 +51,8 @@
   --ap-text: #17181b;
   --ap-text-muted: #5f6066;
   --ap-accent: #3457d5;
+  --ap-grid-bar: rgb(0 0 0 / 10%);
+  --ap-grid-beat: rgb(0 0 0 / 4%);
 
   color-scheme: light;
 }

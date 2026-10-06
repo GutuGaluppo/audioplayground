@@ -1,5 +1,6 @@
 #include "Golden.h"
 #include "TestAudio.h"
+#include "TimelineHelpers.h"
 #include "ap/engine/Engine.h"
 #include "ap/engine/OfflineRenderer.h"
 #include "ap/instruments/DrumMachine.h"
@@ -36,13 +37,7 @@ std::vector<std::size_t> onsets (const std::vector<float>& x, float threshold = 
     return result;
 }
 
-std::uint16_t steps (std::initializer_list<int> indices)
-{
-    std::uint16_t mask = 0;
-    for (const int i : indices)
-        mask = static_cast<std::uint16_t> (mask | (1u << static_cast<unsigned> (i)));
-    return mask;
-}
+constexpr core::Ticks bar = 4 * core::ticksPerQuarterNote;
 
 double energy (const std::vector<float>& x, std::size_t from, std::size_t to)
 {
@@ -75,13 +70,13 @@ TEST_CASE ("Factory kit sounds are valid, bounded, audible and deterministic", "
     }
 }
 
-TEST_CASE ("Sequencer triggers steps sample-accurately at any block size", "[drums]")
+TEST_CASE ("Pattern clips trigger steps sample-accurately at any block size", "[drums]")
 {
     const int blockSize = GENERATE (1, 64, 333, 2048);
     CAPTURE (blockSize);
 
     engine::Engine engine;
-    engine.getDrums().setStepMask (closedHat, steps ({0, 4, 8, 12})); // short sound: clear gaps
+    test::publish (engine, test::drumPatternProject ({{closedHat, {0, 4, 8, 12}}}, 4 * bar)); // short sound
     engine.getTransport().requestPlay();
     const auto audio = engine::renderOffline (engine, {fs, 1, 2 * 96000, blockSize});
 
@@ -90,14 +85,14 @@ TEST_CASE ("Sequencer triggers steps sample-accurately at any block size", "[dru
     CHECK (onsets (audio[0]) == expected);
 }
 
-TEST_CASE ("Sequencer stays silent during the count-in", "[drums]")
+TEST_CASE ("Pattern clips stay silent during the count-in", "[drums]")
 {
     // The count-in clicks always sound; subtract a render without the pattern to isolate drums.
     const auto render = [] (bool withPattern)
     {
         engine::Engine engine;
         if (withPattern)
-            engine.getDrums().setStepMask (closedHat, steps ({0}));
+            test::publish (engine, test::drumPatternProject ({{closedHat, {0}}}, 4 * bar));
         engine.getTransport().setCountInBars (1);
         engine.getTransport().requestPlay();
         return engine::renderOffline (engine, {fs, 1, 2 * 96000, 512})[0];
@@ -111,10 +106,10 @@ TEST_CASE ("Sequencer stays silent during the count-in", "[drums]")
     CHECK (onsets (drumsOnly) == std::vector<std::size_t> {96000}); // first hit on bar 1
 }
 
-TEST_CASE ("Sequencer follows the loop", "[drums][loop]")
+TEST_CASE ("Pattern clips follow the transport loop", "[drums][loop]")
 {
     engine::Engine engine;
-    engine.getDrums().setStepMask (closedHat, steps ({0}));
+    test::publish (engine, test::drumPatternProject ({{closedHat, {0}}}, 4 * bar));
     engine.getTransport().setLoop (true, 0, 2 * core::ticksPerQuarterNote); // half a bar
     engine.getTransport().requestPlay();
     const auto audio = engine::renderOffline (engine, {fs, 1, 96000, 512});
@@ -214,11 +209,11 @@ namespace
 engine::RenderedAudio renderGroove (int blockSize)
 {
     engine::Engine engine;
-    auto& drums = engine.getDrums();
-    drums.setStepMask (kick, steps ({0, 6, 8}));
-    drums.setStepMask (1, steps ({4, 12}));                         // snare
-    drums.setStepMask (closedHat, steps ({0, 2, 4, 6, 8, 10, 14})); // hats
-    drums.setStepMask (openHat, steps ({12}));
+    test::publish (engine, test::drumPatternProject ({{kick, {0, 6, 8}},
+                                                      {1, {4, 12}}, // snare
+                                                      {closedHat, {0, 2, 4, 6, 8, 10, 14}},
+                                                      {openHat, {12}}},
+                                                     4 * bar));
     engine.getTransport().setTempo (100.0);
     engine.getTransport().requestPlay();
     return engine::renderOffline (engine, {fs, 2, static_cast<std::int64_t> (fs * 4.8), blockSize});

@@ -8,17 +8,30 @@
 #include "ap/dsp/SineOscillator.h"
 #include "ap/engine/Metronome.h"
 #include "ap/engine/RenderGraph.h"
+#include "ap/engine/TimelinePlayer.h"
 #include "ap/engine/Transport.h"
 #include "ap/instruments/DrumMachine.h"
 #include "ap/instruments/Sampler.h"
 #include "ap/instruments/Synth.h"
 #include "ap/params/Parameters.h"
 
+#include <array>
 #include <atomic>
 #include <memory>
+#include <optional>
+#include <vector>
 
 namespace ap::engine
 {
+
+// A live note played while recording, stamped with the timeline position the player heard when
+// playing it (the output latency is subtracted).
+struct RecordedNote
+{
+    core::Ticks ticks = 0;
+    instruments::NoteEvent event;
+    model::InstrumentKind instrument = model::InstrumentKind::synth;
+};
 
 // Headless audio engine. Owns everything that runs inside the audio callback.
 //
@@ -31,7 +44,9 @@ class Engine
 public:
     static constexpr float minToneFrequencyHz = 20.0f;
     static constexpr float maxToneFrequencyHz = 20000.0f;
+    static constexpr int maxOutputChannels = 8;
 
+    // maxBlockSize sizes the internal buffers; larger blocks are processed in pieces.
     void prepare (double sampleRate, int maxBlockSize);
     void releaseResources() noexcept;
 
@@ -80,6 +95,24 @@ public:
     bool sendNoteFromUi (const instruments::NoteEvent& event) noexcept { return uiNotes.push (event); }
     bool sendNoteFromMidi (const instruments::NoteEvent& event) noexcept { return midiNotes.push (event); }
 
+    // Note recording (any thread). While enabled and playing, live notes are queued for the
+    // message thread, which builds the clip. latency: output latency in samples, so a note is
+    // placed where the player heard the music, not where the engine was rendering.
+    void setNoteRecording (bool enabled) noexcept
+    {
+        recordingNotes.store (enabled, std::memory_order_relaxed);
+    }
+    [[nodiscard]] bool isRecordingNotes() const noexcept
+    {
+        return recordingNotes.load (std::memory_order_relaxed);
+    }
+    void setRecordingLatency (core::Samples latency) noexcept
+    {
+        recordingLatency.store (std::max<core::Samples> (0, latency), std::memory_order_relaxed);
+    }
+    // Message thread only.
+    [[nodiscard]] std::optional<RecordedNote> popRecordedNote() noexcept { return recordedNotes.pop(); }
+
     // Render structure (message thread). Snapshots are swapped in at the next block boundary;
     // retired ones are freed by collectGarbage(), which must be called periodically.
     void publishRenderGraph (std::unique_ptr<RenderGraph> next) noexcept
@@ -107,11 +140,17 @@ public:
     [[nodiscard]] int getNonFiniteSampleCount() const noexcept;
 
 private:
+    void processBlock (core::AudioBlock output) noexcept AP_NONBLOCKING;
+    void routeLiveNote (const instruments::NoteEvent& note) noexcept AP_NONBLOCKING;
+    void handleNote (model::InstrumentKind instrument,
+                     const instruments::NoteEvent& note) noexcept AP_NONBLOCKING;
+    void renderInstrument (model::InstrumentKind instrument, core::AudioBlock output) noexcept AP_NONBLOCKING;
     void renderTestTone (core::AudioBlock output) noexcept AP_NONBLOCKING;
     void finaliseOutput (core::AudioBlock output) noexcept AP_NONBLOCKING;
     void updatePeak (float blockPeak) noexcept AP_NONBLOCKING;
 
     double sampleRate = 48000.0;
+    int maxBlock = 512;
     bool prepared = false;
 
     params::ParameterStore parameters;
@@ -127,6 +166,13 @@ private:
     LiveInstrument routedInstrument = LiveInstrument::synth; // audio thread
     core::SpscQueue<instruments::NoteEvent, 256> uiNotes;
     core::SpscQueue<instruments::NoteEvent, 256> midiNotes;
+
+    TimelinePlayer timeline;
+    std::vector<float> busStorage; // 2 channels x maxBlock per instrument, allocated in prepare()
+
+    std::atomic<bool> recordingNotes {false};
+    std::atomic<core::Samples> recordingLatency {0};
+    core::SpscQueue<RecordedNote, 1024> recordedNotes;
 
     dsp::SineOscillator toneOscillator;
     dsp::LinearSmoothedValue toneGain;

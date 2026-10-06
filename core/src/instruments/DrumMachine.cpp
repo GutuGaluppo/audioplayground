@@ -26,12 +26,6 @@ void DrumMachine::prepare (double newSampleRate)
         voice = {};
 }
 
-void DrumMachine::setStepMask (int pad, std::uint16_t steps) noexcept
-{
-    if (isValidPad (pad))
-        pads[static_cast<std::size_t> (pad)].steps.store (steps, std::memory_order_relaxed);
-}
-
 void DrumMachine::setPad (int pad, float volumeDb, float pitchSemitones, bool muted) noexcept
 {
     if (!isValidPad (pad))
@@ -127,32 +121,6 @@ void DrumMachine::handle (const NoteEvent& event) noexcept AP_NONBLOCKING
     if (event.type == NoteEvent::Type::noteOn)
         trigger (static_cast<int> (event.note) - firstMidiNote, event.velocity);
     // Drum hits are one-shots: note off is ignored; all-notes-off lets them ring out.
-}
-
-void DrumMachine::sequence (int offset, int length, core::Samples startSample,
-                            const core::TempoMap& tempoMap) noexcept AP_NONBLOCKING
-{
-    const auto endSample = startSample + length;
-    if (endSample <= 0)
-        return; // count-in: the pattern starts at bar 1
-
-    // First step whose sample position is >= max(startSample, 0).
-    auto step = tempoMap.tickAtOrBefore (std::max<core::Samples> (startSample, 0)) / ticksPerStep;
-    while (tempoMap.ticksToSamples (step * ticksPerStep) < std::max<core::Samples> (startSample, 0))
-        ++step;
-
-    for (;; ++step)
-    {
-        const auto stepSample = tempoMap.ticksToSamples (step * ticksPerStep);
-        if (stepSample >= endSample)
-            break;
-
-        const auto bit = static_cast<std::uint16_t> (1u << static_cast<unsigned> (step % numSteps));
-        const int delay = offset + static_cast<int> (stepSample - startSample);
-        for (int pad = 0; pad < numPads; ++pad)
-            if ((pads[static_cast<std::size_t> (pad)].steps.load (std::memory_order_relaxed) & bit) != 0)
-                trigger (pad, 1.0f, delay);
-    }
 }
 
 void DrumMachine::render (core::AudioBlock output) noexcept AP_NONBLOCKING

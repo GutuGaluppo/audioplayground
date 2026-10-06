@@ -1,6 +1,7 @@
 #pragma once
 
 #include "AudioDeviceHost.h"
+#include "NoteRecorder.h"
 #include "ProjectActions.h"
 #include "SampleLoader.h"
 #include "Session.h"
@@ -66,6 +67,34 @@ private:
     void handle (const ap::bridge::TransportSetTempo&);
     void handle (const ap::bridge::TransportSetCountIn&);
     void handle (const ap::bridge::MetronomeSetEnabled&);
+    void handle (const ap::bridge::TransportRecord&);
+    void handle (const ap::bridge::TransportSeek&);
+    void handle (const ap::bridge::TransportSetLoop&);
+    void handle (const ap::bridge::TrackAdd&);
+    void handle (const ap::bridge::TrackRemove&);
+    void handle (const ap::bridge::TrackRename&);
+    void handle (const ap::bridge::TrackSetVolume&);
+    void handle (const ap::bridge::TrackSetPan&);
+    void handle (const ap::bridge::TrackSetMute&);
+    void handle (const ap::bridge::TrackSetSolo&);
+    void handle (const ap::bridge::TrackImportAudio&);
+    void handle (const ap::bridge::ClipCreate&);
+    void handle (const ap::bridge::ClipMove&);
+    void handle (const ap::bridge::ClipResize&);
+    void handle (const ap::bridge::ClipSplit&);
+    void handle (const ap::bridge::ClipRemove&);
+    void handle (const ap::bridge::ClipDuplicate&);
+    void handle (const ap::bridge::ClipSetLoop&);
+    void handle (const ap::bridge::ClipAddNote&);
+    void handle (const ap::bridge::ClipRemoveNote&);
+    void handle (const ap::bridge::ClipEditNote&);
+
+    // Timeline helpers (WebUiHostTimeline.cpp).
+    bool editClip (std::uint64_t clip, model::ClipEdit edit, std::uint64_t gesture,
+                   const std::function<model::Clip (const model::Clip&)>& change);
+    void stopTransport();
+    void sendTimeline();
+    void sendTimelineAssets();
 
     void emit (const ap::bridge::Event& event);
     void sendStatus();
@@ -75,7 +104,6 @@ private:
     void sendProjectState();
     void sendInstrumentState();
     void sendSamplerState();
-    void sendDrumPattern();
     void sendDrumPad (std::size_t pad);
     void onProjectChanged();
     void sendTransportPosition (bool force);
@@ -88,6 +116,7 @@ private:
     ProjectActions& actions;
     SampleLoader& samples;
 
+    NoteRecorder recorder;
     std::unique_ptr<LockedDownWebView> webView;
     ap::bridge::TransportPosition lastPosition;
     bool lastPlaying = false;

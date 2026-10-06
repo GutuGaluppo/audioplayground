@@ -2,6 +2,8 @@ import { isParamId, PARAMETERS } from '../params/generated';
 import type { ParamId } from '../params/generated';
 import { parseNativeEvent, PROTOCOL_VERSION } from './generated';
 import type { Intent, NativeEventPayloads, NativeEventType } from './generated';
+import { createSimulatedTimeline } from './simulatedTimeline';
+import type { SimulatedEdit } from './simulatedTimeline';
 
 const INTENT_EVENT_ID = 'ap.intent';
 const NATIVE_EVENT_ID = 'ap.event';
@@ -81,12 +83,12 @@ export function createSimulatedBridge(): Bridge {
       payload: { id, value: params.get(id) ?? PARAMETERS[id].defaultValue },
     });
   };
-  const setParam = (id: ParamId) => (value: number) => {
-    params.set(id, value);
+  const setParam = (id: ParamId) => (value: unknown) => {
+    params.set(id, value as number);
     sendParam(id);
   };
-  const setTempo = (value: number) => {
-    bpm = value;
+  const setTempo = (value: unknown) => {
+    bpm = value as number;
     sendTransportState();
   };
   let playing = false;
@@ -95,16 +97,11 @@ export function createSimulatedBridge(): Bridge {
   let metronomeEnabled = false;
   let beatsElapsed = 0;
   let countInBeatsLeft = 0;
+  let recording = false;
+  let loop = { enabled: false, start: 0, end: 0 };
 
   // Minimal stand-in for the native undo history (same merge rule: same gesture and target).
-  interface Edit {
-    key: string;
-    gesture: number;
-    label: string;
-    before: number;
-    after: number;
-    set: (value: number) => void;
-  }
+  type Edit = SimulatedEdit;
   let projectName = 'Untitled';
   let dirty = false;
   let hasLocation = false;
@@ -133,11 +130,7 @@ export function createSimulatedBridge(): Bridge {
     'Bass',
     'Zap',
   ];
-  const drumSteps = Array.from({ length: 16 }, () => 0);
   const drumPads = FACTORY.map((name) => ({ name, volumeDb: 0, pitch: 0, muted: false }));
-  const sendPattern = () => {
-    router.dispatch({ type: 'drums.pattern', payload: { steps: [...drumSteps] } });
-  };
   const sendPad = (pad: number) => {
     const info = drumPads[pad];
     if (!info) return;
@@ -161,6 +154,17 @@ export function createSimulatedBridge(): Bridge {
       },
     });
   };
+
+  const timeline = createSimulatedTimeline({
+    dispatch: (message) => {
+      router.dispatch(message);
+    },
+    record: (edit) => {
+      record(edit);
+    },
+    bpm: () => bpm,
+    playhead: () => beatsElapsed * 960,
+  });
 
   const record = (edit: Edit) => {
     redoStack.length = 0;
@@ -191,7 +195,18 @@ export function createSimulatedBridge(): Bridge {
   const sendTransportState = () => {
     router.dispatch({
       type: 'transport.state',
-      payload: { playing, bpm, numerator: 4, denominator: 4, countInBars, metronomeEnabled },
+      payload: {
+        playing,
+        bpm,
+        numerator: 4,
+        denominator: 4,
+        countInBars,
+        metronomeEnabled,
+        recording,
+        loopEnabled: loop.enabled,
+        loopStart: loop.start,
+        loopEnd: loop.end,
+      },
     });
   };
 
@@ -200,8 +215,10 @@ export function createSimulatedBridge(): Bridge {
     const beats = countingIn ? -countInBeatsLeft : beatsElapsed;
     const bar = Math.floor(beats / 4) + 1;
     const beat = (((beats % 4) + 4) % 4) + 1;
-    const step = countingIn ? 0 : (((beatsElapsed * 4) % 16) + 16) % 16;
-    router.dispatch({ type: 'transport.position', payload: { bar, beat, countingIn, step } });
+    router.dispatch({
+      type: 'transport.position',
+      payload: { bar, beat, countingIn, ticks: beats * 960 },
+    });
   };
 
   if (typeof window !== 'undefined') {
@@ -214,6 +231,8 @@ export function createSimulatedBridge(): Bridge {
       if (playing) {
         if (countInBeatsLeft > 0) countInBeatsLeft -= 1;
         else beatsElapsed += 1;
+        if (loop.enabled && beatsElapsed * 960 >= loop.end)
+          beatsElapsed = Math.floor(loop.start / 960);
         sendPosition();
       }
       window.setTimeout(tick, 60000 / bpm);
@@ -224,6 +243,7 @@ export function createSimulatedBridge(): Bridge {
   return {
     isNative: false,
     send: (intent) => {
+      if (timeline.handle(intent)) return;
       switch (intent.type) {
         case 'app.ready':
           queueMicrotask(() => {
@@ -234,7 +254,7 @@ export function createSimulatedBridge(): Bridge {
             sendHistory();
             sendProject();
             router.dispatch({ type: 'instrument.state', payload: { instrument: 0 } });
-            sendPattern();
+            timeline.ready();
             drumPads.forEach((_, pad) => {
               sendPad(pad);
             });
@@ -282,9 +302,31 @@ export function createSimulatedBridge(): Bridge {
           return;
         case 'transport.stop':
           playing = false;
+          recording = false;
           countInBeatsLeft = 0;
           queueMicrotask(sendTransportState);
           return;
+        case 'transport.record':
+          if (recording) {
+            recording = false;
+            playing = false;
+          } else {
+            recording = true;
+            if (!playing) countInBeatsLeft = countInBars * 4;
+            playing = true;
+          }
+          queueMicrotask(sendTransportState);
+          return;
+        case 'transport.seek':
+          beatsElapsed = Math.floor(intent.payload.ticks / 960);
+          queueMicrotask(sendPosition);
+          return;
+        case 'transport.setLoop': {
+          const { enabled, start, end } = intent.payload;
+          loop = { enabled: enabled && end > start, start, end: end > start ? end : start };
+          queueMicrotask(sendTransportState);
+          return;
+        }
         case 'transport.returnToStart':
           beatsElapsed = 0;
           queueMicrotask(sendPosition);
@@ -356,22 +398,6 @@ export function createSimulatedBridge(): Bridge {
                 ),
               },
             });
-          });
-          return;
-        case 'drums.setStep':
-          queueMicrotask(() => {
-            const { pad, step, on } = intent.payload;
-            const row = drumSteps[pad] ?? 0;
-            drumSteps[pad] = on ? row | (1 << step) : row & ~(1 << step);
-            dirty = true;
-            sendPattern();
-            sendProject();
-          });
-          return;
-        case 'drums.clear':
-          queueMicrotask(() => {
-            drumSteps.fill(0);
-            sendPattern();
           });
           return;
         case 'drums.setPad':

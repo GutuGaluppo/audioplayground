@@ -106,3 +106,28 @@ TEST_CASE ("toVar serialises events into the documented envelope", "[bridge]")
     CHECK (static_cast<int> (parsed["payload"]["bufferSize"]) == 256);
     CHECK (static_cast<bool> (parsed["payload"]["toneEnabled"]));
 }
+
+TEST_CASE ("toVar serialises nested lists of records", "[bridge]")
+{
+    TimelineState state;
+    TimelineTrack track;
+    track.id = 3;
+    track.kind = 1;
+    track.name = "Synth";
+    TimelineClip clip;
+    clip.id = 7;
+    clip.length = 3840;
+    clip.notes.push_back ({240, 120, 64, 0.5});
+    track.clips.push_back (clip);
+    state.tracks.push_back (track);
+
+    const auto parsed = juce::JSON::parse (juce::JSON::toString (toVar (Event {state}), true));
+    CHECK (parsed["type"].toString() == "timeline.state");
+    const auto& tracks = *parsed["payload"]["tracks"].getArray();
+    REQUIRE (tracks.size() == 1);
+    CHECK (tracks[0]["name"].toString() == "Synth");
+    const auto& note = tracks[0]["clips"][0]["notes"][0];
+    CHECK (static_cast<int> (note["start"]) == 240);
+    CHECK (static_cast<int> (note["pitch"]) == 64);
+    CHECK (static_cast<double> (note["velocity"]) == 0.5);
+}

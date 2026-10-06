@@ -13,6 +13,11 @@ namespace ap::core
 using Ticks = std::int64_t;
 using Samples = std::int64_t;
 
+// Real time inside audio files: 1/705 600 000 s, which divides every common sample rate exactly,
+// so offsets into a file stay exact whatever rate the device runs at.
+using Flicks = std::int64_t;
+inline constexpr Flicks flicksPerSecond = 705'600'000;
+
 inline constexpr Ticks ticksPerQuarterNote = 960;
 
 inline constexpr double minTempoBpm = 20.0;
@@ -43,6 +48,22 @@ struct TimeSignature
 [[nodiscard]] constexpr bool isValidTempo (double bpm) noexcept
 {
     return bpm >= minTempoBpm && bpm <= maxTempoBpm; // false for NaN
+}
+
+// Duration of a span of ticks at a constant tempo, rounded to the nearest flick.
+[[nodiscard]] inline Flicks ticksToFlicks (Ticks ticks, double bpm) noexcept AP_NONBLOCKING
+{
+    const double tempo = isValidTempo (bpm) ? bpm : 120.0;
+    const double seconds
+        = static_cast<double> (ticks) * 60.0 / (tempo * static_cast<double> (ticksPerQuarterNote));
+    return static_cast<Flicks> (std::llround (seconds * static_cast<double> (flicksPerSecond)));
+}
+
+// Frame index at the given sample rate, rounded to the nearest frame.
+[[nodiscard]] inline Samples flicksToFrames (Flicks flicks, double sampleRate) noexcept AP_NONBLOCKING
+{
+    return static_cast<Samples> (
+        std::llround (static_cast<double> (flicks) * sampleRate / static_cast<double> (flicksPerSecond)));
 }
 
 // 1-based position for display: bar 1, beat 1 is the project start.

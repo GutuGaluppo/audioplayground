@@ -22,6 +22,10 @@ public:
     ~Session() override;
 
     bool perform (model::Command command, model::ProjectDocument::GestureId gesture = 0);
+    // Several commands as one undo step (see ProjectDocument::performGroup).
+    bool performGroup (std::string_view description,
+                       const std::function<void (model::ProjectDocument::Group&)>& edit,
+                       model::ProjectDocument::GestureId gesture = 0);
     bool undo();
     bool redo();
 
@@ -55,6 +59,11 @@ public:
     // Called after every change to the project or its saved state.
     std::function<void()> onChanged;
 
+    // Where the render graph gets decoded audio for audio clips (see SampleLoader).
+    void setAudioLookup (engine::AudioLookup lookup);
+    // Republishes the render graph, e.g. when clip audio finished loading.
+    void refreshEngine();
+
 private:
     void syncEngine();
     bool afterChange (bool changed);
@@ -63,6 +72,7 @@ private:
     void loadInto (model::LoadedProject loaded, std::optional<io::ProjectFolder> location, bool markDirty);
 
     engine::Engine& engine;
+    engine::AudioLookup audioLookup;
     io::ProjectFolder scratch;
     model::ProjectDocument doc;
     model::ProjectMetadata metadata;

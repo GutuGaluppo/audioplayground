@@ -59,8 +59,19 @@ struct AddTrack
     {
     }
 
+    // An instrument track. Rejected if the project already has a track for that instrument.
+    explicit AddTrack (InstrumentKind instrumentKind, std::string trackName = {},
+                       std::optional<std::size_t> at = {})
+        : kind (TrackKind::instrument)
+        , instrument (instrumentKind)
+        , name (std::move (trackName))
+        , index (at)
+    {
+    }
+
     TrackKind kind = TrackKind::audio;
-    std::string name;                 // empty: a default such as "Audio 2"
+    InstrumentKind instrument = InstrumentKind::synth;
+    std::string name;                 // empty: a default such as "Audio 2" or "Drums"
     std::optional<std::size_t> index; // empty: append
     TrackId created;                  // captured
     std::uint64_t previousNextTrackId = 0;
@@ -195,19 +206,6 @@ struct SetSamplerAsset
     AssetId previous;
 };
 
-// Replaces the whole pattern (it is only 32 bytes). Painting several steps in one drag is one
-// gesture, so it merges into a single undo step.
-struct SetDrumSteps
-{
-    explicit SetDrumSteps (std::array<std::uint16_t, DrumKit::numPads> newSteps) noexcept
-        : steps (newSteps)
-    {
-    }
-
-    std::array<std::uint16_t, DrumKit::numPads> steps {};
-    std::array<std::uint16_t, DrumKit::numPads> previous {};
-};
-
 // Replaces one pad's settings (volume, pitch, mute, sample).
 struct SetDrumPad
 {
@@ -222,9 +220,84 @@ struct SetDrumPad
     DrumPad previous;
 };
 
-using Command = std::variant<SetTempo, SetTimeSignature, RenameProject, AddTrack, RemoveTrack, MoveTrack,
-                             RenameTrack, SetTrackVolume, SetTrackPan, SetTrackMute, SetTrackSolo,
-                             SetParameter, AddAsset, SetSamplerAsset, SetDrumSteps, SetDrumPad>;
+// Adds a clip to a track (ADR-007). The clip's id is assigned here; the one passed is ignored.
+struct AddClip
+{
+    AddClip (TrackId targetTrack, Clip newClip)
+        : track (targetTrack)
+        , clip (std::move (newClip))
+    {
+    }
+
+    TrackId track;
+    Clip clip;
+    ClipId created; // captured
+    std::uint64_t previousNextClipId = 0;
+};
+
+struct RemoveClip
+{
+    explicit RemoveClip (ClipId clip) noexcept
+        : id (clip)
+    {
+    }
+
+    ClipId id;
+    TrackId track; // captured
+    Clip removed;  // captured
+};
+
+// What a SetClip changes. Only edits of the same kind on the same clip merge into one undo step
+// (a drag), and the kind names the step in the Undo menu.
+enum class ClipEdit : std::uint8_t
+{
+    move,   // position and/or track
+    resize, // either edge
+    notes,  // note content (piano roll, drum steps)
+    loop    // loop length
+};
+
+// Replaces a clip's region and content, and optionally moves it to another track of the same
+// kind. Everything except the id is taken from value.
+struct SetClip
+{
+    SetClip (ClipId clip, TrackId targetTrack, Clip newValue, ClipEdit kind)
+        : id (clip)
+        , track (targetTrack)
+        , value (std::move (newValue))
+        , edit (kind)
+    {
+    }
+
+    ClipId id;
+    TrackId track;
+    Clip value;
+    ClipEdit edit = ClipEdit::move;
+    TrackId previousTrack; // captured
+    Clip previous;         // captured
+};
+
+// Splits a clip in two at a timeline position (see splitClip). The left part keeps the id.
+struct SplitClip
+{
+    SplitClip (ClipId clip, core::Ticks position) noexcept
+        : id (clip)
+        , at (position)
+    {
+    }
+
+    ClipId id;
+    core::Ticks at = 0;
+    TrackId track;  // captured
+    Clip original;  // captured
+    ClipId created; // captured: the right part
+    std::uint64_t previousNextClipId = 0;
+};
+
+using Command
+    = std::variant<SetTempo, SetTimeSignature, RenameProject, AddTrack, RemoveTrack, MoveTrack, RenameTrack,
+                   SetTrackVolume, SetTrackPan, SetTrackMute, SetTrackSolo, SetParameter, AddAsset,
+                   SetSamplerAsset, SetDrumPad, AddClip, RemoveClip, SetClip, SplitClip>;
 
 enum class ApplyResult
 {

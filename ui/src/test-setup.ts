@@ -9,3 +9,8 @@ afterEach(() => {
 if (!('releasePointerCapture' in Element.prototype)) {
   Object.defineProperty(Element.prototype, 'releasePointerCapture', { value: () => undefined });
 }
+
+// jsdom does not implement scrolling; the timeline scrolls to keep the playhead in view.
+if (!('scrollTo' in Element.prototype)) {
+  Object.defineProperty(Element.prototype, 'scrollTo', { value: () => undefined });
+}

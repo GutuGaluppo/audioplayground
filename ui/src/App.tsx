@@ -6,10 +6,14 @@ import { Notices } from './components/Notices';
 import { ParamSlider } from './components/ParamSlider';
 import { PeakMeter } from './components/PeakMeter';
 import { TransportBar } from './components/TransportBar';
+import { PianoRoll } from './editor/PianoRoll';
 import { Keyboard } from './instrument/Keyboard';
 import { InstrumentArea } from './instrument/InstrumentArea';
 import { useLatest } from './state/latestEvent';
 import { useStores } from './state/StoresContext';
+import { findClip, isAudioClip, TrackKind } from './timeline/model';
+import { useSelection } from './timeline/selection';
+import { Timeline } from './timeline/Timeline';
 
 function formatDevice(status: EngineStatus['payload']): string {
   if (!status.deviceName) return 'No audio output';
@@ -19,6 +23,16 @@ function formatDevice(status: EngineStatus['payload']): string {
     `${String(status.bufferSize)} samples`,
     `${status.outputLatencyMs.toFixed(1)} ms`,
   ].join(' · ');
+}
+
+/** The note editor for the selected synth or sampler clip (drum clips use the step grid). */
+function ClipEditor() {
+  const stores = useStores();
+  const timeline = useLatest(stores.timeline);
+  const selection = useSelection(stores.selection);
+  const found = selection.clip !== null ? findClip(timeline?.tracks ?? [], selection.clip) : null;
+  if (!found || isAudioClip(found.clip) || found.track.kind === TrackKind.drums) return null;
+  return <PianoRoll track={found.track} clip={found.clip} />;
 }
 
 export function App() {
@@ -48,30 +62,12 @@ export function App() {
 
       <TransportBar />
 
-      <main className="stage">
-        <InstrumentArea />
-
-        <section className="card card--compact" aria-label="Test tone">
-          <h2 className="card__title">Test tone</h2>
-          <button
-            type="button"
-            className="play"
-            aria-pressed={toneEnabled}
-            disabled={!status}
-            onClick={() => {
-              bridge.send({ type: 'tone.setEnabled', payload: { enabled: !toneEnabled } });
-            }}
-          >
-            <span className="play__icon" aria-hidden="true">
-              {toneEnabled ? '■' : '▶'}
-            </span>
-            <span>{toneEnabled ? 'Stop test tone' : 'Play test tone'}</span>
-          </button>
-
-          <ParamSlider id="tone.level" label="Level" />
-
-          <PeakMeter />
-        </section>
+      <main className="workspace">
+        <Timeline />
+        <div className="workspace__bottom">
+          <InstrumentArea />
+          <ClipEditor />
+        </div>
       </main>
 
       <Keyboard />
@@ -80,6 +76,21 @@ export function App() {
 
       <footer className="statusbar">
         <span>{status ? formatDevice(status) : 'Connecting to audio engine…'}</span>
+        <div className="statusbar__tone" role="group" aria-label="Test tone">
+          <button
+            type="button"
+            className="toggle"
+            aria-pressed={toneEnabled}
+            disabled={!status}
+            onClick={() => {
+              bridge.send({ type: 'tone.setEnabled', payload: { enabled: !toneEnabled } });
+            }}
+          >
+            {toneEnabled ? 'Stop test tone' : 'Play test tone'}
+          </button>
+          <ParamSlider id="tone.level" label="Level" />
+          <PeakMeter />
+        </div>
         {bridge.isNative ? (
           <button type="button" className="button button--quiet" onClick={openSettings}>
             Audio settings

@@ -4,6 +4,46 @@
 
 export const PROTOCOL_VERSION = 1;
 
+// Records used inside events
+export interface TimelineNote {
+  readonly start: number;
+  readonly length: number;
+  readonly pitch: number;
+  readonly velocity: number;
+}
+
+export interface TimelineClip {
+  readonly id: number;
+  readonly start: number;
+  readonly length: number;
+  readonly asset: number;
+  readonly sourceOffsetSeconds: number;
+  readonly contentOffset: number;
+  readonly loopLength: number;
+  readonly notes: readonly TimelineNote[];
+}
+
+export interface TimelineTrack {
+  readonly id: number;
+  readonly kind: number;
+  readonly name: string;
+  readonly volumeDb: number;
+  readonly pan: number;
+  readonly muted: boolean;
+  readonly soloed: boolean;
+  readonly clips: readonly TimelineClip[];
+}
+
+export interface TimelineAsset {
+  readonly id: number;
+  readonly name: string;
+  readonly loaded: boolean;
+  readonly missing: boolean;
+  readonly loading: boolean;
+  readonly durationSeconds: number;
+  readonly overview: readonly number[];
+}
+
 // Intents: UI -> native
 export interface AppReady {
   readonly type: 'app.ready';
@@ -139,6 +179,7 @@ export interface SamplerLoad {
 export interface DrumsSetStep {
   readonly type: 'drums.setStep';
   readonly payload: {
+    readonly clip: number;
     readonly pad: number;
     readonly step: number;
     readonly on: boolean;
@@ -148,7 +189,9 @@ export interface DrumsSetStep {
 
 export interface DrumsClear {
   readonly type: 'drums.clear';
-  readonly payload: {};
+  readonly payload: {
+    readonly clip: number;
+  };
 }
 
 export interface DrumsTrigger {
@@ -184,7 +227,184 @@ export interface DrumsResetPad {
   };
 }
 
-export type Intent = AppReady | AudioOpenSettings | ToneSetEnabled | TransportPlay | TransportStop | TransportReturnToStart | TransportSetTempo | TransportSetCountIn | MetronomeSetEnabled | ParamSet | EditUndo | EditRedo | ProjectNew | ProjectOpen | ProjectSave | ProjectSaveAs | ProjectRename | NoteOn | NoteOff | NoteAllOff | InstrumentSelect | SamplerLoad | DrumsSetStep | DrumsClear | DrumsTrigger | DrumsSetPad | DrumsLoadPad | DrumsResetPad;
+export interface TransportRecord {
+  readonly type: 'transport.record';
+  readonly payload: {};
+}
+
+export interface TransportSeek {
+  readonly type: 'transport.seek';
+  readonly payload: {
+    readonly ticks: number;
+  };
+}
+
+export interface TransportSetLoop {
+  readonly type: 'transport.setLoop';
+  readonly payload: {
+    readonly enabled: boolean;
+    readonly start: number;
+    readonly end: number;
+  };
+}
+
+export interface TrackAdd {
+  readonly type: 'track.add';
+  readonly payload: {
+    readonly kind: number;
+  };
+}
+
+export interface TrackRemove {
+  readonly type: 'track.remove';
+  readonly payload: {
+    readonly track: number;
+  };
+}
+
+export interface TrackRename {
+  readonly type: 'track.rename';
+  readonly payload: {
+    readonly track: number;
+    readonly name: string;
+  };
+}
+
+export interface TrackSetVolume {
+  readonly type: 'track.setVolume';
+  readonly payload: {
+    readonly track: number;
+    readonly volumeDb: number;
+    readonly gesture: number;
+  };
+}
+
+export interface TrackSetPan {
+  readonly type: 'track.setPan';
+  readonly payload: {
+    readonly track: number;
+    readonly pan: number;
+    readonly gesture: number;
+  };
+}
+
+export interface TrackSetMute {
+  readonly type: 'track.setMute';
+  readonly payload: {
+    readonly track: number;
+    readonly muted: boolean;
+  };
+}
+
+export interface TrackSetSolo {
+  readonly type: 'track.setSolo';
+  readonly payload: {
+    readonly track: number;
+    readonly soloed: boolean;
+  };
+}
+
+export interface TrackImportAudio {
+  readonly type: 'track.importAudio';
+  readonly payload: {
+    readonly track: number;
+    readonly ticks: number;
+  };
+}
+
+export interface ClipCreate {
+  readonly type: 'clip.create';
+  readonly payload: {
+    readonly track: number;
+    readonly start: number;
+    readonly length: number;
+  };
+}
+
+export interface ClipMove {
+  readonly type: 'clip.move';
+  readonly payload: {
+    readonly clip: number;
+    readonly track: number;
+    readonly start: number;
+    readonly gesture: number;
+  };
+}
+
+export interface ClipResize {
+  readonly type: 'clip.resize';
+  readonly payload: {
+    readonly clip: number;
+    readonly edge: number;
+    readonly ticks: number;
+    readonly gesture: number;
+  };
+}
+
+export interface ClipSplit {
+  readonly type: 'clip.split';
+  readonly payload: {
+    readonly clip: number;
+    readonly ticks: number;
+  };
+}
+
+export interface ClipRemove {
+  readonly type: 'clip.remove';
+  readonly payload: {
+    readonly clip: number;
+  };
+}
+
+export interface ClipDuplicate {
+  readonly type: 'clip.duplicate';
+  readonly payload: {
+    readonly clip: number;
+  };
+}
+
+export interface ClipSetLoop {
+  readonly type: 'clip.setLoop';
+  readonly payload: {
+    readonly clip: number;
+    readonly enabled: boolean;
+  };
+}
+
+export interface ClipAddNote {
+  readonly type: 'clip.addNote';
+  readonly payload: {
+    readonly clip: number;
+    readonly start: number;
+    readonly length: number;
+    readonly pitch: number;
+    readonly velocity: number;
+  };
+}
+
+export interface ClipRemoveNote {
+  readonly type: 'clip.removeNote';
+  readonly payload: {
+    readonly clip: number;
+    readonly start: number;
+    readonly pitch: number;
+  };
+}
+
+export interface ClipEditNote {
+  readonly type: 'clip.editNote';
+  readonly payload: {
+    readonly clip: number;
+    readonly fromStart: number;
+    readonly fromPitch: number;
+    readonly start: number;
+    readonly length: number;
+    readonly pitch: number;
+    readonly gesture: number;
+  };
+}
+
+export type Intent = AppReady | AudioOpenSettings | ToneSetEnabled | TransportPlay | TransportStop | TransportReturnToStart | TransportSetTempo | TransportSetCountIn | MetronomeSetEnabled | ParamSet | EditUndo | EditRedo | ProjectNew | ProjectOpen | ProjectSave | ProjectSaveAs | ProjectRename | NoteOn | NoteOff | NoteAllOff | InstrumentSelect | SamplerLoad | DrumsSetStep | DrumsClear | DrumsTrigger | DrumsSetPad | DrumsLoadPad | DrumsResetPad | TransportRecord | TransportSeek | TransportSetLoop | TrackAdd | TrackRemove | TrackRename | TrackSetVolume | TrackSetPan | TrackSetMute | TrackSetSolo | TrackImportAudio | ClipCreate | ClipMove | ClipResize | ClipSplit | ClipRemove | ClipDuplicate | ClipSetLoop | ClipAddNote | ClipRemoveNote | ClipEditNote;
 
 // Events: native -> UI
 export interface EngineStatus {
@@ -215,6 +435,10 @@ export interface TransportState {
     readonly denominator: number;
     readonly countInBars: number;
     readonly metronomeEnabled: boolean;
+    readonly recording: boolean;
+    readonly loopEnabled: boolean;
+    readonly loopStart: number;
+    readonly loopEnd: number;
   };
 }
 
@@ -224,7 +448,7 @@ export interface TransportPosition {
     readonly bar: number;
     readonly beat: number;
     readonly countingIn: boolean;
-    readonly step: number;
+    readonly ticks: number;
   };
 }
 
@@ -282,13 +506,6 @@ export interface SamplerState {
   };
 }
 
-export interface DrumsPattern {
-  readonly type: 'drums.pattern';
-  readonly payload: {
-    readonly steps: readonly number[];
-  };
-}
-
 export interface DrumsPad {
   readonly type: 'drums.pad';
   readonly payload: {
@@ -302,7 +519,21 @@ export interface DrumsPad {
   };
 }
 
-export type NativeEvent = EngineStatus | EngineMeters | TransportState | TransportPosition | ParamValue | HistoryState | ProjectState | AppNotice | InstrumentState | SamplerState | DrumsPattern | DrumsPad;
+export interface TimelineState {
+  readonly type: 'timeline.state';
+  readonly payload: {
+    readonly tracks: readonly TimelineTrack[];
+  };
+}
+
+export interface TimelineAssets {
+  readonly type: 'timeline.assets';
+  readonly payload: {
+    readonly assets: readonly TimelineAsset[];
+  };
+}
+
+export type NativeEvent = EngineStatus | EngineMeters | TransportState | TransportPosition | ParamValue | HistoryState | ProjectState | AppNotice | InstrumentState | SamplerState | DrumsPad | TimelineState | TimelineAssets;
 export type NativeEventType = NativeEvent['type'];
 
 /** Payload type for each native event type. */
@@ -317,8 +548,9 @@ export interface NativeEventPayloads {
   'app.notice': AppNotice['payload'];
   'instrument.state': InstrumentState['payload'];
   'sampler.state': SamplerState['payload'];
-  'drums.pattern': DrumsPattern['payload'];
   'drums.pad': DrumsPad['payload'];
+  'timeline.state': TimelineState['payload'];
+  'timeline.assets': TimelineAssets['payload'];
 }
 
 type Payload = Record<string, unknown>;
@@ -340,6 +572,69 @@ function hasOnlyKeys(payload: Payload, keys: readonly string[]): boolean {
   return actual.length === keys.length && keys.every((key) => Object.hasOwn(payload, key));
 }
 
+function isList(value: unknown, maxItems: number, isItem: (item: unknown) => boolean): boolean {
+  return Array.isArray(value) && value.length <= maxItems && value.every((item: unknown) => isItem(item));
+}
+
+function isTimelineNote(value: unknown): boolean {
+  if (!isPayload(value)) return false;
+  const payload = value;
+  return (
+    hasOnlyKeys(payload, ['start', 'length', 'pitch', 'velocity']) &&
+    Number.isInteger(payload['start']) && (payload['start'] as number) >= 0 && (payload['start'] as number) <= 38400000 &&
+    Number.isInteger(payload['length']) && (payload['length'] as number) >= 1 && (payload['length'] as number) <= 38400000 &&
+    Number.isInteger(payload['pitch']) && (payload['pitch'] as number) >= 0 && (payload['pitch'] as number) <= 127 &&
+    typeof payload['velocity'] === 'number' && Number.isFinite(payload['velocity']) && payload['velocity'] >= 0 && payload['velocity'] <= 1
+  );
+}
+
+function isTimelineClip(value: unknown): boolean {
+  if (!isPayload(value)) return false;
+  const payload = value;
+  return (
+    hasOnlyKeys(payload, ['id', 'start', 'length', 'asset', 'sourceOffsetSeconds', 'contentOffset', 'loopLength', 'notes']) &&
+    Number.isInteger(payload['id']) && (payload['id'] as number) >= 1 && (payload['id'] as number) <= 2147483647 &&
+    Number.isInteger(payload['start']) && (payload['start'] as number) >= 0 && (payload['start'] as number) <= 38400000 &&
+    Number.isInteger(payload['length']) && (payload['length'] as number) >= 1 && (payload['length'] as number) <= 38400000 &&
+    Number.isInteger(payload['asset']) && (payload['asset'] as number) >= 0 && (payload['asset'] as number) <= 2147483647 &&
+    typeof payload['sourceOffsetSeconds'] === 'number' && Number.isFinite(payload['sourceOffsetSeconds']) && payload['sourceOffsetSeconds'] >= 0 && payload['sourceOffsetSeconds'] <= 86400 &&
+    Number.isInteger(payload['contentOffset']) && (payload['contentOffset'] as number) >= 0 && (payload['contentOffset'] as number) <= 38400000 &&
+    Number.isInteger(payload['loopLength']) && (payload['loopLength'] as number) >= 0 && (payload['loopLength'] as number) <= 38400000 &&
+    isList(payload['notes'], 4096, isTimelineNote)
+  );
+}
+
+function isTimelineTrack(value: unknown): boolean {
+  if (!isPayload(value)) return false;
+  const payload = value;
+  return (
+    hasOnlyKeys(payload, ['id', 'kind', 'name', 'volumeDb', 'pan', 'muted', 'soloed', 'clips']) &&
+    Number.isInteger(payload['id']) && (payload['id'] as number) >= 1 && (payload['id'] as number) <= 2147483647 &&
+    Number.isInteger(payload['kind']) && (payload['kind'] as number) >= 0 && (payload['kind'] as number) <= 3 &&
+    typeof payload['name'] === 'string' && payload['name'].length <= 256 &&
+    typeof payload['volumeDb'] === 'number' && Number.isFinite(payload['volumeDb']) && payload['volumeDb'] >= -60 && payload['volumeDb'] <= 6 &&
+    typeof payload['pan'] === 'number' && Number.isFinite(payload['pan']) && payload['pan'] >= -1 && payload['pan'] <= 1 &&
+    typeof payload['muted'] === 'boolean' &&
+    typeof payload['soloed'] === 'boolean' &&
+    isList(payload['clips'], 512, isTimelineClip)
+  );
+}
+
+function isTimelineAsset(value: unknown): boolean {
+  if (!isPayload(value)) return false;
+  const payload = value;
+  return (
+    hasOnlyKeys(payload, ['id', 'name', 'loaded', 'missing', 'loading', 'durationSeconds', 'overview']) &&
+    Number.isInteger(payload['id']) && (payload['id'] as number) >= 1 && (payload['id'] as number) <= 2147483647 &&
+    typeof payload['name'] === 'string' && payload['name'].length <= 256 &&
+    typeof payload['loaded'] === 'boolean' &&
+    typeof payload['missing'] === 'boolean' &&
+    typeof payload['loading'] === 'boolean' &&
+    typeof payload['durationSeconds'] === 'number' && Number.isFinite(payload['durationSeconds']) && payload['durationSeconds'] >= 0 && payload['durationSeconds'] <= 100000 &&
+    isNumberArray(payload['overview'], 0, 1, 512)
+  );
+}
+
 const eventValidators: Record<NativeEventType, (payload: Payload) => boolean> = {
   'engine.status': (payload) =>
     hasOnlyKeys(payload, ['deviceName', 'sampleRate', 'bufferSize', 'outputLatencyMs', 'error', 'toneEnabled']) &&
@@ -353,19 +648,23 @@ const eventValidators: Record<NativeEventType, (payload: Payload) => boolean> = 
     hasOnlyKeys(payload, ['peak']) &&
     typeof payload['peak'] === 'number' && Number.isFinite(payload['peak']) && payload['peak'] >= 0 && payload['peak'] <= 1,
   'transport.state': (payload) =>
-    hasOnlyKeys(payload, ['playing', 'bpm', 'numerator', 'denominator', 'countInBars', 'metronomeEnabled']) &&
+    hasOnlyKeys(payload, ['playing', 'bpm', 'numerator', 'denominator', 'countInBars', 'metronomeEnabled', 'recording', 'loopEnabled', 'loopStart', 'loopEnd']) &&
     typeof payload['playing'] === 'boolean' &&
     typeof payload['bpm'] === 'number' && Number.isFinite(payload['bpm']) && payload['bpm'] >= 20 && payload['bpm'] <= 300 &&
     Number.isInteger(payload['numerator']) && (payload['numerator'] as number) >= 1 && (payload['numerator'] as number) <= 32 &&
     Number.isInteger(payload['denominator']) && (payload['denominator'] as number) >= 1 && (payload['denominator'] as number) <= 16 &&
     Number.isInteger(payload['countInBars']) && (payload['countInBars'] as number) >= 0 && (payload['countInBars'] as number) <= 4 &&
-    typeof payload['metronomeEnabled'] === 'boolean',
+    typeof payload['metronomeEnabled'] === 'boolean' &&
+    typeof payload['recording'] === 'boolean' &&
+    typeof payload['loopEnabled'] === 'boolean' &&
+    Number.isInteger(payload['loopStart']) && (payload['loopStart'] as number) >= 0 && (payload['loopStart'] as number) <= 38400000 &&
+    Number.isInteger(payload['loopEnd']) && (payload['loopEnd'] as number) >= 0 && (payload['loopEnd'] as number) <= 38400000,
   'transport.position': (payload) =>
-    hasOnlyKeys(payload, ['bar', 'beat', 'countingIn', 'step']) &&
+    hasOnlyKeys(payload, ['bar', 'beat', 'countingIn', 'ticks']) &&
     Number.isInteger(payload['bar']) && (payload['bar'] as number) >= -1000 && (payload['bar'] as number) <= 100000000 &&
     Number.isInteger(payload['beat']) && (payload['beat'] as number) >= 1 && (payload['beat'] as number) <= 32 &&
     typeof payload['countingIn'] === 'boolean' &&
-    Number.isInteger(payload['step']) && (payload['step'] as number) >= 0 && (payload['step'] as number) <= 15,
+    Number.isInteger(payload['ticks']) && (payload['ticks'] as number) >= -10000000 && (payload['ticks'] as number) <= 76800000,
   'param.value': (payload) =>
     hasOnlyKeys(payload, ['id', 'value']) &&
     typeof payload['id'] === 'string' && payload['id'].length <= 64 &&
@@ -396,9 +695,6 @@ const eventValidators: Record<NativeEventType, (payload: Payload) => boolean> = 
     typeof payload['loading'] === 'boolean' &&
     typeof payload['durationSeconds'] === 'number' && Number.isFinite(payload['durationSeconds']) && payload['durationSeconds'] >= 0 && payload['durationSeconds'] <= 100000 &&
     isNumberArray(payload['overview'], 0, 1, 512),
-  'drums.pattern': (payload) =>
-    hasOnlyKeys(payload, ['steps']) &&
-    isNumberArray(payload['steps'], 0, 65535, 16),
   'drums.pad': (payload) =>
     hasOnlyKeys(payload, ['pad', 'name', 'volumeDb', 'pitch', 'muted', 'custom', 'missing']) &&
     Number.isInteger(payload['pad']) && (payload['pad'] as number) >= 0 && (payload['pad'] as number) <= 15 &&
@@ -408,6 +704,12 @@ const eventValidators: Record<NativeEventType, (payload: Payload) => boolean> = 
     typeof payload['muted'] === 'boolean' &&
     typeof payload['custom'] === 'boolean' &&
     typeof payload['missing'] === 'boolean',
+  'timeline.state': (payload) =>
+    hasOnlyKeys(payload, ['tracks']) &&
+    isList(payload['tracks'], 64, isTimelineTrack),
+  'timeline.assets': (payload) =>
+    hasOnlyKeys(payload, ['assets']) &&
+    isList(payload['assets'], 1024, isTimelineAsset),
 };
 
 /** Strictly validates a message received from native code. Returns null if it is malformed. */
