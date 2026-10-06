@@ -59,6 +59,19 @@
         "maxLength": 512
       }
     },
+    "project.export": {
+      "format": {
+        "type": "int",
+        "min": 0,
+        "max": 2
+      },
+      "sampleRate": {
+        "type": "int",
+        "min": 8000,
+        "max": 192000
+      }
+    },
+    "project.cancelExport": {},
     "note.on": {
       "note": {
         "type": "int",
@@ -669,6 +682,16 @@
       },
       "hasLocation": {
         "type": "bool"
+      }
+    },
+    "export.state": {
+      "running": {
+        "type": "bool"
+      },
+      "progress": {
+        "type": "number",
+        "min": 0,
+        "max": 1
       }
     },
     "app.notice": {

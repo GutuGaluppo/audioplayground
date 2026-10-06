@@ -1,5 +1,7 @@
 #include "Session.h"
 
+#include "ap/engine/Export.h"
+
 #include <filesystem>
 #include <system_error>
 
@@ -87,22 +89,7 @@ void Session::notify()
 
 void Session::syncEngine()
 {
-    // Lock-free setters; the audio thread picks the values up on its next block.
-    const auto& project = doc.project();
-    engine.getTransport().setTempo (project.tempoBpm);
-    engine.getTransport().setTimeSignature (project.timeSignature);
-
-    for (std::size_t i = 0; i < params::numParameters; ++i)
-        engine.getParameters().set (static_cast<params::ParamId> (i), project.parameters[i]);
-
-    auto& drums = engine.getDrums();
-    for (std::size_t pad = 0; pad < model::DrumKit::numPads; ++pad)
-    {
-        const auto& settings = project.drums.pads[pad];
-        drums.setPad (static_cast<int> (pad), settings.volumeDb, settings.pitch, settings.muted);
-    }
-
-    refreshEngine();
+    engine::configureEngine (engine, doc.project(), doc.version(), audioLookup);
 }
 
 void Session::loadInto (model::LoadedProject loaded, std::optional<io::ProjectFolder> location,

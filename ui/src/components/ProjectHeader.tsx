@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useBridge } from '../bridge/BridgeContext';
 import { useLatest } from '../state/latestEvent';
 import { useStores } from '../state/StoresContext';
+import { ExportButton } from './ExportButton';
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.userAgent);
 const mod = isMac ? '⌘' : 'Ctrl+';
@@ -115,6 +116,7 @@ export function ProjectHeader() {
         >
           Save
         </button>
+        <ExportButton />
       </div>
     </div>
   );

@@ -150,6 +150,19 @@ export interface ProjectRename {
   };
 }
 
+export interface ProjectExport {
+  readonly type: 'project.export';
+  readonly payload: {
+    readonly format: number;
+    readonly sampleRate: number;
+  };
+}
+
+export interface ProjectCancelExport {
+  readonly type: 'project.cancelExport';
+  readonly payload: {};
+}
+
 export interface NoteOn {
   readonly type: 'note.on';
   readonly payload: {
@@ -434,7 +447,7 @@ export interface ClipEditNote {
   };
 }
 
-export type Intent = AppReady | AudioOpenSettings | ToneSetEnabled | TransportPlay | TransportStop | TransportReturnToStart | TransportSetTempo | TransportSetCountIn | MetronomeSetEnabled | ParamSet | EditUndo | EditRedo | ProjectNew | ProjectOpen | ProjectSave | ProjectSaveAs | ProjectRename | NoteOn | NoteOff | NoteAllOff | InstrumentSelect | SamplerLoad | DrumsSetStep | DrumsClear | DrumsTrigger | DrumsSetPad | DrumsLoadPad | DrumsResetPad | TransportRecord | TransportCapture | TransportSeek | TransportSetLoop | TrackAdd | TrackRemove | TrackRename | TrackSetVolume | TrackSetPan | TrackSetMute | TrackSetSolo | TrackSetArmed | TrackSetEffect | TrackImportAudio | ClipCreate | ClipMove | ClipResize | ClipSplit | ClipRemove | ClipDuplicate | ClipSetLoop | ClipAddNote | ClipRemoveNote | ClipEditNote;
+export type Intent = AppReady | AudioOpenSettings | ToneSetEnabled | TransportPlay | TransportStop | TransportReturnToStart | TransportSetTempo | TransportSetCountIn | MetronomeSetEnabled | ParamSet | EditUndo | EditRedo | ProjectNew | ProjectOpen | ProjectSave | ProjectSaveAs | ProjectRename | ProjectExport | ProjectCancelExport | NoteOn | NoteOff | NoteAllOff | InstrumentSelect | SamplerLoad | DrumsSetStep | DrumsClear | DrumsTrigger | DrumsSetPad | DrumsLoadPad | DrumsResetPad | TransportRecord | TransportCapture | TransportSeek | TransportSetLoop | TrackAdd | TrackRemove | TrackRename | TrackSetVolume | TrackSetPan | TrackSetMute | TrackSetSolo | TrackSetArmed | TrackSetEffect | TrackImportAudio | ClipCreate | ClipMove | ClipResize | ClipSplit | ClipRemove | ClipDuplicate | ClipSetLoop | ClipAddNote | ClipRemoveNote | ClipEditNote;
 
 // Events: native -> UI
 export interface EngineStatus {
@@ -516,6 +529,14 @@ export interface ProjectState {
   };
 }
 
+export interface ExportState {
+  readonly type: 'export.state';
+  readonly payload: {
+    readonly running: boolean;
+    readonly progress: number;
+  };
+}
+
 export interface AppNotice {
   readonly type: 'app.notice';
   readonly payload: {
@@ -579,7 +600,7 @@ export interface TimelinePeaks {
   };
 }
 
-export type NativeEvent = EngineStatus | EngineMeters | TransportState | TransportPosition | ParamValue | HistoryState | ProjectState | AppNotice | InstrumentState | SamplerState | DrumsPad | TimelineState | TimelineAssets | TimelinePeaks;
+export type NativeEvent = EngineStatus | EngineMeters | TransportState | TransportPosition | ParamValue | HistoryState | ProjectState | ExportState | AppNotice | InstrumentState | SamplerState | DrumsPad | TimelineState | TimelineAssets | TimelinePeaks;
 export type NativeEventType = NativeEvent['type'];
 
 /** Payload type for each native event type. */
@@ -591,6 +612,7 @@ export interface NativeEventPayloads {
   'param.value': ParamValue['payload'];
   'history.state': HistoryState['payload'];
   'project.state': ProjectState['payload'];
+  'export.state': ExportState['payload'];
   'app.notice': AppNotice['payload'];
   'instrument.state': InstrumentState['payload'];
   'sampler.state': SamplerState['payload'];
@@ -745,6 +767,10 @@ const eventValidators: Record<NativeEventType, (payload: Payload) => boolean> = 
     typeof payload['name'] === 'string' && payload['name'].length <= 512 &&
     typeof payload['dirty'] === 'boolean' &&
     typeof payload['hasLocation'] === 'boolean',
+  'export.state': (payload) =>
+    hasOnlyKeys(payload, ['running', 'progress']) &&
+    typeof payload['running'] === 'boolean' &&
+    typeof payload['progress'] === 'number' && Number.isFinite(payload['progress']) && payload['progress'] >= 0 && payload['progress'] <= 1,
   'app.notice': (payload) =>
     hasOnlyKeys(payload, ['level', 'message']) &&
     Number.isInteger(payload['level']) && (payload['level'] as number) >= 0 && (payload['level'] as number) <= 2 &&

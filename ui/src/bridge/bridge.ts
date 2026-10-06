@@ -98,6 +98,7 @@ export function createSimulatedBridge(): Bridge {
   let beatsElapsed = 0;
   let countInBeatsLeft = 0;
   let recording = false;
+  let exportCancelled = false;
   let captureAvailable = false; // the simulation remembers that notes were played, not which
   let armedTrack = 0; // the simulated "microphone" is gentle noise on the input meter
   let loop = { enabled: false, start: 0, end: 0 };
@@ -439,6 +440,29 @@ export function createSimulatedBridge(): Bridge {
           return; // no sound in the browser simulation
         case 'note.off':
         case 'note.allOff':
+          return;
+        case 'project.export': {
+          // A pretend render: progress for a second, then a result notice.
+          let progress = 0;
+          const tick = () => {
+            progress = Math.min(1, progress + 0.1);
+            router.dispatch({ type: 'export.state', payload: { running: progress < 1, progress } });
+            if (progress < 1 && !exportCancelled) window.setTimeout(tick, 100);
+            else {
+              router.dispatch({ type: 'export.state', payload: { running: false, progress: 1 } });
+              notice(
+                exportCancelled
+                  ? 'Export cancelled.'
+                  : 'Export writes a WAV file in the desktop app.',
+              );
+              exportCancelled = false;
+            }
+          };
+          queueMicrotask(tick);
+          return;
+        }
+        case 'project.cancelExport':
+          exportCancelled = true;
           return;
         case 'transport.capture':
           captureAvailable = false;

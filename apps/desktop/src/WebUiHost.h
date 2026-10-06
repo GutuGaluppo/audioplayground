@@ -2,6 +2,7 @@
 
 #include "AudioDeviceHost.h"
 #include "AudioRecorder.h"
+#include "Exporter.h"
 #include "NoteCapture.h"
 #include "NoteRecorder.h"
 #include "ProjectActions.h"
@@ -53,6 +54,10 @@ private:
     void handle (const ap::bridge::ProjectSave&);
     void handle (const ap::bridge::ProjectSaveAs&);
     void handle (const ap::bridge::ProjectRename&);
+    void handle (const ap::bridge::ProjectExport&);
+    void handle (const ap::bridge::ProjectCancelExport&);
+    void sendExportState();
+    void exportFinished (const Exporter::Result& result);
     void handle (const ap::bridge::NoteOn&);
     void handle (const ap::bridge::NoteOff&);
     void handle (const ap::bridge::NoteAllOff&);
@@ -133,6 +138,8 @@ private:
 
     NoteRecorder recorder;
     NoteCapture capture;
+    Exporter exporter;
+    bool lastExporting = false;
     std::unique_ptr<LockedDownWebView> webView;
     ap::bridge::TransportPosition lastPosition;
     bool lastPlaying = false;

@@ -4,6 +4,8 @@
 #include "EmbeddedResources.h"
 #include "generated/BridgeCodec.h"
 
+#include <array>
+#include <cstdio>
 #include <juce_audio_utils/juce_audio_utils.h>
 
 namespace ap::desktop
@@ -122,6 +124,7 @@ WebUiHost::WebUiHost (AudioDeviceHost& hostToUse, engine::Engine& engineToUse, S
     , audioRecorder (audioRecorderToUse)
     , recorder (sessionToUse)
     , capture (sessionToUse)
+    , exporter (sessionToUse, samplesToUse)
 {
     const auto devUrl = developmentServerUrl();
 
@@ -170,6 +173,7 @@ WebUiHost::WebUiHost (AudioDeviceHost& hostToUse, engine::Engine& engineToUse, S
         = [this] (const std::string& message) { showNotice (ProjectActions::NoticeLevel::error, message); };
     audioRecorder.onNotice
         = [this] (const std::string& message) { showNotice (ProjectActions::NoticeLevel::warning, message); };
+    exporter.onFinished = [this] (const Exporter::Result& result) { exportFinished (result); };
     setSize (1100, 720);
     startTimerHz (meterRefreshHz);
 }
@@ -219,6 +223,7 @@ void WebUiHost::handle (const ap::bridge::AppReady&)
     sendTimeline();
     sendTimelineAssets();
     sendTimelinePeaks (true);
+    sendExportState();
 }
 
 void WebUiHost::handle (const ap::bridge::AudioOpenSettings&)
@@ -292,6 +297,43 @@ void WebUiHost::handle (const ap::bridge::ProjectSaveAs&)
     if (isRecording())
         stopTransport(); // the take joins the project before it is saved or replaced
     actions.saveAs();
+}
+
+void WebUiHost::handle (const ap::bridge::ProjectExport& intent)
+{
+    if (isRecording())
+        stopTransport(); // the take joins the song first
+    const std::array<io::WavFormat, 3> formats {io::WavFormat::pcm16, io::WavFormat::pcm24,
+                                                io::WavFormat::float32};
+    exporter.chooseAndExport (
+        {formats[static_cast<std::size_t> (intent.format)], static_cast<std::uint32_t> (intent.sampleRate)});
+}
+
+void WebUiHost::handle (const ap::bridge::ProjectCancelExport&)
+{
+    exporter.cancel();
+}
+
+void WebUiHost::sendExportState()
+{
+    lastExporting = exporter.isRunning();
+    emit (ap::bridge::ExportState {lastExporting, juce::jlimit (0.0, 1.0, exporter.getProgress())});
+}
+
+void WebUiHost::exportFinished (const Exporter::Result& result)
+{
+    sendExportState();
+    if (result.error == "cancelled")
+        return showNotice (ProjectActions::NoticeLevel::info, "Export cancelled.");
+    if (!result.error.empty())
+        return showNotice (ProjectActions::NoticeLevel::error, "Export failed. " + result.error);
+
+    const auto minutes = static_cast<int> (result.seconds) / 60;
+    const auto seconds = static_cast<int> (result.seconds) % 60;
+    std::array<char, 96> figures {};
+    std::snprintf (figures.data(), figures.size(), "(%d:%02d) · %.1f LUFS · peak %.1f dBTP", minutes, seconds,
+                   result.loudness.integratedLufs, result.loudness.truePeakDb);
+    showNotice (ProjectActions::NoticeLevel::info, "Exported \"" + result.fileName + "\" " + figures.data());
 }
 
 void WebUiHost::handle (const ap::bridge::ProjectRename& intent)
@@ -575,7 +617,9 @@ void WebUiHost::timerCallback()
         juce::jlimit (-60.0, 0.0, static_cast<double> (engine.consumeLimiterReductionDb()))});
 
     pumpPlayedNotes();
-    audioRecorder.poll(); // may end the take by itself (loop wrap, device change, length limit)
+    audioRecorder.poll();
+    if (exporter.isRunning() || lastExporting)
+        sendExportState(); // may end the take by itself (loop wrap, device change, length limit)
 
     // The audio thread may change the playing state (e.g. a device restart); keep the UI in sync.
     if (engine.getTransport().getState().playing != lastPlaying)

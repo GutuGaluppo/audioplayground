@@ -1462,3 +1462,40 @@ kbd {
   background: var(--ap-meter-hot);
   color: #17181b;
 }
+
+/* --- Export (Task 025) -------------------------------------------------------------------- */
+
+.export-options {
+  left: auto;
+  right: 0;
+  gap: var(--ap-space-2);
+  min-width: 220px;
+  padding: var(--ap-space-3);
+}
+
+.export-options label {
+  display: grid;
+  gap: var(--ap-space-1);
+  font-size: var(--ap-text-xs);
+  color: var(--ap-text-muted);
+}
+
+.export-options select {
+  min-height: 32px;
+  border: 1px solid var(--ap-border);
+  border-radius: var(--ap-radius-sm);
+  background: var(--ap-bg);
+  color: var(--ap-text);
+  font: inherit;
+}
+
+.export-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--ap-space-2);
+}
+
+.export-progress progress {
+  width: 96px;
+  accent-color: var(--ap-accent);
+}

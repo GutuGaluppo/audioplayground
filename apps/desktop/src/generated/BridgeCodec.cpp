@@ -376,6 +376,29 @@ std::optional<Intent> parseProjectRename (const juce::var& payloadVar)
     return Intent {message};
 }
 
+std::optional<Intent> parseProjectExport (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"format", "sampleRate"}))
+        return std::nullopt;
+
+    ProjectExport message;
+    if (!readInt (*payload, "format", ProjectExport::formatMin, ProjectExport::formatMax, message.format)) return std::nullopt;
+    if (!readInt (*payload, "sampleRate", ProjectExport::sampleRateMin, ProjectExport::sampleRateMax, message.sampleRate)) return std::nullopt;
+    return Intent {message};
+}
+
+std::optional<Intent> parseProjectCancelExport (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {}))
+        return std::nullopt;
+
+    ProjectCancelExport message;
+
+    return Intent {message};
+}
+
 std::optional<Intent> parseNoteOn (const juce::var& payloadVar)
 {
     const auto* payload = payloadVar.getDynamicObject();
@@ -856,6 +879,10 @@ std::optional<Intent> parseIntent (const juce::var& message)
         return parseProjectSaveAs (payload);
     if (typeName == ProjectRename::type)
         return parseProjectRename (payload);
+    if (typeName == ProjectExport::type)
+        return parseProjectExport (payload);
+    if (typeName == ProjectCancelExport::type)
+        return parseProjectCancelExport (payload);
     if (typeName == NoteOn::type)
         return parseNoteOn (payload);
     if (typeName == NoteOff::type)
@@ -1005,6 +1032,13 @@ juce::var toVar (const Event& event)
                 payload->setProperty ("dirty", m.dirty);
                 payload->setProperty ("hasLocation", m.hasLocation);
                 return envelope (ProjectState::type, payload);
+            },
+            [] (const ExportState& m) -> juce::var
+            {
+                auto* payload = new juce::DynamicObject();
+                payload->setProperty ("running", m.running);
+                payload->setProperty ("progress", m.progress);
+                return envelope (ExportState::type, payload);
             },
             [] (const AppNotice& m) -> juce::var
             {

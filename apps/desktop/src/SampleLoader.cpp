@@ -211,12 +211,17 @@ void SampleLoader::assign (std::size_t slot, model::AssetId asset)
 
 void SampleLoader::publish (std::size_t slot, std::unique_ptr<instruments::SampleBuffer> buffer)
 {
+    // The engine takes its own copy; this one stays for exports.
+    slots[slot].buffer
+        = buffer != nullptr ? std::shared_ptr<const instruments::SampleBuffer> (std::move (buffer)) : nullptr;
+    const auto& kept = slots[slot].buffer;
     if (slot == samplerSlot)
-        engine.loadSamplerSample (buffer != nullptr ? std::move (buffer)
-                                                    : std::make_unique<instruments::SampleBuffer>());
+        engine.loadSamplerSample (kept != nullptr ? std::make_unique<instruments::SampleBuffer> (*kept)
+                                                  : std::make_unique<instruments::SampleBuffer>());
     else
         engine.getDrums().loadPadSample (static_cast<int> (slot - 1),
-                                         std::move (buffer)); // nullptr: factory sound
+                                         kept != nullptr ? std::make_unique<instruments::SampleBuffer> (*kept)
+                                                         : nullptr); // nullptr: factory sound
 }
 
 void SampleLoader::chooseFile (std::function<void (Copied)> onCopied)

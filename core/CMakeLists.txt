@@ -3,11 +3,13 @@
 
 add_library(ap_core STATIC
     src/BuildInfo.cpp
+    src/dsp/Loudness.cpp
     src/dsp/Oversampler.cpp
     src/dsp/Peaks.cpp
     src/dsp/Resampler.cpp
     src/io/ProjectFiles.cpp
     src/io/Recordings.cpp
+    src/io/WavExport.cpp
     src/fx/Compressor.cpp
     src/fx/Delay.cpp
     src/fx/Distortion.cpp
@@ -16,6 +18,7 @@ add_library(ap_core STATIC
     src/fx/Limiter.cpp
     src/fx/Reverb.cpp
     src/engine/Engine.cpp
+    src/engine/Export.cpp
     src/engine/InputCapture.cpp
     src/engine/Metronome.cpp
     src/engine/OfflineRenderer.cpp

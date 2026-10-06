@@ -60,6 +60,16 @@ public:
         return slots[slot].state;
     }
 
+    // The decoded sample a slot plays (null: none, or a drum pad's factory sound), shared so an
+    // export can load the same audio into its own engine.
+    [[nodiscard]] std::shared_ptr<const instruments::SampleBuffer> getSlotBuffer (std::size_t slot) const
+    {
+        return slots[slot].buffer;
+    }
+
+    // The rate decoded audio is converted to (the live engine's).
+    [[nodiscard]] double getEngineRate() const noexcept { return engineRate; }
+
     // Audio used by clips, by asset id (only assets that some audio clip uses).
     struct ClipAudio
     {
@@ -83,6 +93,7 @@ private:
     struct Slot
     {
         model::AssetId requested;
+        std::shared_ptr<const instruments::SampleBuffer> buffer;
         double loadedRate = 0.0;
         std::uint64_t generation = 0;
         State state;

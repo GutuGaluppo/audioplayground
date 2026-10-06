@@ -428,4 +428,39 @@ describe('App', () => {
     await flush();
     expect(screen.getByRole('button', { name: 'Delay off' })).toBeTruthy();
   });
+
+  it('exports with the chosen options, shows progress and can cancel', async () => {
+    const bridge = await renderApp();
+    const sent: unknown[] = [];
+    const send = bridge.send.bind(bridge);
+    bridge.send = (intent) => {
+      sent.push(intent);
+      send(intent);
+    };
+
+    fireEvent.click(screen.getByRole('button', { name: 'Export…' }));
+    const dialog = screen.getByRole('dialog', { name: 'Export options' });
+    fireEvent.change(dialog.querySelectorAll('select')[0] as HTMLSelectElement, {
+      target: { value: '0' },
+    });
+    fireEvent.change(dialog.querySelectorAll('select')[1] as HTMLSelectElement, {
+      target: { value: '44100' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Export WAV…' }));
+    expect(sent).toContainEqual({
+      type: 'project.export',
+      payload: { format: 0, sampleRate: 44100 },
+    });
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 150));
+    });
+    expect(screen.getByRole('status', { name: 'Exporting' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    });
+    expect(screen.queryByRole('status', { name: 'Exporting' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Export…' })).toBeTruthy();
+  });
 });
