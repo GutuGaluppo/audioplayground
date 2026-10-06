@@ -284,7 +284,9 @@ Cada fase termina num **gate**: CI verde (sanitizers inclusos), benchmarks dentr
 | Teste de loopback da gravação (erro < 1 ms) e gravação real com microfone | ⏳ Precisa de um humano com o dispositivo |
 | 014 (captura retroativa) | ✅ Concluída: o engine registra sempre as notas tocadas (relógio de samples + posição); "Capturar" (Shift+C) transforma a última frase (separada por ≥ 4 s de silêncio) em clipes — na posição da timeline se tocada com o transporte rodando, senão no compasso do playhead mantendo o ritmo |
 | 016 (waveforms) | ✅ Concluída: picos de 200/s (≈ 5 ms) calculados no thread de decodificação, enviados uma vez por carregamento (base64, ≤ 10 min), canvas desenha o pico de cada coluna de pixel no zoom atual; visão geral como fallback enquanto carrega. Sem cache em disco: o áudio já é decodificado a cada abertura |
-| 018–023 (FX) | Próximas: Filter → EQ → Compressor → Distortion → Delay → Reverb V1 |
+| 018 (Filter) | ✅ Concluída: SVF TPT estéreo LP/BP/HP, cutoff em escala log e Q suavizados (20 ms), troca de modo com crossfade; golden `filter_sweep_48k`. Liga na cadeia de efeitos na 024 |
+| 019–023 (FX) | Próximas: EQ → Compressor → Distortion → Delay → Reverb V1 |
+| Escuta dos goldens de FX | ⏳ Precisa de um ouvinte humano (`tests/golden/*.wav`) |
 
 Decisões tomadas durante a execução:
 - JUCE 9.0.3, e não 8.

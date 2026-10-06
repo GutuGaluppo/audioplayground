@@ -8,6 +8,7 @@ add_executable(ap_unit_tests
     unit/ConcurrencyTests.cpp
     unit/DrumMachineTests.cpp
     unit/EngineTests.cpp
+    unit/FilterTests.cpp
     unit/LinearSmoothedValueTests.cpp
     unit/MetronomeTests.cpp
     unit/MusicalTimeTests.cpp

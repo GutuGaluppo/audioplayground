@@ -58,23 +58,35 @@ public:
 
     [[nodiscard]] float process (float input) noexcept AP_NONBLOCKING
     {
+        const auto out = processAll (input);
+        switch (mode)
+        {
+        case FilterMode::lowPass:
+            return static_cast<float> (out.low);
+        case FilterMode::highPass:
+            return static_cast<float> (out.high);
+        case FilterMode::bandPass:
+            return static_cast<float> (out.band);
+        }
+        return 0.0f;
+    }
+
+    // All three responses come from the same state, so blending them switches modes without a click.
+    struct Outputs
+    {
+        double low;
+        double band;
+        double high;
+    };
+    [[nodiscard]] Outputs processAll (float input) noexcept AP_NONBLOCKING
+    {
         const double x = static_cast<double> (input);
         const double v3 = x - ic2;
         const double v1 = a1 * ic1 + a2 * v3;
         const double v2 = ic2 + a2 * ic1 + a3 * v3;
         ic1 = 2.0 * v1 - ic1;
         ic2 = 2.0 * v2 - ic2;
-
-        switch (mode)
-        {
-        case FilterMode::lowPass:
-            return static_cast<float> (v2);
-        case FilterMode::highPass:
-            return static_cast<float> (x - k * v1 - v2);
-        case FilterMode::bandPass:
-            return static_cast<float> (v1);
-        }
-        return 0.0f;
+        return {v2, v1, x - k * v1 - v2};
     }
 
 private:
