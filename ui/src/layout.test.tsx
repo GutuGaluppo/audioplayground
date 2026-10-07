@@ -56,6 +56,17 @@ describe('resizable layout', () => {
     expect(getLayoutPrefs().laneHeight).toBe(48);
   });
 
+  it('chooses the snap grid and remembers it', async () => {
+    await renderApp();
+    const select = screen.getByRole('combobox', { name: 'Snap to grid' });
+    expect((select as HTMLSelectElement).value).toBe('3'); // Beat
+    fireEvent.change(select, { target: { value: '4' } });
+    expect(getLayoutPrefs().snap).toBe(4);
+    expect(JSON.parse(window.localStorage.getItem('ap.layout') ?? '{}')).toMatchObject({ snap: 4 });
+    fireEvent.change(select, { target: { value: '0' } });
+    expect(getLayoutPrefs().snap).toBe(0);
+  });
+
   it('resizes a zone with the keyboard and clamps it to its limits', async () => {
     await renderApp();
     const bar = screen.getByRole('separator', { name: 'Editor panel height' });

@@ -1143,3 +1143,10 @@ kbd {
 .effect--sends {
   --effect-colour: var(--ap-accent);
 }
+
+.timeline__snap {
+  display: flex;
+  align-items: center;
+  gap: var(--ap-space-1);
+  font-size: var(--ap-text-sm, 12px);
+}

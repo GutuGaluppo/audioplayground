@@ -10,6 +10,8 @@ export interface LayoutPrefs {
   instrumentWidth: number;
   effectsWidth: number;
   keyboardHeight: number;
+  /** Index into SNAP_OPTIONS. */
+  snap: number;
 }
 
 export const LAYOUT_DEFAULTS: Readonly<LayoutPrefs> = {
@@ -18,6 +20,7 @@ export const LAYOUT_DEFAULTS: Readonly<LayoutPrefs> = {
   instrumentWidth: 520,
   effectsWidth: 520,
   keyboardHeight: 96,
+  snap: 3,
 };
 
 export const LAYOUT_LIMITS: Readonly<Record<keyof LayoutPrefs, readonly [number, number]>> = {
@@ -26,6 +29,7 @@ export const LAYOUT_LIMITS: Readonly<Record<keyof LayoutPrefs, readonly [number,
   instrumentWidth: [320, 1100],
   effectsWidth: [280, 1100],
   keyboardHeight: [64, 220],
+  snap: [0, 4],
 };
 
 /** Preset lane heights. */
@@ -33,6 +37,15 @@ export const LANE_PRESETS = [
   { label: 'S', name: 'Small', height: 48 },
   { label: 'M', name: 'Medium', height: 76 },
   { label: 'L', name: 'Large', height: 120 },
+] as const;
+
+/** Timeline snap grid: `beats` of a beat (0 = off); `bar` snaps to whole bars. */
+export const SNAP_OPTIONS = [
+  { label: 'Off', beats: 0, bar: false },
+  { label: '1/4 beat', beats: 0.25, bar: false },
+  { label: '1/2 beat', beats: 0.5, bar: false },
+  { label: 'Beat', beats: 1, bar: false },
+  { label: 'Bar', beats: 1, bar: true },
 ] as const;
 
 const STORAGE_KEY = 'ap.layout';

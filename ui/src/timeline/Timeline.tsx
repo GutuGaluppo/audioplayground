@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { useBridge } from '../bridge/BridgeContext';
 import type { TimelineAsset, TimelineBus, TimelineTrack } from '../bridge/generated';
-import { LANE_PRESETS, setLayoutPref, useLayoutPrefs } from '../state/layoutPrefs';
+import { LANE_PRESETS, SNAP_OPTIONS, setLayoutPref, useLayoutPrefs } from '../state/layoutPrefs';
 import { useLatest } from '../state/latestEvent';
 import { useStores } from '../state/StoresContext';
 import { ClipView } from './ClipView';
@@ -209,6 +209,8 @@ function Lane({
   const stores = useStores();
   const selection = useSelection(stores.selection);
   const { bar, beat, bpm } = useMeter();
+  const option = SNAP_OPTIONS[useLayoutPrefs().snap] ?? SNAP_OPTIONS[3];
+  const grid = option.bar ? bar : option.beats * beat;
 
   const select = (clip: number | null) => {
     stores.selection.set({ track: track.id, clip, bus: null });
@@ -262,7 +264,7 @@ function Lane({
           track={track}
           asset={isAudioClip(clip) ? assets.find((a) => a.id === clip.asset) : undefined}
           pxPerTick={pxPerTick}
-          grid={beat}
+          grid={grid}
           bpm={bpm}
           selected={selection.clip === clip.id}
           onSelect={() => {
@@ -288,7 +290,7 @@ export function Timeline() {
   const { bar, beat } = useMeter();
   const [pxPerBeat, setPxPerBeat] = useState(24);
   const scrollerRef = useRef<HTMLDivElement>(null);
-  const { laneHeight } = useLayoutPrefs();
+  const { laneHeight, snap: snapIndex } = useLayoutPrefs();
 
   const tracks = timeline?.tracks ?? NO_TRACKS;
   const buses = timeline?.buses ?? NO_BUSES;
@@ -441,6 +443,22 @@ export function Timeline() {
           Delete
         </button>
         <span className="timeline__spacer" />
+        <label className="timeline__snap">
+          Snap{' '}
+          <select
+            value={snapIndex}
+            aria-label="Snap to grid"
+            onChange={(event) => {
+              setLayoutPref('snap', Number(event.target.value));
+            }}
+          >
+            {SNAP_OPTIONS.map((option, index) => (
+              <option key={option.label} value={index}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
         <div className="timeline__sizes" role="group" aria-label="Track height">
           {LANE_PRESETS.map((preset) => (
             <button
