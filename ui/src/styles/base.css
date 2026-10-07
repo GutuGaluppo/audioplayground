@@ -1552,3 +1552,39 @@ kbd {
   font-size: var(--ap-text-xs);
   cursor: pointer;
 }
+
+.waveform-box {
+  position: relative;
+}
+
+.waveform-trim {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.waveform-trim__marker {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 12px;
+  margin-left: -6px;
+  cursor: ew-resize;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.waveform-trim__marker::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 5px;
+  width: 2px;
+  background: var(--ap-accent);
+}
+
+.waveform-trim__marker:focus-visible {
+  outline: 2px solid var(--ap-accent);
+  outline-offset: 1px;
+}
