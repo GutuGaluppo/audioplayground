@@ -20,6 +20,7 @@ endif()
 
 option(AP_BUILD_TESTS "Build unit tests" ON)
 option(AP_BUILD_DESKTOP "Build the desktop application" ON)
+option(AP_BUILD_WEB "Build the browser host (WebAssembly; needs Emscripten)" OFF)
 option(AP_WARNINGS_AS_ERRORS "Treat compiler warnings as errors on first-party targets" ON)
 set(AP_SANITIZERS "" CACHE STRING "Semicolon-separated sanitizers for first-party code (address;undefined | thread | realtime)")
 
@@ -31,6 +32,10 @@ add_subdirectory(core)
 
 if(AP_BUILD_DESKTOP)
     add_subdirectory(apps/desktop)
+endif()
+
+if(AP_BUILD_WEB)
+    add_subdirectory(apps/web)
 endif()
 
 if(AP_BUILD_TESTS)
