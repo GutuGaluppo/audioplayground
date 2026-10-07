@@ -136,6 +136,11 @@ WebUiHost::WebUiHost (AudioDeviceHost& hostToUse, engine::Engine& engineToUse, S
     , audioRecorder (audioRecorderToUse)
     , recorder (sessionToUse)
     , capture (sessionToUse)
+    , applier (sessionToUse, engineToUse,
+               {[this] { sendTransportState(); }, [this] { sendTimeline(); }, [this] { sendProjectState(); },
+                [this] { sendDrumKit(); }, [this] { sendInstrumentState(); }, [this] { sendStatus(); },
+                [this] (params::ParamId id) { sendParameter (id); },
+                [this] (std::size_t pad) { sendDrumPad (pad); }})
     , exporter (sessionToUse, samplesToUse)
     , accompaniment (sessionToUse, samplesToUse, engineToUse)
 {
@@ -163,6 +168,13 @@ WebUiHost::WebUiHost (AudioDeviceHost& hostToUse, engine::Engine& engineToUse, S
     webView->goToURL (devUrl.isNotEmpty() ? devUrl : juce::WebBrowserComponent::getResourceProviderRoot());
 #endif
 
+    applier.loadedAudioSeconds = [this] (model::AssetId asset) -> std::optional<double>
+    {
+        const auto& audio = samples.getClipAudio();
+        if (const auto it = audio.find (asset.value); it != audio.end() && it->second.state.loaded)
+            return it->second.state.durationSeconds;
+        return std::nullopt;
+    };
     host.onStatusChanged = [this]
     {
         const auto status = host.getStatus();
@@ -231,6 +243,14 @@ void WebUiHost::handleIntent (const juce::var& message)
         return;
     }
 
+    // Stopping also ends recording, previews and note capture, which only this host knows about.
+    if (std::holds_alternative<ap::bridge::TransportStop> (*intent))
+    {
+        stopTransport();
+        return;
+    }
+    if (applier.apply (*intent))
+        return;
     std::visit ([this] (const auto& typed) { handle (typed); }, *intent);
 }
 
@@ -295,76 +315,6 @@ void WebUiHost::handle (const ap::bridge::AudioSetSampleRate& intent)
 void WebUiHost::handle (const ap::bridge::AudioSetBufferSize& intent)
 {
     changeDevice ([&] { return host.setBufferSize (intent.size); });
-}
-
-void WebUiHost::handle (const ap::bridge::ToneSetEnabled& intent)
-{
-    engine.setTestToneEnabled (intent.enabled);
-    sendStatus();
-}
-
-void WebUiHost::handle (const ap::bridge::SynthSetPreset& intent)
-{
-    // The synth's parameters in a fixed order (the UI's preset files list them the same way).
-    static constexpr std::array<std::string_view, 10> ids {
-        "synth.waveform", "synth.pitch", "synth.detune",  "synth.cutoff",  "synth.resonance",
-        "synth.attack",   "synth.decay", "synth.sustain", "synth.release", "synth.volume"};
-    if (intent.values.size() != ids.size())
-        return;
-
-    std::array<std::pair<params::ParamId, float>, ids.size()> changes;
-    for (std::size_t i = 0; i < ids.size(); ++i)
-    {
-        const auto id = params::findParamId (ids[i]);
-        const auto value = intent.values[i];
-        if (!id || !params::isInRange (params::descriptor (*id), value))
-        {
-            DBG ("Rejected out-of-range synth preset");
-            return;
-        }
-        changes[i] = {*id, value};
-    }
-
-    session.performGroup ("Apply synth preset",
-                          [&changes] (model::ProjectDocument::Group& group)
-                          {
-                              for (const auto& [id, value] : changes)
-                                  (void)group.perform (model::SetParameter {id, value});
-                          });
-}
-
-void WebUiHost::handle (const ap::bridge::ParamSet& intent)
-{
-    // The codec checked the envelope; the parameter system checks the ID and its own range.
-    const auto id = params::findParamId (intent.id);
-    if (!id)
-    {
-        DBG ("Rejected param.set for an unknown parameter");
-        return;
-    }
-
-    const auto value = static_cast<float> (intent.value);
-    if (!params::isInRange (params::descriptor (*id), value))
-    {
-        DBG ("Rejected out-of-range param.set");
-        return;
-    }
-
-    // Value changes are sent back through onProjectChanged; a rejected or no-op edit still
-    // echoes the current value so a control never stays out of sync.
-    if (!session.perform (model::SetParameter {*id, value},
-                          static_cast<model::ProjectDocument::GestureId> (intent.gesture)))
-        sendParameter (*id);
-}
-
-void WebUiHost::handle (const ap::bridge::EditUndo&)
-{
-    session.undo();
-}
-
-void WebUiHost::handle (const ap::bridge::EditRedo&)
-{
-    session.redo();
 }
 
 void WebUiHost::handle (const ap::bridge::ProjectNew&)
@@ -432,29 +382,6 @@ void WebUiHost::exportFinished (const Exporter::Result& result)
     showNotice (ProjectActions::NoticeLevel::info, "Exported \"" + result.fileName + "\" " + figures.data());
 }
 
-void WebUiHost::handle (const ap::bridge::ProjectRename& intent)
-{
-    if (!session.perform (model::RenameProject {intent.name}))
-        sendProjectState(); // rejected (e.g. empty): restore the shown name
-}
-
-void WebUiHost::handle (const ap::bridge::NoteOn& intent)
-{
-    engine.sendNoteFromUi ({instruments::NoteEvent::Type::noteOn, static_cast<std::uint8_t> (intent.note),
-                            static_cast<float> (intent.velocity)});
-}
-
-void WebUiHost::handle (const ap::bridge::NoteOff& intent)
-{
-    engine.sendNoteFromUi (
-        {instruments::NoteEvent::Type::noteOff, static_cast<std::uint8_t> (intent.note), 0.0f});
-}
-
-void WebUiHost::handle (const ap::bridge::NoteAllOff&)
-{
-    engine.sendNoteFromUi ({instruments::NoteEvent::Type::allNotesOff, 0, 0.0f});
-}
-
 void WebUiHost::sendProjectState()
 {
     ap::bridge::ProjectState event;
@@ -472,35 +399,9 @@ void WebUiHost::showNotice (ProjectActions::NoticeLevel level, const std::string
     emit (event);
 }
 
-void WebUiHost::handle (const ap::bridge::InstrumentSelect& intent)
-{
-    engine.setLiveInstrument (static_cast<engine::Engine::LiveInstrument> (intent.instrument));
-    sendInstrumentState();
-}
-
 void WebUiHost::handle (const ap::bridge::SamplerLoad&)
 {
     samples.chooseAndImport (SampleLoader::samplerSlot);
-}
-
-void WebUiHost::handle (const ap::bridge::DrumsTrigger& intent)
-{
-    // Pads play through the same lock-free note queue as the keyboard (GM drum notes).
-    engine.sendNoteFromUi ({instruments::NoteEvent::Type::noteOn,
-                            static_cast<std::uint8_t> (instruments::DrumMachine::firstMidiNote + intent.pad),
-                            static_cast<float> (intent.velocity)});
-}
-
-void WebUiHost::handle (const ap::bridge::DrumsSetPad& intent)
-{
-    const auto pad = static_cast<std::size_t> (intent.pad);
-    auto settings = session.project().drums.pads[pad];
-    settings.volumeDb = static_cast<float> (intent.volumeDb);
-    settings.pitch = static_cast<float> (intent.pitch);
-    settings.muted = intent.muted;
-    if (!session.perform (model::SetDrumPad {pad, settings},
-                          static_cast<model::ProjectDocument::GestureId> (intent.gesture)))
-        sendDrumPad (pad);
 }
 
 void WebUiHost::handle (const ap::bridge::DrumsLoadPad& intent)
@@ -508,46 +409,50 @@ void WebUiHost::handle (const ap::bridge::DrumsLoadPad& intent)
     samples.chooseAndImport (SampleLoader::padSlot (static_cast<std::size_t> (intent.pad)));
 }
 
-void WebUiHost::handle (const ap::bridge::DrumsResetPad& intent)
-{
-    const auto pad = static_cast<std::size_t> (intent.pad);
-    auto settings = session.project().drums.pads[pad];
-    settings.sample = {};
-    session.perform (model::SetDrumPad {pad, settings});
-}
-
-void WebUiHost::handle (const ap::bridge::DrumsSetKit& intent)
-{
-    if (!session.perform (model::SetDrumKit {static_cast<std::uint8_t> (intent.kit)}))
-        sendDrumKit();
-}
-
 void WebUiHost::sendDrumKit()
 {
-    emit (ap::bridge::DrumsKit {static_cast<int> (session.project().drums.kit)});
+    emit (host::drumsKit (session.project()));
 }
 
 void WebUiHost::sendDrumPad (std::size_t pad)
 {
-    const auto& settings = session.project().drums.pads[pad];
     const auto& state = samples.getState (SampleLoader::padSlot (pad));
-
-    ap::bridge::DrumsPad event;
-    event.pad = static_cast<int> (pad);
-    event.custom = settings.sample.isValid();
-    event.name = event.custom
-                   ? model::sanitiseName (state.name, ap::bridge::DrumsPad::nameMaxLength).value_or ("Sample")
-                   : std::string (instruments::factoryKitNames[pad]);
-    event.volumeDb = static_cast<double> (settings.volumeDb);
-    event.pitch = static_cast<double> (settings.pitch);
-    event.muted = settings.muted;
-    event.missing = state.missing;
-    emit (event);
+    emit (host::drumsPad (session.project(), pad, {state.name, state.missing}));
 }
 
 void WebUiHost::sendInstrumentState()
 {
-    emit (ap::bridge::InstrumentState {static_cast<int> (engine.getLiveInstrument())});
+    emit (host::instrumentState (engine));
+}
+
+void WebUiHost::sendHistory()
+{
+    emit (host::historyState (session.document()));
+}
+
+void WebUiHost::sendParameter (params::ParamId id)
+{
+    emit (host::paramValue (session.project(), id));
+}
+
+void WebUiHost::sendTransportState()
+{
+    auto event = host::transportState (session.project(), engine,
+                                       {isRecording(), audioRecorder.getArmedTrack(), capture.hasNotes()});
+    lastRecording = event.recording;
+    lastCaptureAvailable = event.captureAvailable;
+    lastPlaying = event.playing;
+    emit (event);
+}
+
+void WebUiHost::sendTransportPosition (bool force)
+{
+    const auto event = host::transportPosition (engine);
+    if (force || !(event == lastPosition))
+    {
+        lastPosition = event;
+        emit (event);
+    }
 }
 
 void WebUiHost::sendSamplerState()
@@ -584,58 +489,6 @@ void WebUiHost::onProjectChanged()
     for (std::size_t i = 0; i < params::numParameters; ++i)
         sendParameter (static_cast<params::ParamId> (i));
     sendHistory();
-}
-
-void WebUiHost::sendHistory()
-{
-    const auto& doc = session.document();
-    ap::bridge::HistoryState event;
-    event.canUndo = doc.canUndo();
-    event.canRedo = doc.canRedo();
-    event.undoLabel
-        = std::string (doc.undoDescription().substr (0, ap::bridge::HistoryState::undoLabelMaxLength));
-    event.redoLabel
-        = std::string (doc.redoDescription().substr (0, ap::bridge::HistoryState::redoLabelMaxLength));
-    emit (event);
-}
-
-void WebUiHost::sendParameter (params::ParamId id)
-{
-    emit (ap::bridge::ParamValue {std::string (params::descriptor (id).id),
-                                  static_cast<double> (session.project().parameter (id))});
-}
-
-void WebUiHost::handle (const ap::bridge::TransportPlay&)
-{
-    engine.getTransport().requestPlay();
-}
-
-void WebUiHost::handle (const ap::bridge::TransportStop&)
-{
-    stopTransport();
-}
-
-void WebUiHost::handle (const ap::bridge::TransportReturnToStart&)
-{
-    engine.getTransport().requestSeek (0);
-}
-
-void WebUiHost::handle (const ap::bridge::TransportSetTempo& intent)
-{
-    if (!session.perform (model::SetTempo {intent.bpm}))
-        sendTransportState(); // rejected or unchanged: resync the field
-}
-
-void WebUiHost::handle (const ap::bridge::TransportSetCountIn& intent)
-{
-    engine.getTransport().setCountInBars (intent.bars);
-    sendTransportState();
-}
-
-void WebUiHost::handle (const ap::bridge::MetronomeSetEnabled& intent)
-{
-    engine.getMetronome().setEnabled (intent.enabled);
-    sendTransportState();
 }
 
 void WebUiHost::emit (const ap::bridge::Event& event)
@@ -698,63 +551,9 @@ void WebUiHost::sendAudioDevices()
     emit (event);
 }
 
-void WebUiHost::sendTransportState()
-{
-    const auto& transport = engine.getTransport();
-
-    ap::bridge::TransportState event;
-    event.playing = transport.getState().playing;
-    event.bpm = session.project().tempoBpm;
-    event.numerator = session.project().timeSignature.numerator;
-    event.denominator = session.project().timeSignature.denominator;
-    event.countInBars = transport.getCountInBars();
-    event.metronomeEnabled = engine.getMetronome().isEnabled();
-    event.recording = isRecording();
-    event.armedTrack = static_cast<int> (
-        std::min<std::uint64_t> (audioRecorder.getArmedTrack().value, std::numeric_limits<int>::max()));
-    lastRecording = event.recording;
-    event.captureAvailable = capture.hasNotes();
-    lastCaptureAvailable = event.captureAvailable;
-    const auto loop = transport.getLoop();
-    event.loopEnabled = loop.enabled;
-    event.loopStart = static_cast<int> (std::clamp<core::Ticks> (loop.start, 0, model::maxTimelineTicks));
-    event.loopEnd = static_cast<int> (std::clamp<core::Ticks> (loop.end, 0, model::maxTimelineTicks));
-
-    lastPlaying = event.playing;
-    emit (event);
-}
-
-void WebUiHost::sendTransportPosition (bool force)
-{
-    const auto& transport = engine.getTransport();
-    const auto state = transport.getState();
-
-    // Bars and beats depend only on the meter; the sample rate is irrelevant for this conversion.
-    const core::TempoMap map (transport.getTempo(), transport.getTimeSignature(), 48000.0);
-    const auto position = map.toBarBeatTick (state.positionTicks);
-
-    ap::bridge::TransportPosition event;
-    event.bar = static_cast<int> (std::clamp<std::int64_t> (
-        position.bar, ap::bridge::TransportPosition::barMin, ap::bridge::TransportPosition::barMax));
-    event.beat = position.beat;
-    event.ticks = static_cast<int> (std::clamp<core::Ticks> (state.positionTicks,
-                                                             ap::bridge::TransportPosition::ticksMin,
-                                                             ap::bridge::TransportPosition::ticksMax));
-    event.countingIn = state.countingIn;
-
-    if (force || !(event == lastPosition))
-    {
-        lastPosition = event;
-        emit (event);
-    }
-}
-
 void WebUiHost::timerCallback()
 {
-    emit (ap::bridge::EngineMeters {
-        juce::jlimit (0.0, 1.0, static_cast<double> (engine.consumeOutputPeak())),
-        juce::jlimit (0.0, 1.0, static_cast<double> (engine.consumeInputPeak())),
-        juce::jlimit (-60.0, 0.0, static_cast<double> (engine.consumeLimiterReductionDb()))});
+    emit (host::engineMeters (engine));
 
     pumpPlayedNotes();
     audioRecorder.poll();

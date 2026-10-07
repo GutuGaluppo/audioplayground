@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ap/engine/Engine.h"
+#include "ap/host/ProjectEditor.h"
 #include "ap/io/ProjectFiles.h"
 #include "ap/model/ProjectDocument.h"
 
@@ -14,23 +15,24 @@ namespace ap::desktop
 
 // The open project, its history and where it lives on disk, kept in sync with the engine.
 // Message thread only. All project changes go through perform/undo/redo (ADR-003).
-class Session final : private juce::Timer
+class Session final
+    : public host::ProjectEditor
+    , private juce::Timer
 {
 public:
     // scratchFolder holds autosaves of projects that have never been saved.
     Session (engine::Engine& engine, io::ProjectFolder scratchFolder);
     ~Session() override;
 
-    bool perform (model::Command command, model::ProjectDocument::GestureId gesture = 0);
+    bool perform (model::Command command, model::ProjectDocument::GestureId gesture = 0) override;
     // Several commands as one undo step (see ProjectDocument::performGroup).
     bool performGroup (std::string_view description,
                        const std::function<void (model::ProjectDocument::Group&)>& edit,
-                       model::ProjectDocument::GestureId gesture = 0);
-    bool undo();
-    bool redo();
+                       model::ProjectDocument::GestureId gesture = 0) override;
+    bool undo() override;
+    bool redo() override;
 
-    [[nodiscard]] const model::ProjectDocument& document() const noexcept { return doc; }
-    [[nodiscard]] const model::Project& project() const noexcept { return doc.project(); }
+    [[nodiscard]] const model::ProjectDocument& document() const noexcept override { return doc; }
 
     // --- Persistence -----------------------------------------------------------------------
     [[nodiscard]] bool isDirty() const noexcept { return doc.version() != savedVersion; }

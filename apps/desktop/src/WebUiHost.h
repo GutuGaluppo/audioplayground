@@ -11,6 +11,8 @@
 #include "Session.h"
 #include "ap/bridge/generated/Messages.h"
 #include "ap/engine/Engine.h"
+#include "ap/host/IntentApplier.h"
+#include "ap/host/Snapshots.h"
 
 #include <functional>
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -56,66 +58,28 @@ private:
     class LockedDownWebView;
 
     void handleIntent (const juce::var& message);
+    // Intents that only edit the project or drive the engine are handled by host::IntentApplier,
+    // shared with the web host. What is left here needs this platform: devices, files, recording.
+    template <typename T> void handle (const T&) {}
     void handle (const ap::bridge::AppReady&);
     void handle (const ap::bridge::AudioOpenSettings&);
     void handle (const ap::bridge::AudioSetOutput&);
     void handle (const ap::bridge::AudioSetInput&);
     void handle (const ap::bridge::AudioSetSampleRate&);
     void handle (const ap::bridge::AudioSetBufferSize&);
-    void handle (const ap::bridge::ToneSetEnabled&);
-    void handle (const ap::bridge::ParamSet&);
-    void handle (const ap::bridge::SynthSetPreset&);
-    void handle (const ap::bridge::EditUndo&);
-    void handle (const ap::bridge::EditRedo&);
     void handle (const ap::bridge::ProjectNew&);
     void handle (const ap::bridge::ProjectOpen&);
     void handle (const ap::bridge::ProjectSave&);
     void handle (const ap::bridge::ProjectSaveAs&);
-    void handle (const ap::bridge::ProjectRename&);
     void handle (const ap::bridge::ProjectExport&);
     void handle (const ap::bridge::ProjectCancelExport&);
     void sendExportState();
     void exportFinished (const Exporter::Result& result);
-    void handle (const ap::bridge::NoteOn&);
-    void handle (const ap::bridge::NoteOff&);
-    void handle (const ap::bridge::NoteAllOff&);
-    void handle (const ap::bridge::InstrumentSelect&);
     void handle (const ap::bridge::SamplerLoad&);
-    void handle (const ap::bridge::DrumsSetStep&);
-    void handle (const ap::bridge::DrumsClear&);
-    void handle (const ap::bridge::DrumsSetPattern&);
-    void handle (const ap::bridge::DrumsTrigger&);
-    void handle (const ap::bridge::DrumsSetPad&);
     void handle (const ap::bridge::DrumsLoadPad&);
-    void handle (const ap::bridge::DrumsResetPad&);
-    void handle (const ap::bridge::DrumsSetKit&);
-    void handle (const ap::bridge::TransportPlay&);
-    void handle (const ap::bridge::TransportStop&);
-    void handle (const ap::bridge::TransportReturnToStart&);
-    void handle (const ap::bridge::TransportSetTempo&);
-    void handle (const ap::bridge::TransportSetCountIn&);
-    void handle (const ap::bridge::MetronomeSetEnabled&);
     void handle (const ap::bridge::TransportRecord&);
     void handle (const ap::bridge::TransportCapture&);
-    void handle (const ap::bridge::TransportSeek&);
-    void handle (const ap::bridge::TransportSetLoop&);
-    void handle (const ap::bridge::TrackAdd&);
-    void handle (const ap::bridge::TrackRemove&);
-    void handle (const ap::bridge::TrackRename&);
-    void handle (const ap::bridge::TrackSetVolume&);
-    void handle (const ap::bridge::TrackSetPan&);
-    void handle (const ap::bridge::TrackSetMute&);
-    void handle (const ap::bridge::TrackSetSolo&);
     void handle (const ap::bridge::TrackSetArmed&);
-    void handle (const ap::bridge::TrackSetEffect&);
-    void handle (const ap::bridge::TrackSetSend&);
-    void handle (const ap::bridge::BusAdd&);
-    void handle (const ap::bridge::BusRemove&);
-    void handle (const ap::bridge::BusRename&);
-    void handle (const ap::bridge::BusSetVolume&);
-    void handle (const ap::bridge::BusSetPan&);
-    void handle (const ap::bridge::BusSetMute&);
-    void handle (const ap::bridge::BusSetEffect&);
     void handle (const ap::bridge::TrackImportAudio&);
     void handle (const ap::bridge::AssetLocate&);
     void handle (const ap::bridge::AssetRemove&);
@@ -126,20 +90,7 @@ private:
     void handle (const ap::bridge::AccompanimentAdd&);
     void handle (const ap::bridge::AccompanimentNext&);
     void handle (const ap::bridge::AccompanimentDismiss&);
-    void handle (const ap::bridge::ClipCreate&);
-    void handle (const ap::bridge::ClipMove&);
-    void handle (const ap::bridge::ClipResize&);
-    void handle (const ap::bridge::ClipSplit&);
-    void handle (const ap::bridge::ClipRemove&);
-    void handle (const ap::bridge::ClipDuplicate&);
-    void handle (const ap::bridge::ClipSetLoop&);
-    void handle (const ap::bridge::ClipAddNote&);
-    void handle (const ap::bridge::ClipRemoveNote&);
-    void handle (const ap::bridge::ClipEditNote&);
 
-    // Timeline helpers (WebUiHostTimeline.cpp).
-    bool editClip (std::uint64_t clip, model::ClipEdit edit, std::uint64_t gesture,
-                   const std::function<model::Clip (const model::Clip&)>& change);
     void stopTransport();
     void stopNoteRecording (core::Ticks position);
     void pumpPlayedNotes();
@@ -148,10 +99,6 @@ private:
     {
         return recorder.isRecording() || audioRecorder.isRecording();
     }
-    // Edits a drum pattern clip: the given one, or the one at the playhead (created when there is
-    // none and createIfMissing).
-    void editDrumPattern (std::uint64_t clipId, std::uint64_t gesture, bool createIfMissing,
-                          const std::function<model::Clip (const model::Clip&)>& change);
     void sendTimeline();
     void sendTimelineAssets();
     // Every audio file of the project and what uses it. recheckFiles stats each file again.
@@ -186,6 +133,7 @@ private:
 
     NoteRecorder recorder;
     NoteCapture capture;
+    host::IntentApplier applier;
     Exporter exporter;
     AccompanimentService accompaniment;
     bool lastExporting = false;

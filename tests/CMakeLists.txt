@@ -13,6 +13,7 @@ add_executable(ap_unit_tests
     unit/BusTests.cpp
     unit/DrumMachineTests.cpp
     unit/EffectChainTests.cpp
+    unit/IntentApplierTests.cpp
     unit/EngineTests.cpp
     unit/EqualizerTests.cpp
     unit/ExportTests.cpp

@@ -37,6 +37,9 @@ add_library(ap_core STATIC
     src/engine/TimelinePlayer.cpp
     src/engine/TrackChain.cpp
     src/engine/Transport.cpp
+    src/host/DocumentEditor.cpp
+    src/host/IntentApplier.cpp
+    src/host/Snapshots.cpp
     src/instruments/DrumMachine.cpp
     src/instruments/FactoryKit.cpp
     src/instruments/Sampler.cpp
