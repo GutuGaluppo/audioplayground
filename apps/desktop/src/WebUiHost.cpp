@@ -140,7 +140,8 @@ WebUiHost::WebUiHost (AudioDeviceHost& hostToUse, engine::Engine& engineToUse, S
                {[this] { sendTransportState(); }, [this] { sendTimeline(); }, [this] { sendProjectState(); },
                 [this] { sendDrumKit(); }, [this] { sendInstrumentState(); }, [this] { sendStatus(); },
                 [this] (params::ParamId id) { sendParameter (id); },
-                [this] (std::size_t pad) { sendDrumPad (pad); }})
+                [this] (std::size_t pad) { sendDrumPad (pad); }, [this] (int level, std::string_view message)
+                { showNotice (static_cast<ProjectActions::NoticeLevel> (level), std::string (message)); }})
     , exporter (sessionToUse, samplesToUse)
     , accompaniment (sessionToUse, samplesToUse, engineToUse)
 {

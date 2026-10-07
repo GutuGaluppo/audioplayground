@@ -49,7 +49,8 @@ WebHost::WebHost (double rate, int blockSize)
                 [this] { sendProjectState(); }, [this] { emit (host::drumsKit (editor.project())); },
                 [this] { emit (host::instrumentState (engine)); }, [this] { sendStatus(); },
                 [this] (params::ParamId id) { emit (host::paramValue (editor.project(), id)); },
-                [this] (std::size_t pad) { emit (host::drumsPad (editor.project(), pad, {})); }})
+                [this] (std::size_t pad) { emit (host::drumsPad (editor.project(), pad, {})); },
+                [this] (int level, std::string_view message) { notice (level, message); }})
 {
     sentParameters.fill (std::numeric_limits<float>::quiet_NaN());
     engine.prepare (sampleRate, maxBlock);

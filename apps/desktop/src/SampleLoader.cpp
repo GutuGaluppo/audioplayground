@@ -44,25 +44,6 @@ void registerFormats (juce::AudioFormatManager& formats)
     formats.registerFormat (new juce::FlacAudioFormat(), false);
 }
 
-std::vector<float> computeOverview (const std::vector<std::vector<float>>& channels, int points)
-{
-    std::vector<float> overview (static_cast<std::size_t> (points), 0.0f);
-    if (channels.empty() || channels.front().empty())
-        return overview;
-
-    const auto frames = channels.front().size();
-    for (std::size_t p = 0; p < overview.size(); ++p)
-    {
-        const auto from = frames * p / overview.size();
-        const auto to = std::max (from + 1, frames * (p + 1) / overview.size());
-        float peak = 0.0f;
-        for (const auto& channel : channels)
-            for (auto i = from; i < std::min (to, frames); ++i)
-                peak = std::max (peak, std::abs (channel[i]));
-        overview[p] = std::min (peak, 1.0f);
-    }
-    return overview;
-}
 } // namespace
 
 struct SampleLoader::Decoded
@@ -124,7 +105,7 @@ std::shared_ptr<SampleLoader::Decoded> decode (const juce::File& file, const std
             }
             if (wantOverview)
             {
-                result->overview = computeOverview (buffer->channels, SampleLoader::overviewPoints);
+                result->overview = dsp::computeOverview (buffer->channels, SampleLoader::overviewPoints);
                 result->peaks = dsp::computePeaks (buffer->channels, rate);
             }
             result->durationSeconds = static_cast<double> (length) / reader->sampleRate;

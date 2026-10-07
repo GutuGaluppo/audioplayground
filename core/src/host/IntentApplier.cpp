@@ -341,6 +341,27 @@ bool IntentApplier::handle (const bridge::DrumsClear& intent)
     return true;
 }
 
+// --- Audio files ------------------------------------------------------------------------------
+
+bool IntentApplier::handle (const bridge::AssetRemove& intent)
+{
+    const model::AssetId id {static_cast<std::uint64_t> (intent.asset)};
+    if (!editor.perform (model::RemoveAssets {{id}}) && resync.notice)
+        resync.notice (1, "That audio is still in use.");
+    return true;
+}
+
+bool IntentApplier::handle (const bridge::AssetRemoveUnused&)
+{
+    std::vector<model::AssetId> unused;
+    for (const auto& asset : editor.project().assets)
+        if (!editor.project().assetUse (asset.id).any())
+            unused.push_back (asset.id);
+    if (!unused.empty())
+        editor.perform (model::RemoveAssets {std::move (unused)});
+    return true;
+}
+
 // --- Tracks and buses ------------------------------------------------------------------------
 
 bool IntentApplier::handle (const bridge::TrackAdd& intent)

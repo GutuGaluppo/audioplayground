@@ -1,5 +1,7 @@
+#include "ap/dsp/Peaks.h"
 #include "ap/engine/Engine.h"
 #include "ap/engine/OfflineRenderer.h"
+#include "ap/host/Base64.h"
 #include "ap/host/DocumentEditor.h"
 #include "ap/host/IntentApplier.h"
 #include "ap/host/Snapshots.h"
@@ -23,12 +25,14 @@ struct Rig
     int timeline = 0, transport = 0, project = 0, drumKit = 0, instrument = 0, status = 0;
     std::vector<params::ParamId> parameters;
     std::vector<std::size_t> pads;
-    host::IntentApplier applier {editor,
-                                 engine,
-                                 {[this] { ++transport; }, [this] { ++timeline; }, [this] { ++project; },
-                                  [this] { ++drumKit; }, [this] { ++instrument; }, [this] { ++status; },
-                                  [this] (params::ParamId id) { parameters.push_back (id); },
-                                  [this] (std::size_t pad) { pads.push_back (pad); }}};
+    std::vector<std::pair<int, std::string>> notices;
+    host::IntentApplier applier {
+        editor,
+        engine,
+        {[this] { ++transport; }, [this] { ++timeline; }, [this] { ++project; }, [this] { ++drumKit; }, [this]
+         { ++instrument; }, [this] { ++status; }, [this] (params::ParamId id) { parameters.push_back (id); },
+         [this] (std::size_t pad) { pads.push_back (pad); },
+         [this] (int level, std::string_view text) { notices.emplace_back (level, std::string (text)); }}};
 
     Rig() { engine.prepare (48000.0, 256); }
 
@@ -62,7 +66,6 @@ TEST_CASE ("Intents for the platform are left to the host", "[host][applier]")
     CHECK_FALSE (rig.send (TransportRecord {}));
     CHECK_FALSE (rig.send (SamplerLoad {}));
     CHECK_FALSE (rig.send (TrackImportAudio {}));
-    CHECK_FALSE (rig.send (AssetRemoveUnused {}));
     CHECK_FALSE (rig.send (AccompanimentAdd {}));
     CHECK_FALSE (rig.send (AppReady {}));
     CHECK (rig.editor.project().tracks.empty());
@@ -558,4 +561,96 @@ TEST_CASE ("The snapshots describe the project the way the UI expects", "[host][
     CHECK (host::paramValue (rig.editor.project(), *params::findParamId ("synth.cutoff")).value == 4000.0);
     CHECK (host::drumsKit (rig.editor.project()).kit == 0);
     CHECK (host::transportPosition (rig.engine).bar >= 1);
+}
+
+TEST_CASE ("Unused audio goes in one step; what is in use is kept, with a reason", "[host][applier][assets]")
+{
+    Rig rig;
+    const auto audio = rig.addTrack (0);
+    REQUIRE (rig.editor.perform (model::AddAsset {"audio/1-used.wav", "used.wav"}));
+    REQUIRE (rig.editor.perform (model::AddAsset {"audio/2-spare.wav", "spare.wav"}));
+    REQUIRE (rig.editor.perform (model::AddAsset {"audio/3-spare.wav", "spare 2.wav"}));
+    model::Clip clip;
+    clip.asset = rig.editor.project().assets[0].id;
+    clip.length = 960;
+    REQUIRE (rig.editor.perform (model::AddClip {audio, clip}));
+
+    AssetRemove remove;
+    remove.asset = static_cast<int> (rig.editor.project().assets[0].id.value);
+    CHECK (rig.send (remove));
+    CHECK (rig.editor.project().assets.size() == 3);
+    REQUIRE (rig.notices.size() == 1);
+    CHECK (rig.notices[0].second == "That audio is still in use.");
+
+    CHECK (rig.send (AssetRemoveUnused {}));
+    REQUIRE (rig.editor.project().assets.size() == 1);
+    CHECK (rig.editor.project().assets[0].name == "used.wav");
+    CHECK (rig.editor.document().undoDescription() == "Remove unused audio");
+    CHECK (rig.send (AssetRemoveUnused {})); // nothing left to remove: nothing happens
+    CHECK (rig.editor.project().assets.size() == 1);
+    CHECK (rig.send (EditUndo {}));
+    CHECK (rig.editor.project().assets.size() == 3);
+}
+
+TEST_CASE ("Asset snapshots count uses and report missing files", "[host][snapshots][assets]")
+{
+    Rig rig;
+    const auto audio = rig.addTrack (0);
+    REQUIRE (rig.editor.perform (model::AddAsset {"audio/1-a.wav", "a.wav"}));
+    REQUIRE (rig.editor.perform (model::AddAsset {"audio/2-b.wav", "b.wav"}));
+    model::Clip clip;
+    clip.asset = rig.editor.project().assets[0].id;
+    clip.length = 960;
+    REQUIRE (rig.editor.perform (model::AddClip {audio, clip}));
+
+    const auto event = host::projectAssets (rig.editor.project(), [&] (model::AssetId id)
+                                            { return id == rig.editor.project().assets[1].id; });
+    REQUIRE (event.assets.size() == 2);
+    CHECK (event.assets[0].clips == 1);
+    CHECK_FALSE (event.assets[0].missing);
+    CHECK (event.assets[1].clips == 0);
+    CHECK (event.assets[1].missing);
+    CHECK (host::projectAssets (rig.editor.project(), {}).assets[1].missing == false);
+
+    host::AssetAudio loaded;
+    loaded.loaded = true;
+    loaded.durationSeconds = 1.5;
+    loaded.overview = {0.5f, 1.0f};
+    const auto asset = host::timelineAsset (rig.editor.project(), rig.editor.project().assets[0].id, loaded);
+    CHECK (asset.name == "a.wav"); // the project's name wins
+    CHECK (asset.loaded);
+    CHECK (asset.durationSeconds == Catch::Approx (1.5));
+    CHECK (asset.overview.size() == 2);
+
+    CHECK_FALSE (host::timelinePeaks (rig.editor.project().assets[0].id, {}).has_value());
+    const auto peaks = host::timelinePeaks (rig.editor.project().assets[0].id, {1, 2, 3, 255});
+    REQUIRE (peaks.has_value());
+    CHECK (peaks->data == "AQID/w==");
+}
+
+TEST_CASE ("base64 matches RFC 4648", "[host][base64]")
+{
+    const auto encode = [] (std::string_view text)
+    { return host::base64Encode (reinterpret_cast<const std::uint8_t*> (text.data()), text.size()); };
+    CHECK (encode ("") == "");
+    CHECK (encode ("f") == "Zg==");
+    CHECK (encode ("fo") == "Zm8=");
+    CHECK (encode ("foo") == "Zm9v");
+    CHECK (encode ("foob") == "Zm9vYg==");
+    CHECK (encode ("fooba") == "Zm9vYmE=");
+    CHECK (encode ("foobar") == "Zm9vYmFy");
+}
+
+TEST_CASE ("The overview is the loudest value of each slice, 0 to 1", "[host][overview]")
+{
+    std::vector<std::vector<float>> channels (2, std::vector<float> (1000, 0.0f));
+    channels[0][10] = 0.5f;
+    channels[1][990] = -2.0f; // clipped to 1
+    const auto overview = dsp::computeOverview (channels, 4);
+    REQUIRE (overview.size() == 4);
+    CHECK (overview[0] == 0.5f);
+    CHECK (overview[1] == 0.0f);
+    CHECK (overview[3] == 1.0f);
+    CHECK (dsp::computeOverview ({}, 8) == std::vector<float> (8, 0.0f));
+    CHECK (dsp::computeOverview (channels).size() == static_cast<std::size_t> (dsp::overviewPoints));
 }

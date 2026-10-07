@@ -6,6 +6,7 @@
 
 #include <functional>
 #include <optional>
+#include <string_view>
 
 namespace ap::host
 {
@@ -22,6 +23,8 @@ struct Resync
     std::function<void()> status;
     std::function<void (params::ParamId)> parameter;
     std::function<void (std::size_t)> drumPad;
+    // A message for the person (level 0 info, 1 warning, 2 error).
+    std::function<void (int, std::string_view)> notice;
 };
 
 // The intents that only edit the project or drive the engine (ADR-003): the same code runs in the
@@ -73,6 +76,8 @@ private:
     bool handle (const bridge::DrumsSetStep&);
     bool handle (const bridge::DrumsClear&);
     bool handle (const bridge::DrumsSetPattern&);
+    bool handle (const bridge::AssetRemove&);
+    bool handle (const bridge::AssetRemoveUnused&);
     bool handle (const bridge::TrackAdd&);
     bool handle (const bridge::TrackRemove&);
     bool handle (const bridge::TrackRename&);

@@ -135,23 +135,6 @@ void WebUiHost::handle (const ap::bridge::AssetLocate& intent)
     samples.chooseAndRelink (model::AssetId {static_cast<std::uint64_t> (intent.asset)});
 }
 
-void WebUiHost::handle (const ap::bridge::AssetRemove& intent)
-{
-    const model::AssetId id {static_cast<std::uint64_t> (intent.asset)};
-    if (!session.perform (model::RemoveAssets {{id}}))
-        showNotice (ProjectActions::NoticeLevel::warning, "That audio is still in use.");
-}
-
-void WebUiHost::handle (const ap::bridge::AssetRemoveUnused&)
-{
-    std::vector<model::AssetId> unused;
-    for (const auto& asset : session.project().assets)
-        if (!session.project().assetUse (asset.id).any())
-            unused.push_back (asset.id);
-    if (!unused.empty())
-        session.perform (model::RemoveAssets {std::move (unused)});
-}
-
 void WebUiHost::handle (const ap::bridge::AccompanimentSuggest& intent)
 {
     accompaniment.suggestFor (model::ClipId {static_cast<std::uint64_t> (intent.clip)});
@@ -201,31 +184,20 @@ void WebUiHost::sendAccompaniment()
 
 void WebUiHost::sendProjectAssets (bool recheckFiles)
 {
-    using ap::bridge::ProjectAsset;
-
-    const auto& project = session.project();
     if (recheckFiles)
         assetMissing.clear();
 
-    ap::bridge::ProjectAssets event;
     std::map<std::uint64_t, bool> missing;
-    for (const auto& asset : project.assets)
-    {
-        const auto known = assetMissing.find (asset.id.value);
-        const bool isMissing
-            = known != assetMissing.end() ? known->second : !samples.assetFileExists (asset.id);
-        missing[asset.id.value] = isMissing;
-
-        const auto use = project.assetUse (asset.id);
-        ProjectAsset a;
-        a.id = toInt (asset.id.value);
-        a.name = model::sanitiseName (asset.name, ProjectAsset::nameMaxLength).value_or ("Audio");
-        a.clips = static_cast<int> (std::min<std::size_t> (use.clips, ProjectAsset::clipsMax));
-        a.pads = static_cast<int> (std::min<std::size_t> (use.pads, ProjectAsset::padsMax));
-        a.sampler = use.sampler;
-        a.missing = isMissing;
-        event.assets.push_back (std::move (a));
-    }
+    const auto event = host::projectAssets (session.project(),
+                                            [&] (model::AssetId id)
+                                            {
+                                                const auto known = assetMissing.find (id.value);
+                                                const bool isMissing = known != assetMissing.end()
+                                                                         ? known->second
+                                                                         : !samples.assetFileExists (id);
+                                                missing[id.value] = isMissing;
+                                                return isMissing;
+                                            });
     assetMissing = std::move (missing);
 
     if (sentProjectAssets && *sentProjectAssets == event)
@@ -233,10 +205,6 @@ void WebUiHost::sendProjectAssets (bool recheckFiles)
     sentProjectAssets = event;
     emit (event);
 }
-
-// --- Clips -----------------------------------------------------------------------------------
-
-// --- Drum patterns ---------------------------------------------------------------------------
 
 // --- Events ----------------------------------------------------------------------------------
 
@@ -247,24 +215,12 @@ void WebUiHost::sendTimeline()
 
 void WebUiHost::sendTimelineAssets()
 {
-    using ap::bridge::TimelineAsset;
-
     ap::bridge::TimelineAssets event;
     for (const auto& [id, audio] : samples.getClipAudio())
-    {
-        const auto* asset = session.project().findAsset (model::AssetId {id});
-        TimelineAsset a;
-        a.id = toInt (id);
-        a.name = model::sanitiseName (asset != nullptr ? asset->name : audio.state.name,
-                                      TimelineAsset::nameMaxLength)
-                     .value_or ("Audio");
-        a.loaded = audio.state.loaded;
-        a.missing = audio.state.missing;
-        a.loading = audio.state.loading;
-        a.durationSeconds = std::clamp (audio.state.durationSeconds, 0.0, TimelineAsset::durationSecondsMax);
-        a.overview = audio.state.overview;
-        event.assets.push_back (std::move (a));
-    }
+        event.assets.push_back (
+            host::timelineAsset (session.project(), model::AssetId {id},
+                                 {audio.state.name, audio.state.loaded, audio.state.missing,
+                                  audio.state.loading, audio.state.durationSeconds, audio.state.overview}));
     emit (event);
 }
 
@@ -279,19 +235,15 @@ void WebUiHost::sendTimelinePeaks (bool all)
 
     for (const auto& [id, clipAudio] : audio)
     {
-        const auto& peaks = clipAudio.state.peaks;
-        if (!clipAudio.state.loaded || peaks.empty())
+        if (!clipAudio.state.loaded)
             continue;
         if (const auto it = sentPeaks.find (id); it != sentPeaks.end() && it->second == clipAudio.generation)
             continue;
-        sentPeaks[id] = clipAudio.generation;
-
-        ap::bridge::TimelinePeaks event;
-        event.asset = toInt (id);
-        event.peaksPerSecond = dsp::peaksPerSecond;
-        event.data = juce::Base64::toBase64 (peaks.data(), peaks.size()).toStdString();
-        if (event.data.size() <= ap::bridge::TimelinePeaks::dataMaxLength)
-            emit (event);
+        if (const auto event = host::timelinePeaks (model::AssetId {id}, clipAudio.state.peaks))
+        {
+            sentPeaks[id] = clipAudio.generation;
+            emit (*event);
+        }
     }
 }
 

@@ -1,5 +1,7 @@
 #include "ap/host/Snapshots.h"
 
+#include "ap/dsp/Peaks.h"
+#include "ap/host/Base64.h"
 #include "ap/instruments/FactoryKit.h"
 
 #include <algorithm>
@@ -115,6 +117,56 @@ bridge::DrumsKit drumsKit (const model::Project& project)
 bridge::InstrumentState instrumentState (const engine::Engine& engine)
 {
     return {static_cast<int> (engine.getLiveInstrument())};
+}
+
+bridge::TimelineAsset timelineAsset (const model::Project& project, model::AssetId id,
+                                     const AssetAudio& audio)
+{
+    const auto* asset = project.findAsset (id);
+    bridge::TimelineAsset a;
+    a.id = toInt (id.value);
+    a.name = model::sanitiseName (asset != nullptr ? asset->name : audio.name,
+                                  bridge::TimelineAsset::nameMaxLength)
+                 .value_or ("Audio");
+    a.loaded = audio.loaded;
+    a.missing = audio.missing;
+    a.loading = audio.loading;
+    a.durationSeconds = std::clamp (audio.durationSeconds, 0.0, bridge::TimelineAsset::durationSecondsMax);
+    a.overview = audio.overview;
+    return a;
+}
+
+bridge::ProjectAssets projectAssets (const model::Project& project,
+                                     const std::function<bool (model::AssetId)>& isMissing)
+{
+    using bridge::ProjectAsset;
+    bridge::ProjectAssets event;
+    for (const auto& asset : project.assets)
+    {
+        const auto use = project.assetUse (asset.id);
+        ProjectAsset a;
+        a.id = toInt (asset.id.value);
+        a.name = model::sanitiseName (asset.name, ProjectAsset::nameMaxLength).value_or ("Audio");
+        a.clips = static_cast<int> (std::min<std::size_t> (use.clips, ProjectAsset::clipsMax));
+        a.pads = static_cast<int> (std::min<std::size_t> (use.pads, ProjectAsset::padsMax));
+        a.sampler = use.sampler;
+        a.missing = isMissing && isMissing (asset.id);
+        event.assets.push_back (std::move (a));
+    }
+    return event;
+}
+
+std::optional<bridge::TimelinePeaks> timelinePeaks (model::AssetId id, const std::vector<std::uint8_t>& peaks)
+{
+    if (peaks.empty())
+        return std::nullopt;
+    bridge::TimelinePeaks event;
+    event.asset = toInt (id.value);
+    event.peaksPerSecond = dsp::peaksPerSecond;
+    event.data = base64Encode (peaks.data(), peaks.size());
+    if (event.data.size() > bridge::TimelinePeaks::dataMaxLength)
+        return std::nullopt;
+    return event;
 }
 
 bridge::DrumsPad drumsPad (const model::Project& project, std::size_t pad, const PadSample& sample)

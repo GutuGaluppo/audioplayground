@@ -82,8 +82,6 @@ private:
     void handle (const ap::bridge::TrackSetArmed&);
     void handle (const ap::bridge::TrackImportAudio&);
     void handle (const ap::bridge::AssetLocate&);
-    void handle (const ap::bridge::AssetRemove&);
-    void handle (const ap::bridge::AssetRemoveUnused&);
     void handle (const ap::bridge::AccompanimentSuggest&);
     void handle (const ap::bridge::AccompanimentPreview&);
     void handle (const ap::bridge::AccompanimentStopPreview&);
