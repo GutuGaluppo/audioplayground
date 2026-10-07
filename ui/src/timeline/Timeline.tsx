@@ -233,6 +233,30 @@ function Lane({
       onPointerDown={(event) => {
         if (event.target === event.currentTarget) select(null);
       }}
+      onDragOver={(event) => {
+        // Audio files can be dropped on an audio track (the browser version).
+        if (
+          bridge.importFiles &&
+          track.kind === TrackKind.audio &&
+          event.dataTransfer.types.includes('Files')
+        )
+          event.preventDefault();
+      }}
+      onDrop={(event) => {
+        if (
+          !bridge.importFiles ||
+          track.kind !== TrackKind.audio ||
+          event.dataTransfer.files.length === 0
+        )
+          return;
+        event.preventDefault();
+        const x = event.clientX - event.currentTarget.getBoundingClientRect().left;
+        void bridge.importFiles([...event.dataTransfer.files], {
+          kind: 'clip',
+          track: track.id,
+          ticks: Math.max(0, Math.floor(x / pxPerTick / bar) * bar),
+        });
+      }}
       onDoubleClick={(event) => {
         if (event.target !== event.currentTarget) return;
         const x = event.clientX - event.currentTarget.getBoundingClientRect().left;

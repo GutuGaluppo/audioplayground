@@ -40,9 +40,26 @@ handling in TypeScript would break ADR-003: two engines to keep in agreement.
   (WebAssembly only, not script `eval`) and carries the engine files; the desktop bundle carries
   none of them.
 - **Milestone 1 scope:** transport and tempo, synth and drums played from the keyboard and pads,
-  presets, effects and mixer, buses, timeline editing, undo/redo, the starter song, and saving
-  (below). Not in the browser yet, and each says so with a notice instead of failing silently:
-  importing audio, recording, the sampler, export, accompaniment suggestions, device choice.
+  presets, effects and mixer, buses, timeline editing, undo/redo, the starter song, saving, and
+  audio files (below). Not in the browser yet, and each says so with a notice instead of failing
+  silently: recording, export, accompaniment suggestions, device choice.
+- **Audio files.** The browser decodes (`decodeAudioData`: WAV, MP3, AAC, Ogg, FLAC, whatever it can
+  play) at the output's sample rate, so the engine needs no resampler; the page keeps the file as
+  it was imported, in IndexedDB, under `audio/<random id>.<ext>`, which is what the song file lists
+  (so a song file stays the desktop's format, and the id is the only link between a song and its
+  files). Choosing a file (`track.importAudio`, `asset.locate`, `sampler.load`, `drums.loadPad`) and
+  dropping one on an audio track are answered by the page, which opens the browser's file dialog
+  from the click and then hands the decoded samples to the engine with the project edit it implies
+  (a clip of the file's length, a relinked asset, the sampler's or a pad's sample) as one undo
+  step. The engine keeps the samples, builds the overview and peaks the UI draws, feeds the sampler
+  and the pads, and reports each file as loading, loaded or missing, exactly as the desktop does
+  (the events come from the same shared code). Opening a song loads the files it lists one at a
+  time; any the page cannot find or decode show as missing with Locate. Limits, enforced in the
+  engine and again in the page: 10 minutes, two channels (more are cut to two), 200 MB per file,
+  256 MB of decoded audio in memory (the engine says so when it is full). Stored files nobody uses
+  (not a saved song, not the unsaved work kept for recovery, not the open song) are released, but
+  only once an hour old, since another tab may be about to use them; if any saved song predates this
+  bookkeeping nothing is released.
 - **Saving and opening (IndexedDB).** The core turns the project into the desktop's project file
   text (`ap_project_export`) and back through the same strict parser (`parseProject`: version,
   keys, ranges, size and nesting limits), so a song stored in the browser is exactly a desktop
@@ -69,21 +86,25 @@ handling in TypeScript would break ADR-003: two engines to keep in agreement.
 ## Consequences
 - The browser and the desktop behave the same for everything in the shared layer by construction;
   what differs is only what each platform provides (files, devices, recording).
-- Follow-ups, each small now that the shared layer exists: audio import through `decodeAudioData`
-  (stored beside the song in IndexedDB), export, microphone input (`getUserMedia` into the worklet), Web MIDI, then mobile layouts.
+- Follow-ups, each small now that the shared layer exists: export, microphone input (`getUserMedia` into the worklet), Web MIDI, then mobile layouts.
 - Latency is the Web Audio output latency plus one render quantum; keys and pads reach the engine in
   about one message-port hop. Measure it on real devices before promising a number.
 - The engine ran at about 1 % of real time for the starter song in Node. Heavier projects and phones
   still need measuring.
 
 ## Verification
-- Fifteen Node tests (`apps/web/test`) run the real module through the same `engine.js` the worklet
+- Twenty-four Node tests (`apps/web/test`) run the real module through the same `engine.js` the worklet
   loads: starter song, playing, undo/redo, refusals, malformed and oversized messages, unicode,
   determinism across block sizes, bounded memory, and saving: export and reopen gives the same
   project and the same sound, dirty tracking, recovered-as-unsaved, and eleven kinds of untrusted
-  project text refused without touching the open song.
+  project text refused without touching the open song; and audio: a file becomes a clip of its own
+  length in one undo step and plays at its level, stereo stays stereo, a song opens before its audio
+  arrives, missing and relinked files, the sampler and a pad playing their own samples, refused
+  paths, rates, formats and lengths, and the memory cap.
 - Headless C++ tests of the shared code; UI tests of the bridge and the gate.
 - A manual run in a browser (the UI with the real worklet: starter song loaded, playhead and meters
-  moving; and saving against the real IndexedDB: autosave written, restored after a reload, Save
-  As, Open, Cmd+S over an opened song, delete of the open song). It cannot be heard from the test environment, so listening on real browsers and devices
+  moving; saving against the real IndexedDB: autosave written, restored after a reload, Save As,
+  Open, Cmd+S over an opened song, delete of the open song; and audio: a 44.1 kHz WAV dropped on a
+  lane becomes a clip with its waveform, survives a reload through Save and Open, and shows as
+  missing with Locate when its stored file is removed). It cannot be heard from the test environment, so listening on real browsers and devices
   is still a human check.

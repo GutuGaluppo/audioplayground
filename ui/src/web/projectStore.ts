@@ -5,6 +5,14 @@ export interface ProjectInfo {
   /** Milliseconds since the epoch. */
   readonly updatedAt: number;
   readonly bytes: number;
+  /** The audio files it uses (their paths in the song), so a file nobody uses can be let go. */
+  readonly audio?: readonly string[];
+}
+
+/** An audio file kept for songs: the file as it was imported, found again by the path the song uses. */
+export interface StoredAudio {
+  readonly path: string;
+  readonly at: number;
 }
 
 /** The last unsaved state, kept as it changes so a closed tab or a crash loses almost nothing. */
@@ -14,6 +22,7 @@ export interface Autosave {
   readonly at: number;
   /** The saved song it was a change of, if any. */
   readonly forId: string | null;
+  readonly audio?: readonly string[];
 }
 
 /** Where songs live in the browser. Everything the page stores is untrusted when read back. */
@@ -25,13 +34,19 @@ export interface ProjectStore {
   readAutosave(): Promise<Autosave | undefined>;
   writeAutosave(autosave: Autosave): Promise<void>;
   clearAutosave(): Promise<void>;
+  readAudio(path: string): Promise<ArrayBuffer | undefined>;
+  writeAudio(path: string, bytes: ArrayBuffer): Promise<void>;
+  removeAudio(path: string): Promise<void>;
+  listAudio(): Promise<StoredAudio[]>;
 }
 
 const DATABASE = 'audio-playground';
-const VERSION = 1;
+const VERSION = 2;
 const INFO = 'projects';
 const DATA = 'files';
 const AUTOSAVE = 'autosave';
+const AUDIO = 'audio';
+const AUDIO_INFO = 'audioInfo';
 const AUTOSAVE_KEY = 'current';
 
 function request<T>(req: IDBRequest<T>): Promise<T> {
@@ -87,10 +102,17 @@ export async function openIndexedDbStore(factory?: IDBFactory): Promise<ProjectS
   const db = await new Promise<IDBDatabase>((resolve, reject) => {
     const open = idb.open(DATABASE, VERSION);
     open.onupgradeneeded = () => {
+      // Version 1 had songs and the autosave; version 2 adds the audio files (contents and a
+      // listing, so looking at what is stored never reads the files).
       const created = open.result;
-      created.createObjectStore(INFO, { keyPath: 'id' });
-      created.createObjectStore(DATA);
-      created.createObjectStore(AUTOSAVE);
+      for (const [name, options] of [
+        [INFO, { keyPath: 'id' }],
+        [DATA, undefined],
+        [AUTOSAVE, undefined],
+        [AUDIO, undefined],
+        [AUDIO_INFO, { keyPath: 'path' }],
+      ] as const)
+        if (!created.objectStoreNames.contains(name)) created.createObjectStore(name, options);
     };
     open.onsuccess = () => {
       resolve(open.result);
@@ -140,20 +162,54 @@ export async function openIndexedDbStore(factory?: IDBFactory): Promise<ProjectS
       tx.objectStore(AUTOSAVE).delete(AUTOSAVE_KEY);
       await finished(tx);
     },
+    async readAudio(path) {
+      const bytes: unknown = await request(db.transaction(AUDIO).objectStore(AUDIO).get(path));
+      return bytes instanceof ArrayBuffer ? bytes : undefined;
+    },
+    async writeAudio(path, bytes) {
+      const tx = db.transaction([AUDIO, AUDIO_INFO], 'readwrite');
+      tx.objectStore(AUDIO).put(bytes, path);
+      tx.objectStore(AUDIO_INFO).put({ path, at: Date.now() } satisfies StoredAudio);
+      await finished(tx);
+    },
+    async removeAudio(path) {
+      const tx = db.transaction([AUDIO, AUDIO_INFO], 'readwrite');
+      tx.objectStore(AUDIO).delete(path);
+      tx.objectStore(AUDIO_INFO).delete(path);
+      await finished(tx);
+    },
+    async listAudio() {
+      const rows: unknown[] = await request(
+        db.transaction(AUDIO_INFO).objectStore(AUDIO_INFO).getAll(),
+      );
+      return rows.filter(
+        (row): row is StoredAudio =>
+          typeof row === 'object' &&
+          row !== null &&
+          typeof (row as StoredAudio).path === 'string' &&
+          typeof (row as StoredAudio).at === 'number',
+      );
+    },
   };
 }
 
 /** The same interface in memory: for tests, and for a page that may not store anything. */
 export function createMemoryStore(): ProjectStore & {
   readonly failNextWrite: (error: Error) => void;
+  readonly setClock: (now: number) => void;
 } {
   const infos = new Map<string, ProjectInfo>();
   const files = new Map<string, string>();
+  const sounds = new Map<string, { bytes: ArrayBuffer; at: number }>();
   let autosave: Autosave | undefined;
   let failure: Error | undefined;
+  let clock = 0;
   return {
     failNextWrite: (error) => {
       failure = error;
+    },
+    setClock: (now) => {
+      clock = now;
     },
     list: () => Promise.resolve([...infos.values()]),
     read: (id) => Promise.resolve(files.get(id)),
@@ -181,5 +237,20 @@ export function createMemoryStore(): ProjectStore & {
       autosave = undefined;
       return Promise.resolve();
     },
+    readAudio: (path) => Promise.resolve(sounds.get(path)?.bytes),
+    writeAudio: (path, bytes) => {
+      if (failure) {
+        const error = failure;
+        failure = undefined;
+        return Promise.reject(error);
+      }
+      sounds.set(path, { bytes, at: clock });
+      return Promise.resolve();
+    },
+    removeAudio: (path) => {
+      sounds.delete(path);
+      return Promise.resolve();
+    },
+    listAudio: () => Promise.resolve([...sounds].map(([path, { at }]) => ({ path, at }))),
   };
 }

@@ -11,6 +11,8 @@ function setup() {
   const notices: [number, string][] = [];
   const engine = { name: 'First song', dirty: false, hasLocation: false, changes: 0 };
   let ids = 0;
+  let override: string | undefined;
+  const openAudio = new Set<string>();
   let clock = Date.parse('2026-10-07T12:00:00Z');
   const sent: Intent[] = [];
 
@@ -26,7 +28,9 @@ function setup() {
   };
   const host: ProjectHost = {
     exportProject: (stamp) =>
-      Promise.resolve(JSON.stringify({ name: engine.name, changes: engine.changes, stamp })),
+      Promise.resolve(
+        override ?? JSON.stringify({ name: engine.name, changes: engine.changes, stamp }),
+      ),
     importProject: (json, options) => {
       const file = JSON.parse(json) as { name: string; changes: number; bad?: boolean };
       if (file.bad)
@@ -64,6 +68,7 @@ function setup() {
     host,
     autosaveDelayMs: 2000,
     newId: () => `id-${String(++ids)}`,
+    audioInUse: () => openAudio,
     now: () => new Date((clock += 1000)),
   });
   const edit = () => {
@@ -72,7 +77,10 @@ function setup() {
     report();
   };
   report();
-  return { library, store, engine, notices, sent, edit };
+  const exportAs = (text: string) => {
+    override = text;
+  };
+  return { library, store, engine, notices, sent, edit, exportAs, openAudio };
 }
 
 const flush = async () => {
@@ -289,6 +297,84 @@ describe('New and Open', () => {
     expect(t.library.dialog()?.kind).toBe('open');
     t.library.cancel();
     expect(t.library.dialog()).toBeNull();
+  });
+});
+
+describe('audio files', () => {
+  const song = (...paths: string[]) =>
+    JSON.stringify({ name: 'x', changes: 0, assets: paths.map((path) => ({ path })) });
+  const HOUR = 60 * 60 * 1000;
+
+  it('records which audio a saved song uses', async () => {
+    const t = setup();
+    t.exportAs(song('audio/a.wav', 'audio/b.wav'));
+    await t.library.request('saveAs');
+    await t.library.saveAs('With audio');
+    expect((await t.store.list())[0]?.audio).toEqual(['audio/a.wav', 'audio/b.wav']);
+  });
+
+  it('lets go of old audio no song uses, and keeps everything else', async () => {
+    const t = setup();
+    const bytes = new ArrayBuffer(4);
+    for (const path of ['audio/used.wav', 'audio/open.wav', 'audio/orphan.wav', 'audio/fresh.wav'])
+      await t.store.writeAudio(path, bytes);
+    t.store.setClock(0); // all stored at time 0 ...
+    await t.store.writeAudio('audio/fresh.wav', bytes);
+    await t.store.writeAudio('audio/later.wav', bytes); // ... and these at "now"
+    t.store.setClock(Date.parse('2026-10-07T12:30:00Z'));
+    await t.store.writeAudio('audio/fresh.wav', bytes);
+    await t.store.writeAudio('audio/later.wav', bytes);
+    t.openAudio.add('audio/open.wav');
+
+    t.exportAs(song('audio/used.wav'));
+    await t.library.request('saveAs');
+    await t.library.saveAs('Song');
+    t.store.setClock(0);
+    await t.store.writeAudio('audio/recovery.wav', bytes); // old, and only the unsaved work uses it
+    await t.store.writeAutosave({
+      name: 'x',
+      json: song('audio/recovery.wav'),
+      at: 1,
+      forId: null,
+      audio: ['audio/recovery.wav'],
+    });
+    t.store.setClock(0);
+    await t.library.collectAudio();
+
+    const left = (await t.store.listAudio()).map((f) => f.path).sort();
+    // The orphan went; the song's, the open song's, the recovery's and the recent ones stayed.
+    expect(left).toEqual([
+      'audio/fresh.wav',
+      'audio/later.wav',
+      'audio/open.wav',
+      'audio/recovery.wav',
+      'audio/used.wav',
+    ]);
+    expect(HOUR).toBeGreaterThan(0);
+  });
+
+  it('does nothing when it cannot be sure what is used', async () => {
+    const t = setup();
+    await t.store.write(
+      { id: 'old', name: 'Saved before audio was tracked', updatedAt: 1, bytes: 1 },
+      '{}',
+    );
+    await t.store.writeAudio('audio/mystery.wav', new ArrayBuffer(4));
+    await t.library.collectAudio();
+    expect(await t.store.listAudio()).toHaveLength(1);
+  });
+
+  it('collects after a song is deleted, so its audio does not pile up', async () => {
+    const t = setup();
+    t.exportAs(song('audio/gone-with-it.wav'));
+    t.store.setClock(Date.parse('2026-10-07T12:00:30Z'));
+    await t.store.writeAudio('audio/gone-with-it.wav', new ArrayBuffer(4));
+    await t.library.request('saveAs');
+    await t.library.saveAs('Doomed');
+    await t.library.request('open');
+    await t.library.deleteProject('id-1');
+    // Stored "now" in the fake clock, so it is inside the grace period and stays for an hour.
+    expect(await t.store.listAudio()).toHaveLength(1);
   });
 });
 

@@ -1,4 +1,5 @@
 import type { Intent } from '../bridge/generated';
+import { audioPathsIn } from './audioFiles';
 import type { Autosave, ProjectInfo, ProjectStore } from './projectStore';
 
 /** What the person is asked, one at a time. */
@@ -48,7 +49,12 @@ export interface LibraryOptions {
   /** How long after the last change an unsaved song is kept (ms). */
   readonly autosaveDelayMs?: number;
   readonly newId?: () => string;
+  /** The audio files the open song uses: never let go of those. */
+  readonly audioInUse?: () => Iterable<string>;
 }
+
+/** An audio file nobody uses is kept this long (ms) first: another tab may be about to use it. */
+export const AUDIO_GRACE_MS = 60 * 60 * 1000;
 
 export const MAX_NAME_LENGTH = 128;
 
@@ -79,6 +85,7 @@ export class WebProjectLibrary implements ProjectLibrary {
   private readonly now: () => Date;
   private readonly autosaveDelay: number;
   private readonly newId: () => string;
+  private readonly audioInUse: () => Iterable<string>;
   private readonly listeners = new Set<() => void>();
 
   private current: ProjectDialog | null = null;
@@ -94,6 +101,7 @@ export class WebProjectLibrary implements ProjectLibrary {
     this.now = options.now ?? (() => new Date());
     this.autosaveDelay = options.autosaveDelayMs ?? 2000;
     this.newId = options.newId ?? defaultId;
+    this.audioInUse = options.audioInUse ?? (() => []);
   }
 
   // --- What the interface reads ---------------------------------------------------------------
@@ -131,6 +139,7 @@ export class WebProjectLibrary implements ProjectLibrary {
     return this.queue(async () => {
       const autosave = await this.store.readAutosave().catch(() => undefined);
       if (autosave) this.show({ kind: 'recover', name: autosave.name, at: autosave.at });
+      await this.collectAudio();
     });
   }
 
@@ -198,6 +207,7 @@ export class WebProjectLibrary implements ProjectLibrary {
         this.currentId = null;
         await this.host.markUnsaved(); // the open song now exists only on screen
       }
+      await this.collectAudio();
       if (this.current?.kind === 'open') await this.showOpen();
     });
   }
@@ -314,7 +324,13 @@ export class WebProjectLibrary implements ProjectLibrary {
     try {
       const json = await this.host.exportProject(timestamp(this.now()));
       await this.store.write(
-        { id, name, updatedAt: this.now().getTime(), bytes: json.length },
+        {
+          id,
+          name,
+          updatedAt: this.now().getTime(),
+          bytes: json.length,
+          audio: audioPathsIn(json),
+        },
         json,
       );
     } catch (error) {
@@ -323,6 +339,7 @@ export class WebProjectLibrary implements ProjectLibrary {
     }
     await this.host.markSaved(true);
     await this.dropAutosave();
+    await this.collectAudio();
     this.host.notice(0, `Saved “${name}” in this browser.`);
     void this.keepStorage();
     return true;
@@ -353,6 +370,7 @@ export class WebProjectLibrary implements ProjectLibrary {
       json,
       at: this.now().getTime(),
       forId: this.currentId,
+      audio: audioPathsIn(json),
     };
     await this.store.writeAutosave(record);
   }
@@ -361,5 +379,29 @@ export class WebProjectLibrary implements ProjectLibrary {
     clearTimeout(this.autosaveTimer);
     this.autosaveTimer = undefined;
     await this.store.clearAutosave().catch(() => undefined);
+  }
+
+  /**
+   * Lets go of audio files no song uses: not the saved songs, not the unsaved work kept for recovery,
+   * not the open song, and not anything stored in the last hour (another tab may be about to use it).
+   * Does nothing if it cannot be sure, i.e. if any song was saved before audio was tracked.
+   */
+  async collectAudio(): Promise<void> {
+    try {
+      const songs = await this.store.list();
+      const autosave = await this.store.readAutosave();
+      if (songs.some((song) => !song.audio) || (autosave && !autosave.audio)) return;
+
+      const keep = new Set<string>(this.audioInUse());
+      for (const song of songs) song.audio?.forEach((path) => keep.add(path));
+      autosave?.audio?.forEach((path) => keep.add(path));
+
+      const now = this.now().getTime();
+      for (const file of await this.store.listAudio())
+        if (!keep.has(file.path) && now - file.at > AUDIO_GRACE_MS)
+          await this.store.removeAudio(file.path);
+    } catch {
+      // storage trouble: the files stay, which is the safe side
+    }
   }
 }

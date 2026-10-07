@@ -1,3 +1,6 @@
+import { AudioImporter } from '../web/audioImporter';
+import { chooseAudioFile, decodeAudio, randomId } from '../web/audioFiles';
+import type { ImportTarget } from '../web/audioFiles';
 import { WebProjectLibrary } from '../web/projectLibrary';
 import type { ProjectHost } from '../web/projectLibrary';
 import { openIndexedDbStore } from '../web/projectStore';
@@ -99,12 +102,15 @@ export function createWasmBridge(
   };
   void ensureBooted();
 
-  const call = async (command: Record<string, unknown>): Promise<Record<string, unknown>> => {
+  const call = async (
+    command: Record<string, unknown>,
+    transfer: Transferable[] = [],
+  ): Promise<Record<string, unknown>> => {
     await engineReady;
     return new Promise((resolve) => {
       const id = nextRequest++;
       waiting.set(id, resolve);
-      node?.port.postMessage({ command: { id, ...command } });
+      node?.port.postMessage({ command: { id, ...command } }, transfer);
     });
   };
   const notice = (level: 0 | 1 | 2, message: string) => {
@@ -127,7 +133,25 @@ export function createWasmBridge(
     readAutosave: async () => (await storeOpening).readAutosave(),
     writeAutosave: async (autosave) => (await storeOpening).writeAutosave(autosave),
     clearAutosave: async () => (await storeOpening).clearAutosave(),
+    readAudio: async (path) => (await storeOpening).readAudio(path),
+    writeAudio: async (path, bytes) => (await storeOpening).writeAudio(path, bytes),
+    removeAudio: async (path) => (await storeOpening).removeAudio(path),
+    listAudio: async () => (await storeOpening).listAudio(),
   };
+
+  // Audio files: decoded by the browser, kept in storage, handed to the engine as samples.
+  const importer = new AudioImporter({
+    store: lazyStore,
+    decode: async (bytes) => {
+      await ensureBooted();
+      if (!context) throw new Error('The audio engine is not running.');
+      return decodeAudio(context, bytes);
+    },
+    send: call,
+    notice,
+    newId: randomId,
+    choose: chooseAudioFile,
+  });
   const host: ProjectHost = {
     exportProject: async (timestamp) => {
       const reply = await call({ kind: 'export', timestamp });
@@ -137,6 +161,7 @@ export function createWasmBridge(
     },
     importProject: async (json, options) => {
       const reply = await call({ kind: 'import', json, ...options });
+      if (reply['ok'] === true) void importer.loadSong(json); // the song's audio follows
       return reply['ok'] === true
         ? { ok: true }
         : {
@@ -150,10 +175,17 @@ export function createWasmBridge(
     markUnsaved: async () => {
       await call({ kind: 'unsaved' });
     },
-    send: forward,
+    send: (intent) => {
+      if (intent.type === 'project.new') importer.newSong();
+      forward(intent);
+    },
     notice,
   };
-  const projects = new WebProjectLibrary({ store: lazyStore, host });
+  const projects = new WebProjectLibrary({
+    store: lazyStore,
+    host,
+    audioInUse: () => importer.inUse,
+  });
   router.on('project.state', (state) => {
     projects.projectState(state);
   });
@@ -200,6 +232,12 @@ export function createWasmBridge(
     isNative: false,
     audio,
     projects,
+    importFiles: async (files, target) => {
+      const [first, ...others] = files;
+      if (!first) return;
+      if (others.length > 0) notice(0, 'One file at a time: importing the first.');
+      await importer.importFile(first, target);
+    },
     send: (intent) => {
       // New, Open, Save and Save As are questions about where songs are kept: the page answers.
       switch (intent.type) {
@@ -214,6 +252,23 @@ export function createWasmBridge(
           return;
         case 'project.saveAs':
           void projects.request('saveAs');
+          return;
+        // Files are chosen with the browser's dialog; it opens only from the click that got here.
+        case 'track.importAudio':
+          void importer.choose({
+            kind: 'clip',
+            track: intent.payload.track,
+            ticks: intent.payload.ticks,
+          } satisfies ImportTarget);
+          return;
+        case 'asset.locate':
+          void importer.choose({ kind: 'relink', asset: intent.payload.asset });
+          return;
+        case 'sampler.load':
+          void importer.choose({ kind: 'sampler' });
+          return;
+        case 'drums.loadPad':
+          void importer.choose({ kind: 'pad', pad: intent.payload.pad });
           return;
         default:
           forward(intent);
