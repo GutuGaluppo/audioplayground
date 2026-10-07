@@ -3,6 +3,7 @@
 
 add_library(ap_core STATIC
     src/BuildInfo.cpp
+    src/analysis/RhythmAnalysis.cpp
     src/dsp/Loudness.cpp
     src/dsp/Oversampler.cpp
     src/dsp/Peaks.cpp

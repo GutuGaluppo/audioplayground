@@ -28,6 +28,7 @@ add_executable(ap_unit_tests
     unit/ReverbTests.cpp
     unit/RenderGraphTests.cpp
     unit/ResamplerTests.cpp
+    unit/RhythmAnalysisTests.cpp
     unit/SamplerTests.cpp
     unit/SineOscillatorTests.cpp
     unit/SynthDspTests.cpp
