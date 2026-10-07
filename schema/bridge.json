@@ -403,6 +403,18 @@
       }
     },
     "asset.removeUnused": {},
+    "accompaniment.suggest": {
+      "clip": {
+        "type": "int",
+        "min": 1,
+        "max": 2147483647
+      }
+    },
+    "accompaniment.preview": {},
+    "accompaniment.stopPreview": {},
+    "accompaniment.add": {},
+    "accompaniment.next": {},
+    "accompaniment.dismiss": {},
     "clip.create": {
       "track": {
         "type": "int",
@@ -1265,6 +1277,38 @@
             "type": "bool"
           }
         }
+      }
+    },
+    "accompaniment.state": {
+      "state": {
+        "type": "int",
+        "min": 0,
+        "max": 6
+      },
+      "reason": {
+        "type": "int",
+        "min": 0,
+        "max": 6
+      },
+      "message": {
+        "type": "string",
+        "maxLength": 300
+      },
+      "grooveName": {
+        "type": "string",
+        "maxLength": 100
+      },
+      "detail": {
+        "type": "string",
+        "maxLength": 300
+      },
+      "clip": {
+        "type": "int",
+        "min": 0,
+        "max": 2147483647
+      },
+      "canTryAnother": {
+        "type": "bool"
       }
     },
     "timeline.peaks": {

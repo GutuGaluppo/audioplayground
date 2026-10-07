@@ -58,6 +58,9 @@ public:
     // Errors and explanations for the user.
     std::function<void (const std::string&)> onNotice;
 
+    // A finished take is now a clip (called after the undo step exists).
+    std::function<void (model::ClipId)> onTakeAdded;
+
 private:
     struct Take
     {

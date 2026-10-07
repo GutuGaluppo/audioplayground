@@ -65,6 +65,13 @@ public:
     // Republishes the render graph, e.g. when clip audio finished loading.
     void refreshEngine();
 
+    // Plays a project that is not the open one (a suggestion being previewed, ADR-011) without
+    // touching the open project or its history. Any real change, and opening or creating a project,
+    // ends the preview first; endPreview() ends it too.
+    void setPreview (model::Project project);
+    void endPreview();
+    [[nodiscard]] bool isPreviewing() const noexcept { return preview.has_value(); }
+
 private:
     void syncEngine();
     bool afterChange (bool changed);
@@ -78,6 +85,7 @@ private:
     model::ProjectDocument doc;
     model::ProjectMetadata metadata;
     std::optional<io::ProjectFolder> folder;
+    std::optional<model::Project> preview;
     std::uint64_t savedVersion = 0;
     std::uint64_t autosavedVersion = 0;
     int ticksSinceAutosave = 0;

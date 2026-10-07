@@ -442,6 +442,18 @@ export function Timeline() {
         >
           Delete
         </button>
+        <button
+          type="button"
+          className="button"
+          disabled={!selected || !isAudioClip(selected.clip)}
+          onClick={() => {
+            if (selected)
+              bridge.send({ type: 'accompaniment.suggest', payload: { clip: selected.clip.id } });
+          }}
+          title="Listen to the selected audio and suggest a beat to play with it"
+        >
+          Try a beat
+        </button>
         <span className="timeline__spacer" />
         <label className="timeline__snap">
           Snap{' '}

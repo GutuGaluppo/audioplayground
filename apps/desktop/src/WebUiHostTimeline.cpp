@@ -63,6 +63,7 @@ bool WebUiHost::editClip (std::uint64_t clip, model::ClipEdit edit, std::uint64_
 
 void WebUiHost::stopTransport()
 {
+    accompaniment.stopPreview(); // a beat being previewed ends with the music
     const auto position = engine.getTransport().getState().positionTicks;
     engine.getTransport().requestStop();
     stopNoteRecording (position);
@@ -326,6 +327,53 @@ void WebUiHost::handle (const ap::bridge::AssetRemoveUnused&)
             unused.push_back (asset.id);
     if (!unused.empty())
         session.perform (model::RemoveAssets {std::move (unused)});
+}
+
+void WebUiHost::handle (const ap::bridge::AccompanimentSuggest& intent)
+{
+    accompaniment.suggestFor (model::ClipId {static_cast<std::uint64_t> (intent.clip)});
+}
+
+void WebUiHost::handle (const ap::bridge::AccompanimentPreview&)
+{
+    accompaniment.preview();
+    sendTransportState();
+}
+
+void WebUiHost::handle (const ap::bridge::AccompanimentStopPreview&)
+{
+    accompaniment.stopPreview();
+    sendTransportState();
+}
+
+void WebUiHost::handle (const ap::bridge::AccompanimentAdd&)
+{
+    accompaniment.add();
+}
+
+void WebUiHost::handle (const ap::bridge::AccompanimentNext&)
+{
+    accompaniment.next();
+}
+
+void WebUiHost::handle (const ap::bridge::AccompanimentDismiss&)
+{
+    accompaniment.dismiss();
+    sendTransportState();
+}
+
+void WebUiHost::sendAccompaniment()
+{
+    const auto& s = accompaniment.snapshot();
+    ap::bridge::AccompanimentState event;
+    event.state = static_cast<int> (s.state);
+    event.reason = static_cast<int> (s.reason);
+    event.message = s.message.substr (0, 280);
+    event.grooveName = s.grooveName.substr (0, 90);
+    event.detail = s.detail.substr (0, 280);
+    event.clip = toInt (s.clip.value);
+    event.canTryAnother = s.canTryAnother;
+    emit (event);
 }
 
 void WebUiHost::sendProjectAssets (bool recheckFiles)

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "AccompanimentService.h"
 #include "AudioDeviceHost.h"
 #include "AudioRecorder.h"
 #include "Exporter.h"
@@ -48,6 +49,7 @@ public:
     // exactly as the page would send them and read the events the host would have emitted.
     void receiveIntent (const juce::var& message) { handleIntent (message); }
     std::function<void (const juce::var&)> eventSink;
+    AccompanimentService& accompanimentForTests() noexcept { return accompaniment; }
 #endif
 
 private:
@@ -118,6 +120,12 @@ private:
     void handle (const ap::bridge::AssetLocate&);
     void handle (const ap::bridge::AssetRemove&);
     void handle (const ap::bridge::AssetRemoveUnused&);
+    void handle (const ap::bridge::AccompanimentSuggest&);
+    void handle (const ap::bridge::AccompanimentPreview&);
+    void handle (const ap::bridge::AccompanimentStopPreview&);
+    void handle (const ap::bridge::AccompanimentAdd&);
+    void handle (const ap::bridge::AccompanimentNext&);
+    void handle (const ap::bridge::AccompanimentDismiss&);
     void handle (const ap::bridge::ClipCreate&);
     void handle (const ap::bridge::ClipMove&);
     void handle (const ap::bridge::ClipResize&);
@@ -149,6 +157,7 @@ private:
     // Every audio file of the project and what uses it. recheckFiles stats each file again.
     void sendProjectAssets (bool recheckFiles = false);
     void sendTimelinePeaks (bool all);
+    void sendAccompaniment();
 
     void emit (const ap::bridge::Event& event);
     void sendStatus();
@@ -178,6 +187,7 @@ private:
     NoteRecorder recorder;
     NoteCapture capture;
     Exporter exporter;
+    AccompanimentService accompaniment;
     bool lastExporting = false;
     std::unique_ptr<LockedDownWebView> webView;
     ap::bridge::TransportPosition lastPosition;

@@ -67,6 +67,7 @@ add_custom_command(
 # --- Sources -------------------------------------------------------------------------------------
 
 set(AP_DESKTOP_SOURCES
+    src/AccompanimentService.cpp
     src/AudioDeviceHost.cpp
     src/Main.cpp
     src/AudioRecorder.cpp

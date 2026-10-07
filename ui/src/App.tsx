@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 
 import { useBridge } from './bridge/BridgeContext';
 import type { EngineStatus } from './bridge/generated';
+import { AccompanimentBar } from './components/AccompanimentBar';
 import { AudioDevicesMenu } from './components/AudioDevicesMenu';
 import { Notices } from './components/Notices';
 import { QuickStart } from './components/QuickStart';
@@ -77,6 +78,7 @@ export function App() {
       ) : null}
 
       <TransportBar />
+      <AccompanimentBar />
 
       <main className="workspace">
         <Timeline />

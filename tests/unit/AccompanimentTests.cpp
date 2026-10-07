@@ -6,6 +6,7 @@
 #include "ap/engine/OfflineRenderer.h"
 #include "ap/model/ClipEditing.h"
 
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <set>
 
@@ -129,6 +130,24 @@ TEST_CASE ("A take becomes a context only when there is a rhythm to follow", "[a
         const auto r = makeContext (steady (87.0), project, meter);
         CHECK (r.verdict == Verdict::tempoMismatch);
         CHECK (r.detectedBpm == 87.0);
+    }
+    SECTION ("the beats must fall on the project's grid, or the groove would clash")
+    {
+        // 120 BPM: a beat every 0.5 s. A first beat at 4.02 s is 20 ms off (4 %): fine.
+        CHECK (makeContext (steady (120.0), project, meter, 4.02).verdict == Verdict::ready);
+        CHECK (makeContext (steady (120.0), project, meter, 3.98).verdict == Verdict::ready);
+        // A quarter of a beat late (125 ms) is not.
+        CHECK (makeContext (steady (120.0), project, meter, 4.125).verdict == Verdict::offGrid);
+        CHECK (makeContext (steady (120.0), project, meter, 3.9).verdict == Verdict::offGrid);
+        // A take counted in doubles has beats on the project's eighths, which are on the grid.
+        CHECK (makeContext (steady (240.0), project, meter, 4.25).verdict == Verdict::ready);
+        CHECK (makeContext (steady (240.0), project, meter, 4.125).verdict == Verdict::offGrid);
+        // Not asked: no check.
+        CHECK (makeContext (steady (120.0), project, meter).verdict == Verdict::ready);
+
+        CHECK (beatGridError (4.02, 120.0) == Catch::Approx (0.02).margin (1e-9));
+        CHECK (beatGridError (4.48, 120.0) == Catch::Approx (-0.02).margin (1e-9));
+        CHECK (std::abs (beatGridError (4.25, 120.0)) == Catch::Approx (0.25).margin (1e-9));
     }
     SECTION ("an unsure tempo asks for help, an absent one says there is no rhythm")
     {

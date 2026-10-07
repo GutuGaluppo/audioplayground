@@ -1,11 +1,15 @@
 #include "SampleLoader.h"
 #include "TempDirectory.h"
+#include "TimelineHelpers.h"
+#include "WavFile.h"
 #include "WebUiHost.h"
 #include "ap/engine/OfflineRenderer.h"
+#include "ap/model/ClipEditing.h"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <cmath>
+#include <set>
 
 using namespace ap;
 
@@ -241,4 +245,275 @@ TEST_CASE ("Tempo set in the UI reaches the engine and the song", "[bridge][inte
 
     h.send ("transport.setTempo", R"({"bpm": 5000})"); // outside 20..300: the codec refuses it
     CHECK (h.engine.getTransport().getTempo() == 90.0);
+}
+
+// --- Smart Accompaniment (ADR-011) -----------------------------------------------------------
+
+namespace
+{
+// A drum groove played at `bpm`, optionally delayed by `lateSeconds`: stands in for a recorded take.
+std::vector<float> grooveAudio (double bpm, double seconds, double lateSeconds = 0.0)
+{
+    engine::Engine engine;
+    test::publish (engine,
+                   test::drumPatternProject ({{0, {0, 6, 8}}, {1, {4, 12}}, {2, {0, 2, 4, 6, 8, 10, 12, 14}}},
+                                             16 * 4 * core::ticksPerQuarterNote));
+    engine.getTransport().setTempo (bpm);
+    engine.getTransport().requestPlay();
+    const auto audio
+        = engine::renderOffline (engine, {rate, 1, static_cast<std::int64_t> (seconds * rate), 512});
+    std::vector<float> out (static_cast<std::size_t> (lateSeconds * rate), 0.0f);
+    out.insert (out.end(), audio[0].begin(), audio[0].end());
+    return out;
+}
+
+// A sustained chord with a slow swell: no rhythm in it.
+std::vector<float> padAudio (double seconds)
+{
+    std::vector<float> x (static_cast<std::size_t> (seconds * rate));
+    for (std::size_t i = 0; i < x.size(); ++i)
+    {
+        const double t = static_cast<double> (i) / rate;
+        x[i] = static_cast<float> (0.2 * std::min (1.0, t / 2.0)
+                                   * (std::sin (6.2831853 * 220.0 * t) + std::sin (6.2831853 * 277.18 * t)
+                                      + std::sin (6.2831853 * 329.63 * t)));
+    }
+    return x;
+}
+
+struct TakeHarness : Harness
+{
+    std::vector<std::string> productEvents;
+
+    TakeHarness()
+    {
+        ui->accompanimentForTests().onEvent
+            = [this] (std::string_view name) { productEvents.emplace_back (name); };
+    }
+
+    // Puts audio on a new audio track at tick 0, as a finished take, and waits for it to decode.
+    model::ClipId addTake (const std::vector<float>& audio, double projectBpm)
+    {
+        if (session.project().tempoBpm != projectBpm)
+            REQUIRE (session.perform (model::SetTempo {projectBpm}));
+        const auto folder = session.assetRoot().audioDirectory();
+        std::filesystem::create_directories (folder);
+        test::writeFloatWav (folder / "1-take.wav", {rate, {audio}});
+
+        REQUIRE (session.perform (model::AddTrack {model::TrackKind::audio}));
+        const auto track = session.project().tracks.back().id;
+        REQUIRE (session.perform (model::AddAsset {"audio/1-take.wav", "take.wav"}));
+        model::Clip clip;
+        clip.asset = session.project().assets.back().id;
+        clip.length = static_cast<core::Ticks> (static_cast<double> (audio.size()) / rate * projectBpm / 60.0
+                                                * core::ticksPerQuarterNote);
+        REQUIRE (session.perform (model::AddClip {track, clip}));
+        const auto id = session.project().tracks.back().clips.back().id;
+        loader.sync (rate);
+        waitFor (
+            [&]
+            {
+                return loader.getClipAudio().count (session.project().assets.back().id.value) > 0
+                    && loader.getClipAudio().at (session.project().assets.back().id.value).buffer != nullptr;
+            });
+        return id;
+    }
+
+    void waitFor (const std::function<bool()>& done)
+    {
+        for (int i = 0; i < 1500 && !done(); ++i)
+            juce::MessageManager::getInstance()->runDispatchLoopUntil (10);
+        REQUIRE (done());
+    }
+
+    [[nodiscard]] int accompanimentState() const
+    {
+        return static_cast<int> (latest ("accompaniment.state")["state"]);
+    }
+
+    void waitForSuggestionOutcome()
+    {
+        waitFor ([&] { return accompanimentState() != 1 && accompanimentState() != 0; });
+    }
+};
+
+constexpr int stateReady = 2, statePreviewing = 3, stateAccepted = 4, stateDismissed = 5,
+              stateUnavailable = 6;
+} // namespace
+
+TEST_CASE ("A take with a clear beat gets a suggestion that is previewed, then added in one undo step",
+           "[bridge][integration][accompaniment]")
+{
+    TakeHarness h;
+    h.send ("app.ready");
+    const auto take = h.addTake (grooveAudio (100.0, 16.0), 100.0);
+
+    h.send ("accompaniment.suggest", "{\"clip\": " + juce::String (static_cast<int> (take.value)) + "}");
+    CHECK (h.accompanimentState() == 1); // listening; playback is not held up
+    h.waitForSuggestionOutcome();
+    REQUIRE (h.accompanimentState() == stateReady);
+    const auto offer = h.latest ("accompaniment.state");
+    CHECK (offer["message"].toString() == "Try a beat");
+    CHECK (offer["grooveName"].toString().isNotEmpty());
+    CHECK (offer["detail"].toString().isNotEmpty());
+    CHECK (static_cast<int> (offer["clip"]) == static_cast<int> (take.value));
+    CHECK (h.session.project().tracks.size() == 1); // nothing added yet
+
+    // Preview: the groove plays with the take, the project is untouched.
+    const auto before = h.session.project().tracks.size();
+    const auto undoDepthBefore = h.latest ("history.state")["undoLabel"].toString();
+    h.send ("accompaniment.preview");
+    CHECK (h.accompanimentState() == statePreviewing);
+    CHECK (h.session.isPreviewing());
+    CHECK (h.session.project().tracks.size() == before);
+    CHECK (h.latest ("history.state")["undoLabel"].toString() == undoDepthBefore);
+    const auto withPreview = h.loudness (6);
+
+    h.send ("accompaniment.stopPreview");
+    CHECK (h.accompanimentState() == stateReady);
+    CHECK_FALSE (h.session.isPreviewing());
+    const auto takeOnly = h.loudness (6);
+    CHECK (withPreview > takeOnly * 1.05); // the groove really was in the signal path
+
+    // Add: one normal undo step; undo brings the suggestion back.
+    h.send ("accompaniment.preview");
+    h.send ("accompaniment.add");
+    CHECK (h.accompanimentState() == stateAccepted);
+    CHECK_FALSE (h.session.isPreviewing());
+    REQUIRE (h.session.project().tracks.size() == before + 1);
+    const auto& drums = h.session.project().tracks.back();
+    REQUIRE (drums.clips.size() == 1);
+    CHECK (drums.clips[0].start == 0); // on the bar the take starts in
+    CHECK (drums.clips[0].loopLength == model::DrumKit::patternLength);
+    CHECK (h.latest ("history.state")["undoLabel"].toString() == "Add drums");
+
+    h.send ("edit.undo");
+    CHECK (h.session.project().tracks.size() == before);
+    CHECK (h.accompanimentState() == stateReady);
+
+    CHECK (h.productEvents
+           == std::vector<std::string> {"accompaniment_suggested", "accompaniment_previewed",
+                                        "accompaniment_previewed", "accompaniment_accepted",
+                                        "accompaniment_removed"});
+}
+
+TEST_CASE ("Try another moves through the ranking without repeating, and dismiss clears the offer",
+           "[bridge][integration][accompaniment]")
+{
+    TakeHarness h;
+    h.send ("app.ready");
+    const auto take = h.addTake (grooveAudio (100.0, 16.0), 100.0);
+    h.send ("accompaniment.suggest", "{\"clip\": " + juce::String (static_cast<int> (take.value)) + "}");
+    h.waitForSuggestionOutcome();
+    REQUIRE (h.accompanimentState() == stateReady);
+
+    std::set<std::string> names {h.latest ("accompaniment.state")["grooveName"].toString().toStdString()};
+    for (int i = 0; i < 3; ++i)
+    {
+        REQUIRE (static_cast<bool> (h.latest ("accompaniment.state")["canTryAnother"]));
+        h.send ("accompaniment.next");
+        CHECK (names.insert (h.latest ("accompaniment.state")["grooveName"].toString().toStdString()).second);
+    }
+
+    h.send ("accompaniment.preview");
+    h.send ("accompaniment.next"); // switches the groove being previewed
+    CHECK (h.accompanimentState() == statePreviewing);
+    CHECK (h.session.isPreviewing());
+
+    h.send ("accompaniment.dismiss");
+    CHECK (h.accompanimentState() == stateDismissed);
+    CHECK_FALSE (h.session.isPreviewing());
+    CHECK (h.session.project().tracks.size() == 1);
+    h.send ("accompaniment.add"); // nothing on offer any more
+    CHECK (h.session.project().tracks.size() == 1);
+    CHECK (std::count (h.productEvents.begin(), h.productEvents.end(), "accompaniment_changed") == 4);
+    CHECK (std::count (h.productEvents.begin(), h.productEvents.end(), "accompaniment_skipped") == 1);
+}
+
+TEST_CASE ("Editing the project ends a preview and keeps the offer", "[bridge][integration][accompaniment]")
+{
+    TakeHarness h;
+    h.send ("app.ready");
+    const auto take = h.addTake (grooveAudio (100.0, 16.0), 100.0);
+    h.send ("accompaniment.suggest", "{\"clip\": " + juce::String (static_cast<int> (take.value)) + "}");
+    h.waitForSuggestionOutcome();
+    h.send ("accompaniment.preview");
+    REQUIRE (h.session.isPreviewing());
+
+    h.send ("transport.setTempo", R"({"bpm": 101})");
+    CHECK_FALSE (h.session.isPreviewing());
+    CHECK (h.accompanimentState() == stateReady);
+
+    h.send ("accompaniment.preview");
+    h.send ("transport.stop"); // the music stops: so does the preview
+    CHECK_FALSE (h.session.isPreviewing());
+
+    // Deleting the take takes the offer with it.
+    h.send ("clip.remove", "{\"clip\": " + juce::String (static_cast<int> (take.value)) + "}");
+    CHECK (h.accompanimentState() == 0);
+}
+
+TEST_CASE ("Material that cannot be accompanied says why, and does not suggest",
+           "[bridge][integration][accompaniment]")
+{
+    SECTION ("a sustained pad")
+    {
+        TakeHarness h;
+        h.send ("app.ready");
+        const auto take = h.addTake (padAudio (14.0), 100.0);
+        h.send ("accompaniment.suggest", "{\"clip\": " + juce::String (static_cast<int> (take.value)) + "}");
+        h.waitForSuggestionOutcome();
+        REQUIRE (h.accompanimentState() == stateUnavailable);
+        CHECK (static_cast<int> (h.latest ("accompaniment.state")["reason"]) == 1);
+        CHECK (h.latest ("accompaniment.state")["message"].toString().contains (
+            "Couldn't find a rhythm pattern"));
+        h.send ("accompaniment.preview"); // nothing to preview
+        CHECK_FALSE (h.session.isPreviewing());
+        CHECK (h.productEvents.empty());
+    }
+    SECTION ("a take at another tempo than the project")
+    {
+        TakeHarness h;
+        h.send ("app.ready");
+        const auto take = h.addTake (grooveAudio (90.0, 16.0), 120.0);
+        h.send ("accompaniment.suggest", "{\"clip\": " + juce::String (static_cast<int> (take.value)) + "}");
+        h.waitForSuggestionOutcome();
+        REQUIRE (h.accompanimentState() == stateUnavailable);
+        CHECK (static_cast<int> (h.latest ("accompaniment.state")["reason"]) == 3);
+        const auto message = h.latest ("accompaniment.state")["message"].toString();
+        CHECK (message.contains ("90 BPM"));
+        CHECK (message.contains ("120"));
+    }
+    SECTION ("a take that is in time with itself but not with the project's beat")
+    {
+        TakeHarness h;
+        h.send ("app.ready");
+        const auto take
+            = h.addTake (grooveAudio (100.0, 16.0, 0.17), 100.0); // 0.17 s late: over a quarter of a beat
+        h.send ("accompaniment.suggest", "{\"clip\": " + juce::String (static_cast<int> (take.value)) + "}");
+        h.waitForSuggestionOutcome();
+        REQUIRE (h.accompanimentState() == stateUnavailable);
+        CHECK (static_cast<int> (h.latest ("accompaniment.state")["reason"]) == 6);
+    }
+    SECTION ("drums are already there")
+    {
+        TakeHarness h;
+        h.send ("app.ready");
+        const auto take = h.addTake (grooveAudio (100.0, 16.0), 100.0);
+        h.send ("drums.setStep", R"({"clip": 0, "pad": 0, "step": 0, "on": true, "gesture": 0})");
+        h.send ("accompaniment.suggest", "{\"clip\": " + juce::String (static_cast<int> (take.value)) + "}");
+        h.waitForSuggestionOutcome();
+        REQUIRE (h.accompanimentState() == stateUnavailable);
+        CHECK (static_cast<int> (h.latest ("accompaniment.state")["reason"]) == 5);
+    }
+    SECTION ("not an audio clip")
+    {
+        TakeHarness h;
+        h.send ("app.ready");
+        h.send ("drums.setStep", R"({"clip": 0, "pad": 0, "step": 0, "on": true, "gesture": 0})");
+        const auto clip = h.drumClip();
+        const auto before = h.count ("accompaniment.state");
+        h.send ("accompaniment.suggest", "{\"clip\": " + juce::String (static_cast<int> (clip["id"])) + "}");
+        CHECK (h.count ("accompaniment.state") == before);
+    }
 }

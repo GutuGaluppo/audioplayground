@@ -871,6 +871,72 @@ std::optional<Intent> parseAssetRemoveUnused (const juce::var& payloadVar)
     return Intent {message};
 }
 
+std::optional<Intent> parseAccompanimentSuggest (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"clip"}))
+        return std::nullopt;
+
+    AccompanimentSuggest message;
+    if (!readInt (*payload, "clip", AccompanimentSuggest::clipMin, AccompanimentSuggest::clipMax, message.clip)) return std::nullopt;
+    return Intent {message};
+}
+
+std::optional<Intent> parseAccompanimentPreview (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {}))
+        return std::nullopt;
+
+    AccompanimentPreview message;
+
+    return Intent {message};
+}
+
+std::optional<Intent> parseAccompanimentStopPreview (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {}))
+        return std::nullopt;
+
+    AccompanimentStopPreview message;
+
+    return Intent {message};
+}
+
+std::optional<Intent> parseAccompanimentAdd (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {}))
+        return std::nullopt;
+
+    AccompanimentAdd message;
+
+    return Intent {message};
+}
+
+std::optional<Intent> parseAccompanimentNext (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {}))
+        return std::nullopt;
+
+    AccompanimentNext message;
+
+    return Intent {message};
+}
+
+std::optional<Intent> parseAccompanimentDismiss (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {}))
+        return std::nullopt;
+
+    AccompanimentDismiss message;
+
+    return Intent {message};
+}
+
 std::optional<Intent> parseClipCreate (const juce::var& payloadVar)
 {
     const auto* payload = payloadVar.getDynamicObject();
@@ -1226,6 +1292,18 @@ std::optional<Intent> parseIntent (const juce::var& message)
         return parseAssetRemove (payload);
     if (typeName == AssetRemoveUnused::type)
         return parseAssetRemoveUnused (payload);
+    if (typeName == AccompanimentSuggest::type)
+        return parseAccompanimentSuggest (payload);
+    if (typeName == AccompanimentPreview::type)
+        return parseAccompanimentPreview (payload);
+    if (typeName == AccompanimentStopPreview::type)
+        return parseAccompanimentStopPreview (payload);
+    if (typeName == AccompanimentAdd::type)
+        return parseAccompanimentAdd (payload);
+    if (typeName == AccompanimentNext::type)
+        return parseAccompanimentNext (payload);
+    if (typeName == AccompanimentDismiss::type)
+        return parseAccompanimentDismiss (payload);
     if (typeName == ClipCreate::type)
         return parseClipCreate (payload);
     if (typeName == ClipMove::type)
@@ -1422,6 +1500,18 @@ juce::var toVar (const Event& event)
                 auto* payload = new juce::DynamicObject();
                 payload->setProperty ("assets", toVarList (m.assets));
                 return envelope (ProjectAssets::type, payload);
+            },
+            [] (const AccompanimentState& m) -> juce::var
+            {
+                auto* payload = new juce::DynamicObject();
+                payload->setProperty ("state", m.state);
+                payload->setProperty ("reason", m.reason);
+                payload->setProperty ("message", juce::String (m.message));
+                payload->setProperty ("grooveName", juce::String (m.grooveName));
+                payload->setProperty ("detail", juce::String (m.detail));
+                payload->setProperty ("clip", m.clip);
+                payload->setProperty ("canTryAnother", m.canTryAnother);
+                return envelope (AccompanimentState::type, payload);
             },
             [] (const TimelinePeaks& m) -> juce::var
             {

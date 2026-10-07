@@ -1,5 +1,6 @@
 #include "ap/accompaniment/MusicalContext.h"
 
+#include <algorithm>
 #include <cmath>
 
 namespace ap::accompaniment
@@ -15,8 +16,20 @@ bool sameTempoUpToOctave (double detected, double project, double tolerance) noe
     return false;
 }
 
+double beatGridError (double beatSeconds, double bpm) noexcept
+{
+    const double period = 60.0 / bpm;
+    double error = std::fmod (beatSeconds, period);
+    if (error > 0.5 * period)
+        error -= period;
+    else if (error < -0.5 * period)
+        error += period;
+    return error;
+}
+
 ContextResult makeContext (const analysis::RhythmAnalysis& analysis, double projectBpm,
-                           core::TimeSignature projectMeter, const ContextSettings& s)
+                           core::TimeSignature projectMeter, std::optional<double> firstBeatProjectSeconds,
+                           const ContextSettings& s)
 {
     ContextResult result;
     result.detectedBpm = analysis.bpm;
@@ -36,6 +49,17 @@ ContextResult makeContext (const analysis::RhythmAnalysis& analysis, double proj
     {
         result.verdict = Verdict::tempoMismatch;
         return result;
+    }
+
+    if (firstBeatProjectSeconds)
+    {
+        // Compare on the finer of the two grids, so a take counted in doubles or halves still lines up.
+        const double gridBpm = std::max (projectBpm, analysis.bpm);
+        if (std::abs (beatGridError (*firstBeatProjectSeconds, gridBpm)) > s.gridTolerance * 60.0 / gridBpm)
+        {
+            result.verdict = Verdict::offGrid;
+            return result;
+        }
     }
 
     auto& context = result.context;

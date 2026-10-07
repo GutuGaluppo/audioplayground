@@ -1229,3 +1229,36 @@ kbd {
   color: var(--ap-text-muted);
   font-size: var(--ap-text-xs);
 }
+
+/* Smart Accompaniment strip ------------------------------------------------------------------ */
+
+.accompaniment {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ap-space-3);
+  padding: var(--ap-space-1) var(--ap-space-4);
+  border-bottom: 1px solid var(--ap-border);
+  background: color-mix(in srgb, var(--ap-accent) 10%, var(--ap-surface));
+  font-size: var(--ap-text-sm);
+}
+
+.accompaniment[data-state='6'] {
+  background: var(--ap-surface);
+  color: var(--ap-text-muted);
+}
+
+.accompaniment__text {
+  margin: 0;
+  min-width: 0;
+}
+
+.accompaniment__detail {
+  color: var(--ap-text-muted);
+}
+
+.accompaniment__actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: var(--ap-space-2);
+}

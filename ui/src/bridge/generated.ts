@@ -461,6 +461,38 @@ export interface AssetRemoveUnused {
   readonly payload: {};
 }
 
+export interface AccompanimentSuggest {
+  readonly type: 'accompaniment.suggest';
+  readonly payload: {
+    readonly clip: number;
+  };
+}
+
+export interface AccompanimentPreview {
+  readonly type: 'accompaniment.preview';
+  readonly payload: {};
+}
+
+export interface AccompanimentStopPreview {
+  readonly type: 'accompaniment.stopPreview';
+  readonly payload: {};
+}
+
+export interface AccompanimentAdd {
+  readonly type: 'accompaniment.add';
+  readonly payload: {};
+}
+
+export interface AccompanimentNext {
+  readonly type: 'accompaniment.next';
+  readonly payload: {};
+}
+
+export interface AccompanimentDismiss {
+  readonly type: 'accompaniment.dismiss';
+  readonly payload: {};
+}
+
 export interface ClipCreate {
   readonly type: 'clip.create';
   readonly payload: {
@@ -620,7 +652,7 @@ export interface TrackSetSend {
   };
 }
 
-export type Intent = AppReady | AudioOpenSettings | AudioSetOutput | AudioSetInput | AudioSetSampleRate | AudioSetBufferSize | ToneSetEnabled | TransportPlay | TransportStop | TransportReturnToStart | TransportSetTempo | TransportSetCountIn | MetronomeSetEnabled | ParamSet | SynthSetPreset | EditUndo | EditRedo | ProjectNew | ProjectOpen | ProjectSave | ProjectSaveAs | ProjectRename | ProjectExport | ProjectCancelExport | NoteOn | NoteOff | NoteAllOff | InstrumentSelect | SamplerLoad | DrumsSetStep | DrumsClear | DrumsSetPattern | DrumsTrigger | DrumsSetPad | DrumsLoadPad | DrumsResetPad | DrumsSetKit | TransportRecord | TransportCapture | TransportSeek | TransportSetLoop | TrackAdd | TrackRemove | TrackRename | TrackSetVolume | TrackSetPan | TrackSetMute | TrackSetSolo | TrackSetArmed | TrackSetEffect | TrackImportAudio | AssetLocate | AssetRemove | AssetRemoveUnused | ClipCreate | ClipMove | ClipResize | ClipSplit | ClipRemove | ClipDuplicate | ClipSetLoop | ClipAddNote | ClipRemoveNote | ClipEditNote | BusAdd | BusRemove | BusRename | BusSetVolume | BusSetPan | BusSetMute | BusSetEffect | TrackSetSend;
+export type Intent = AppReady | AudioOpenSettings | AudioSetOutput | AudioSetInput | AudioSetSampleRate | AudioSetBufferSize | ToneSetEnabled | TransportPlay | TransportStop | TransportReturnToStart | TransportSetTempo | TransportSetCountIn | MetronomeSetEnabled | ParamSet | SynthSetPreset | EditUndo | EditRedo | ProjectNew | ProjectOpen | ProjectSave | ProjectSaveAs | ProjectRename | ProjectExport | ProjectCancelExport | NoteOn | NoteOff | NoteAllOff | InstrumentSelect | SamplerLoad | DrumsSetStep | DrumsClear | DrumsSetPattern | DrumsTrigger | DrumsSetPad | DrumsLoadPad | DrumsResetPad | DrumsSetKit | TransportRecord | TransportCapture | TransportSeek | TransportSetLoop | TrackAdd | TrackRemove | TrackRename | TrackSetVolume | TrackSetPan | TrackSetMute | TrackSetSolo | TrackSetArmed | TrackSetEffect | TrackImportAudio | AssetLocate | AssetRemove | AssetRemoveUnused | AccompanimentSuggest | AccompanimentPreview | AccompanimentStopPreview | AccompanimentAdd | AccompanimentNext | AccompanimentDismiss | ClipCreate | ClipMove | ClipResize | ClipSplit | ClipRemove | ClipDuplicate | ClipSetLoop | ClipAddNote | ClipRemoveNote | ClipEditNote | BusAdd | BusRemove | BusRename | BusSetVolume | BusSetPan | BusSetMute | BusSetEffect | TrackSetSend;
 
 // Events: native -> UI
 export interface EngineStatus {
@@ -793,6 +825,19 @@ export interface ProjectAssets {
   };
 }
 
+export interface AccompanimentState {
+  readonly type: 'accompaniment.state';
+  readonly payload: {
+    readonly state: number;
+    readonly reason: number;
+    readonly message: string;
+    readonly grooveName: string;
+    readonly detail: string;
+    readonly clip: number;
+    readonly canTryAnother: boolean;
+  };
+}
+
 export interface TimelinePeaks {
   readonly type: 'timeline.peaks';
   readonly payload: {
@@ -802,7 +847,7 @@ export interface TimelinePeaks {
   };
 }
 
-export type NativeEvent = EngineStatus | AudioDevices | EngineMeters | TransportState | TransportPosition | ParamValue | HistoryState | ProjectState | ExportState | AppNotice | InstrumentState | SamplerState | DrumsKit | DrumsPad | TimelineState | TimelineAssets | ProjectAssets | TimelinePeaks;
+export type NativeEvent = EngineStatus | AudioDevices | EngineMeters | TransportState | TransportPosition | ParamValue | HistoryState | ProjectState | ExportState | AppNotice | InstrumentState | SamplerState | DrumsKit | DrumsPad | TimelineState | TimelineAssets | ProjectAssets | AccompanimentState | TimelinePeaks;
 export type NativeEventType = NativeEvent['type'];
 
 /** Payload type for each native event type. */
@@ -824,6 +869,7 @@ export interface NativeEventPayloads {
   'timeline.state': TimelineState['payload'];
   'timeline.assets': TimelineAssets['payload'];
   'project.assets': ProjectAssets['payload'];
+  'accompaniment.state': AccompanimentState['payload'];
   'timeline.peaks': TimelinePeaks['payload'];
 }
 
@@ -1090,6 +1136,15 @@ const eventValidators: Record<NativeEventType, (payload: Payload) => boolean> = 
   'project.assets': (payload) =>
     hasOnlyKeys(payload, ['assets']) &&
     isList(payload['assets'], 1024, isProjectAsset),
+  'accompaniment.state': (payload) =>
+    hasOnlyKeys(payload, ['state', 'reason', 'message', 'grooveName', 'detail', 'clip', 'canTryAnother']) &&
+    Number.isInteger(payload['state']) && (payload['state'] as number) >= 0 && (payload['state'] as number) <= 6 &&
+    Number.isInteger(payload['reason']) && (payload['reason'] as number) >= 0 && (payload['reason'] as number) <= 6 &&
+    typeof payload['message'] === 'string' && payload['message'].length <= 300 &&
+    typeof payload['grooveName'] === 'string' && payload['grooveName'].length <= 100 &&
+    typeof payload['detail'] === 'string' && payload['detail'].length <= 300 &&
+    Number.isInteger(payload['clip']) && (payload['clip'] as number) >= 0 && (payload['clip'] as number) <= 2147483647 &&
+    typeof payload['canTryAnother'] === 'boolean',
   'timeline.peaks': (payload) =>
     hasOnlyKeys(payload, ['asset', 'peaksPerSecond', 'data']) &&
     Number.isInteger(payload['asset']) && (payload['asset'] as number) >= 1 && (payload['asset'] as number) <= 2147483647 &&

@@ -137,6 +137,7 @@ WebUiHost::WebUiHost (AudioDeviceHost& hostToUse, engine::Engine& engineToUse, S
     , recorder (sessionToUse)
     , capture (sessionToUse)
     , exporter (sessionToUse, samplesToUse)
+    , accompaniment (sessionToUse, samplesToUse, engineToUse)
 {
 #if !AP_HEADLESS_UI
     const auto devUrl = developmentServerUrl();
@@ -183,6 +184,7 @@ WebUiHost::WebUiHost (AudioDeviceHost& hostToUse, engine::Engine& engineToUse, S
     };
     samples.onClipAudioChanged = [this]
     {
+        accompaniment.audioChanged();
         sendProjectAssets (true);
         sendTimelineAssets();
         sendTimelinePeaks (false);
@@ -191,6 +193,8 @@ WebUiHost::WebUiHost (AudioDeviceHost& hostToUse, engine::Engine& engineToUse, S
         = [this] (const std::string& message) { showNotice (ProjectActions::NoticeLevel::error, message); };
     audioRecorder.onNotice
         = [this] (const std::string& message) { showNotice (ProjectActions::NoticeLevel::warning, message); };
+    accompaniment.onChanged = [this] { sendAccompaniment(); };
+    audioRecorder.onTakeAdded = [this] (model::ClipId clip) { accompaniment.suggestFor (clip); };
     exporter.onFinished = [this] (const Exporter::Result& result) { exportFinished (result); };
     setSize (1100, 720);
     startTimerHz (meterRefreshHz);
@@ -206,6 +210,8 @@ WebUiHost::~WebUiHost()
     samples.onClipAudioChanged = nullptr;
     samples.onError = nullptr;
     audioRecorder.onNotice = nullptr;
+    audioRecorder.onTakeAdded = nullptr;
+    accompaniment.onChanged = nullptr;
 }
 
 void WebUiHost::resized()
@@ -249,6 +255,7 @@ void WebUiHost::handle (const ap::bridge::AppReady&)
     sendTimelineAssets();
     sendTimelinePeaks (true);
     sendExportState();
+    sendAccompaniment();
 }
 
 void WebUiHost::handle (const ap::bridge::AudioOpenSettings&)
@@ -566,6 +573,7 @@ void WebUiHost::onProjectChanged()
             disarm();
 
     samples.sync (host.getStatus().sampleRate);
+    accompaniment.projectChanged();
     sendProjectState();
     sendTimeline();
     sendProjectAssets();

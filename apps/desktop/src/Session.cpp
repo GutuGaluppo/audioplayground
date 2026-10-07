@@ -58,7 +58,21 @@ void Session::setAudioLookup (engine::AudioLookup lookup)
 void Session::refreshEngine()
 {
     engine.publishRenderGraph (std::make_unique<engine::RenderGraph> (
-        engine::buildRenderGraph (doc.project(), doc.version(), audioLookup)));
+        engine::buildRenderGraph (preview ? *preview : doc.project(), doc.version(), audioLookup)));
+}
+
+void Session::setPreview (model::Project project)
+{
+    preview = std::move (project);
+    refreshEngine();
+}
+
+void Session::endPreview()
+{
+    if (!preview)
+        return;
+    preview.reset();
+    refreshEngine();
 }
 
 bool Session::undo()
@@ -75,6 +89,7 @@ bool Session::afterChange (bool changed)
 {
     if (changed)
     {
+        preview.reset(); // syncEngine publishes the real project
         syncEngine();
         notify();
     }
@@ -95,6 +110,7 @@ void Session::syncEngine()
 void Session::loadInto (model::LoadedProject loaded, std::optional<io::ProjectFolder> location,
                         bool markDirty)
 {
+    preview.reset();
     doc.reset (std::move (loaded.project));
     metadata = std::move (loaded.metadata);
     folder = std::move (location);

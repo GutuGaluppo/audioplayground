@@ -802,6 +802,52 @@ struct AssetRemoveUnused
     bool operator== (const AssetRemoveUnused&) const = default;
 };
 
+struct AccompanimentSuggest
+{
+    static constexpr std::string_view type = "accompaniment.suggest";
+    static constexpr int clipMin = 1;
+    static constexpr int clipMax = 2147483647;
+
+    int clip = 0;
+
+    bool operator== (const AccompanimentSuggest&) const = default;
+};
+
+struct AccompanimentPreview
+{
+    static constexpr std::string_view type = "accompaniment.preview";
+
+    bool operator== (const AccompanimentPreview&) const = default;
+};
+
+struct AccompanimentStopPreview
+{
+    static constexpr std::string_view type = "accompaniment.stopPreview";
+
+    bool operator== (const AccompanimentStopPreview&) const = default;
+};
+
+struct AccompanimentAdd
+{
+    static constexpr std::string_view type = "accompaniment.add";
+
+    bool operator== (const AccompanimentAdd&) const = default;
+};
+
+struct AccompanimentNext
+{
+    static constexpr std::string_view type = "accompaniment.next";
+
+    bool operator== (const AccompanimentNext&) const = default;
+};
+
+struct AccompanimentDismiss
+{
+    static constexpr std::string_view type = "accompaniment.dismiss";
+
+    bool operator== (const AccompanimentDismiss&) const = default;
+};
+
 struct ClipCreate
 {
     static constexpr std::string_view type = "clip.create";
@@ -1384,6 +1430,30 @@ struct ProjectAssets
     bool operator== (const ProjectAssets&) const = default;
 };
 
+struct AccompanimentState
+{
+    static constexpr std::string_view type = "accompaniment.state";
+    static constexpr int stateMin = 0;
+    static constexpr int stateMax = 6;
+    static constexpr int reasonMin = 0;
+    static constexpr int reasonMax = 6;
+    static constexpr std::size_t messageMaxLength = 300;
+    static constexpr std::size_t grooveNameMaxLength = 100;
+    static constexpr std::size_t detailMaxLength = 300;
+    static constexpr int clipMin = 0;
+    static constexpr int clipMax = 2147483647;
+
+    int state = 0;
+    int reason = 0;
+    std::string message {};
+    std::string grooveName {};
+    std::string detail {};
+    int clip = 0;
+    bool canTryAnother = false;
+
+    bool operator== (const AccompanimentState&) const = default;
+};
+
 struct TimelinePeaks
 {
     static constexpr std::string_view type = "timeline.peaks";
@@ -1400,7 +1470,7 @@ struct TimelinePeaks
     bool operator== (const TimelinePeaks&) const = default;
 };
 
-using Intent = std::variant<AppReady, AudioOpenSettings, AudioSetOutput, AudioSetInput, AudioSetSampleRate, AudioSetBufferSize, ToneSetEnabled, TransportPlay, TransportStop, TransportReturnToStart, TransportSetTempo, TransportSetCountIn, MetronomeSetEnabled, ParamSet, SynthSetPreset, EditUndo, EditRedo, ProjectNew, ProjectOpen, ProjectSave, ProjectSaveAs, ProjectRename, ProjectExport, ProjectCancelExport, NoteOn, NoteOff, NoteAllOff, InstrumentSelect, SamplerLoad, DrumsSetStep, DrumsClear, DrumsSetPattern, DrumsTrigger, DrumsSetPad, DrumsLoadPad, DrumsResetPad, DrumsSetKit, TransportRecord, TransportCapture, TransportSeek, TransportSetLoop, TrackAdd, TrackRemove, TrackRename, TrackSetVolume, TrackSetPan, TrackSetMute, TrackSetSolo, TrackSetArmed, TrackSetEffect, TrackImportAudio, AssetLocate, AssetRemove, AssetRemoveUnused, ClipCreate, ClipMove, ClipResize, ClipSplit, ClipRemove, ClipDuplicate, ClipSetLoop, ClipAddNote, ClipRemoveNote, ClipEditNote, BusAdd, BusRemove, BusRename, BusSetVolume, BusSetPan, BusSetMute, BusSetEffect, TrackSetSend>;
-using Event = std::variant<EngineStatus, AudioDevices, EngineMeters, TransportState, TransportPosition, ParamValue, HistoryState, ProjectState, ExportState, AppNotice, InstrumentState, SamplerState, DrumsKit, DrumsPad, TimelineState, TimelineAssets, ProjectAssets, TimelinePeaks>;
+using Intent = std::variant<AppReady, AudioOpenSettings, AudioSetOutput, AudioSetInput, AudioSetSampleRate, AudioSetBufferSize, ToneSetEnabled, TransportPlay, TransportStop, TransportReturnToStart, TransportSetTempo, TransportSetCountIn, MetronomeSetEnabled, ParamSet, SynthSetPreset, EditUndo, EditRedo, ProjectNew, ProjectOpen, ProjectSave, ProjectSaveAs, ProjectRename, ProjectExport, ProjectCancelExport, NoteOn, NoteOff, NoteAllOff, InstrumentSelect, SamplerLoad, DrumsSetStep, DrumsClear, DrumsSetPattern, DrumsTrigger, DrumsSetPad, DrumsLoadPad, DrumsResetPad, DrumsSetKit, TransportRecord, TransportCapture, TransportSeek, TransportSetLoop, TrackAdd, TrackRemove, TrackRename, TrackSetVolume, TrackSetPan, TrackSetMute, TrackSetSolo, TrackSetArmed, TrackSetEffect, TrackImportAudio, AssetLocate, AssetRemove, AssetRemoveUnused, AccompanimentSuggest, AccompanimentPreview, AccompanimentStopPreview, AccompanimentAdd, AccompanimentNext, AccompanimentDismiss, ClipCreate, ClipMove, ClipResize, ClipSplit, ClipRemove, ClipDuplicate, ClipSetLoop, ClipAddNote, ClipRemoveNote, ClipEditNote, BusAdd, BusRemove, BusRename, BusSetVolume, BusSetPan, BusSetMute, BusSetEffect, TrackSetSend>;
+using Event = std::variant<EngineStatus, AudioDevices, EngineMeters, TransportState, TransportPosition, ParamValue, HistoryState, ProjectState, ExportState, AppNotice, InstrumentState, SamplerState, DrumsKit, DrumsPad, TimelineState, TimelineAssets, ProjectAssets, AccompanimentState, TimelinePeaks>;
 
 } // namespace ap::bridge

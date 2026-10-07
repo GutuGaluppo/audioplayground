@@ -57,6 +57,7 @@ endif()
 if(AP_BUILD_DESKTOP)
     add_executable(ap_desktop_tests
         desktop/AudioDeviceHostTests.cpp
+        support/WavFile.cpp
         desktop/BridgeIntegrationTests.cpp
         desktop/AudioRecorderTests.cpp
         desktop/BridgeCodecTests.cpp
@@ -65,6 +66,7 @@ if(AP_BUILD_DESKTOP)
         desktop/NoteRecorderTests.cpp
         desktop/SampleLoaderTests.cpp
         desktop/SessionTests.cpp
+        "${PROJECT_SOURCE_DIR}/apps/desktop/src/AccompanimentService.cpp"
         "${PROJECT_SOURCE_DIR}/apps/desktop/src/AudioDeviceHost.cpp"
         "${PROJECT_SOURCE_DIR}/apps/desktop/src/AudioRecorder.cpp"
         "${PROJECT_SOURCE_DIR}/apps/desktop/src/Exporter.cpp"

@@ -1,6 +1,6 @@
 # ADR-011: Smart Accompaniment MVP
 
-**Status**: Proposed  
+**Status**: Accepted (2026-10-07). As decisões de implementação do MVP estão na última seção.  
 **Relates to**: [ADR-010: Effect Buses](ADR-010-effect-buses.md)
 
 Implemente a primeira versão do sistema de **Smart Accompaniment** do MusicBox.
@@ -743,3 +743,47 @@ Ele simplesmente deve sentir:
 > **Reduce the distance between musical intention and sound.**
 
 A implementação técnica pode ser sofisticada internamente, mas essa complexidade não deve aparecer para o músico.
+
+---
+
+# Decisões de implementação (MVP)
+
+O texto acima é a especificação de produto. Estas são as escolhas feitas ao implementá-la, e onde o MVP se afasta dela de propósito.
+
+## O que foi construído
+
+```text
+AudioAnalysis    core/analysis/RhythmAnalysis        onsets, BPM + confiança, beats, feel
+Music context    core/accompaniment/MusicalContext   análise -> contexto + veredito
+Library          presets/grooves.json (embutido)     12 grooves e seus metadados
+Recommendation   core/accompaniment/Grooves          findAccompaniment(kind, contexto)
+Service/preview  apps/desktop/AccompanimentService   estados, preview, add, eventos
+UI               components/AccompanimentBar          faixa discreta + "Try a beat" na timeline
+```
+
+As camadas do núcleo não dependem da UI nem do desktop. `findAccompaniment(Kind::drums, ...)` já é a API extensível do §14; só `drums` existe.
+
+## Onde o MVP difere da especificação
+
+1. **A biblioteca são padrões do kit de bateria interno, não áudio gravado.** Um groove é um compasso de 16 passos tocado pela bateria do app, com os metadados do §4. Vantagens: nenhuma licença de amostras, nada a esticar (**não há time-stretching**: o padrão simplesmente segue o BPM do projeto), preview imediato e a base entra no projeto como um clipe de padrão comum, editável. Grooves de áudio curados continuam possíveis depois como outro `Kind` ou fonte, sem mudar o matcher.
+2. **O andamento do projeto é fixo (decisão D4), então a base toca no BPM do projeto, não no detectado.** A análise serve para **validar**: o take precisa estar no mesmo andamento (±4 %, ou o dobro/metade) e com os beats sobre a grade do projeto (±15 % de um tempo). Caso contrário não há sugestão, e a mensagem diz o que fazer ("parece ~87 BPM, mas o projeto está em 120", "o take não está no tempo do metrônomo"). Mudar o BPM do projeto para o do take fica para depois (mexe em todos os clipes). Tap tempo: o campo de BPM que já existe cumpre esse papel.
+3. **Compasso:** a biblioteca só tem 4/4; um projeto em outro compasso não recebe sugestão. O compasso do take não é detectado (o projeto manda).
+4. **Sem `loopCandidate`** na análise (não é usado pelo MVP).
+
+## Como funciona
+
+- **Análise** (`analyseRhythm`): fluxo espectral em magnitudes logarítmicas (FFT 1024, passo de 10 ms), picos com limiar local e absoluto, andamento por autocorrelação com preferência suave por 110 BPM (faixa 50–220), confiança = quanto da curva se repete, fase dos beats, feel (straight/swing) pela posição dos ataques fora do tempo. Puro e determinístico. 62 ms para 2 minutos de áudio em release (meta: < 500 ms). Roda numa thread de trabalho e nunca atrasa o playback.
+- **Veredito** (`makeContext`): `noRhythm` (< 0,5 ataque/s ou confiança < 0,5), `tempoUncertain` (0,5–0,7), `tempoMismatch`, `offGrid`, ou `ready`. Densidade, energia e feel viram palavras; os limiares estão em `ContextSettings`.
+- **Matching** (`findAccompaniment`): pesos do §5 em `MatchWeights` (configuráveis), score normalizado, empates por id, nunca um groove fora do compasso ou do seu intervalo de BPM, nada abaixo de `minimumScore`. "Try another" exclui os já mostrados.
+- **Preview:** o serviço monta uma **cópia hipotética do projeto** com a base e a publica no motor (`Session::setPreview`); o projeto aberto e o histórico não mudam. O preview termina com qualquer edição real, ao parar o transporte, ao abrir outro projeto, ao adicionar ou dispensar.
+- **Add:** um passo de undo ("Add drums") na trilha de bateria (criada se faltar), do compasso onde o take começa até o fim dele. ⌘Z remove e a oferta volta. Se já há bateria nesse trecho, não se sugere.
+- **Cache:** resultado por asset e versão do algoritmo, em memória.
+- **Eventos locais (§16):** `accompaniment_suggested/previewed/skipped/changed/accepted/removed` chegam a um callback; só nomes, sem áudio nem arquivos, e nada é enviado a lugar nenhum.
+- **Gatilhos:** ao terminar uma gravação de áudio (automático) e o botão "Try a beat" com um clipe de áudio selecionado.
+
+## Limites conhecidos
+
+- **Validado com sinais sintéticos e com áudio renderizado pelo próprio motor** (baterias, riffs de synth, acordes sustentados, ruído, jitter, swing). **Ainda não com gravações reais** de violão, guitarra, teclado ou voz. Os limiares (em especial `minPeakFlux`) foram calibrados nesses sinais e provavelmente precisam de ajuste com material real. Isso é uma verificação humana pendente.
+- O andamento pode sair em oitava (um pulso rápido lido como metade); o veredito aceita dobro/metade em relação ao projeto.
+- Material que não é percussivo nem articulado (pads, voz, acordes longos) cai em `noRhythm`, como pede o §11; pode haver falsos negativos em takes muito suaves.
+

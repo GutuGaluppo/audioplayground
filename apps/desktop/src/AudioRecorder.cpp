@@ -236,22 +236,23 @@ bool AudioRecorder::stop()
     if (placement.length == 0)
         return discard(); // everything was played before the song start (e.g. during the count-in)
 
-    const bool added
-        = session.performGroup ("Record audio",
-                                [&] (model::ProjectDocument::Group& group)
-                                {
-                                    const auto track = targetTrack (group, take.track);
-                                    const auto* asset
-                                        = group.perform (model::AddAsset {take.relativePath, take.name});
-                                    if (!track.isValid() || asset == nullptr)
-                                        return;
-                                    model::Clip clip;
-                                    clip.start = placement.start;
-                                    clip.length = placement.length;
-                                    clip.asset = std::get<model::AddAsset> (*asset).created;
-                                    clip.sourceOffset = placement.sourceOffset;
-                                    (void)group.perform (model::AddClip {track, std::move (clip)});
-                                });
+    model::ClipId addedClip;
+    const bool added = session.performGroup (
+        "Record audio",
+        [&] (model::ProjectDocument::Group& group)
+        {
+            const auto track = targetTrack (group, take.track);
+            const auto* asset = group.perform (model::AddAsset {take.relativePath, take.name});
+            if (!track.isValid() || asset == nullptr)
+                return;
+            model::Clip clip;
+            clip.start = placement.start;
+            clip.length = placement.length;
+            clip.asset = std::get<model::AddAsset> (*asset).created;
+            clip.sourceOffset = placement.sourceOffset;
+            if (const auto* result = group.perform (model::AddClip {track, std::move (clip)}))
+                addedClip = std::get<model::AddClip> (*result).created;
+        });
 
     if (!added)
     {
@@ -259,6 +260,8 @@ bool AudioRecorder::stop()
         return discard();
     }
     removeQuietly (journal);
+    if (onTakeAdded && addedClip.isValid())
+        onTakeAdded (addedClip);
     return true;
 }
 
