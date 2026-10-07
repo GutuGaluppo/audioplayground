@@ -44,6 +44,20 @@ const Asset* Project::findAsset (AssetId id) const noexcept
     return it == assets.end() ? nullptr : &*it;
 }
 
+Project::AssetUse Project::assetUse (AssetId id) const noexcept
+{
+    AssetUse use;
+    for (const auto& track : tracks)
+        for (const auto& clip : track.clips)
+            if (clip.asset == id)
+                ++use.clips;
+    for (const auto& pad : drums.pads)
+        if (pad.sample == id)
+            ++use.pads;
+    use.sampler = samplerAsset == id;
+    return use;
+}
+
 const Track* Project::findInstrumentTrack (InstrumentKind instrument) const noexcept
 {
     const auto it = std::find_if (tracks.begin(), tracks.end(), [instrument] (const Track& t)

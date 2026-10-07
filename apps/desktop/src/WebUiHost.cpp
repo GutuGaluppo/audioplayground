@@ -166,6 +166,7 @@ WebUiHost::WebUiHost (AudioDeviceHost& hostToUse, engine::Engine& engineToUse, S
     };
     samples.onClipAudioChanged = [this]
     {
+        sendProjectAssets (true);
         sendTimelineAssets();
         sendTimelinePeaks (false);
     };
@@ -222,6 +223,7 @@ void WebUiHost::handle (const ap::bridge::AppReady&)
     for (std::size_t pad = 0; pad < model::DrumKit::numPads; ++pad)
         sendDrumPad (pad);
     sendTimeline();
+    sendProjectAssets (true);
     sendTimelineAssets();
     sendTimelinePeaks (true);
     sendExportState();
@@ -480,6 +482,7 @@ void WebUiHost::onProjectChanged()
     samples.sync (host.getStatus().sampleRate);
     sendProjectState();
     sendTimeline();
+    sendProjectAssets();
     sendDrumKit();
     for (std::size_t pad = 0; pad < model::DrumKit::numPads; ++pad)
         sendDrumPad (pad);

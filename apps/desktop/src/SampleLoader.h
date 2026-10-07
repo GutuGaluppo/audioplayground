@@ -59,6 +59,9 @@ public:
     // Same with a given file (no dialog). Returns true if the asset now points at a copy of it.
     bool relink (model::AssetId asset, const juce::File& source);
 
+    // Whether the file an asset points at is in the project folder (a stat, so not for hot paths).
+    [[nodiscard]] bool assetFileExists (model::AssetId asset) const;
+
     // Call when the project changes (open, undo...) or the device sample rate changes.
     void sync (double engineSampleRate);
 

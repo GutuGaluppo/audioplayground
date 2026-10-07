@@ -1157,3 +1157,50 @@ kbd {
   gap: var(--ap-space-1);
   font-size: var(--ap-text-xs);
 }
+
+.audio-files {
+  display: flex;
+  min-width: 340px;
+  max-width: 460px;
+  flex-direction: column;
+  gap: var(--ap-space-2);
+}
+
+.audio-files ul {
+  display: flex;
+  max-height: 260px;
+  margin: 0;
+  padding: 0;
+  flex-direction: column;
+  gap: var(--ap-space-1);
+  overflow-y: auto;
+  list-style: none;
+}
+
+.audio-files li {
+  display: grid;
+  align-items: center;
+  gap: var(--ap-space-2);
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+}
+
+.audio-files__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.audio-files__use,
+.audio-files__note,
+.audio-files__empty {
+  color: var(--ap-text-muted);
+  font-size: var(--ap-text-xs);
+}
+
+.audio-files li[data-missing='true'] .audio-files__use {
+  color: var(--ap-meter-clip);
+}
+
+.audio-files p {
+  margin: 0;
+}

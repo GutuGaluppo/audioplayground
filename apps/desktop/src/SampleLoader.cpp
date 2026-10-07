@@ -414,6 +414,12 @@ std::optional<juce::File> SampleLoader::resolve (model::AssetId asset, std::stri
     return file.existsAsFile() ? std::optional<juce::File> (file) : std::nullopt;
 }
 
+bool SampleLoader::assetFileExists (model::AssetId asset) const
+{
+    std::string name;
+    return resolve (asset, name).has_value();
+}
+
 void SampleLoader::syncClipAudio()
 {
     std::set<std::uint64_t> wanted;

@@ -99,6 +99,8 @@ private:
     void handle (const ap::bridge::BusSetEffect&);
     void handle (const ap::bridge::TrackImportAudio&);
     void handle (const ap::bridge::AssetLocate&);
+    void handle (const ap::bridge::AssetRemove&);
+    void handle (const ap::bridge::AssetRemoveUnused&);
     void handle (const ap::bridge::ClipCreate&);
     void handle (const ap::bridge::ClipMove&);
     void handle (const ap::bridge::ClipResize&);
@@ -123,6 +125,8 @@ private:
     }
     void sendTimeline();
     void sendTimelineAssets();
+    // Every audio file of the project and what uses it. recheckFiles stats each file again.
+    void sendProjectAssets (bool recheckFiles = false);
     void sendTimelinePeaks (bool all);
 
     void emit (const ap::bridge::Event& event);
@@ -156,6 +160,8 @@ private:
     bool lastPlaying = false;
     bool lastRecording = false;
     bool lastCaptureAvailable = false;
+    std::map<std::uint64_t, bool> assetMissing; // asset -> file not found, as last checked
+    std::optional<ap::bridge::ProjectAssets> sentProjectAssets;
     std::map<std::uint64_t, std::uint64_t> sentPeaks; // asset -> load generation already sent
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (WebUiHost)

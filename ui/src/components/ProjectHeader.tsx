@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useBridge } from '../bridge/BridgeContext';
 import { useLatest } from '../state/latestEvent';
 import { useStores } from '../state/StoresContext';
+import { AudioFilesMenu } from './AudioFilesMenu';
 import { ExportButton } from './ExportButton';
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.userAgent);
@@ -116,6 +117,7 @@ export function ProjectHeader() {
         >
           Save
         </button>
+        <AudioFilesMenu />
         <ExportButton />
       </div>
     </div>

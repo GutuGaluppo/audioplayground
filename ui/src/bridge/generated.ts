@@ -70,6 +70,15 @@ export interface TimelineAsset {
   readonly overview: readonly number[];
 }
 
+export interface ProjectAsset {
+  readonly id: number;
+  readonly name: string;
+  readonly clips: number;
+  readonly pads: number;
+  readonly sampler: boolean;
+  readonly missing: boolean;
+}
+
 // Intents: UI -> native
 export interface AppReady {
   readonly type: 'app.ready';
@@ -389,6 +398,18 @@ export interface AssetLocate {
   };
 }
 
+export interface AssetRemove {
+  readonly type: 'asset.remove';
+  readonly payload: {
+    readonly asset: number;
+  };
+}
+
+export interface AssetRemoveUnused {
+  readonly type: 'asset.removeUnused';
+  readonly payload: {};
+}
+
 export interface ClipCreate {
   readonly type: 'clip.create';
   readonly payload: {
@@ -548,7 +569,7 @@ export interface TrackSetSend {
   };
 }
 
-export type Intent = AppReady | AudioOpenSettings | ToneSetEnabled | TransportPlay | TransportStop | TransportReturnToStart | TransportSetTempo | TransportSetCountIn | MetronomeSetEnabled | ParamSet | EditUndo | EditRedo | ProjectNew | ProjectOpen | ProjectSave | ProjectSaveAs | ProjectRename | ProjectExport | ProjectCancelExport | NoteOn | NoteOff | NoteAllOff | InstrumentSelect | SamplerLoad | DrumsSetStep | DrumsClear | DrumsTrigger | DrumsSetPad | DrumsLoadPad | DrumsResetPad | DrumsSetKit | TransportRecord | TransportCapture | TransportSeek | TransportSetLoop | TrackAdd | TrackRemove | TrackRename | TrackSetVolume | TrackSetPan | TrackSetMute | TrackSetSolo | TrackSetArmed | TrackSetEffect | TrackImportAudio | AssetLocate | ClipCreate | ClipMove | ClipResize | ClipSplit | ClipRemove | ClipDuplicate | ClipSetLoop | ClipAddNote | ClipRemoveNote | ClipEditNote | BusAdd | BusRemove | BusRename | BusSetVolume | BusSetPan | BusSetMute | BusSetEffect | TrackSetSend;
+export type Intent = AppReady | AudioOpenSettings | ToneSetEnabled | TransportPlay | TransportStop | TransportReturnToStart | TransportSetTempo | TransportSetCountIn | MetronomeSetEnabled | ParamSet | EditUndo | EditRedo | ProjectNew | ProjectOpen | ProjectSave | ProjectSaveAs | ProjectRename | ProjectExport | ProjectCancelExport | NoteOn | NoteOff | NoteAllOff | InstrumentSelect | SamplerLoad | DrumsSetStep | DrumsClear | DrumsTrigger | DrumsSetPad | DrumsLoadPad | DrumsResetPad | DrumsSetKit | TransportRecord | TransportCapture | TransportSeek | TransportSetLoop | TrackAdd | TrackRemove | TrackRename | TrackSetVolume | TrackSetPan | TrackSetMute | TrackSetSolo | TrackSetArmed | TrackSetEffect | TrackImportAudio | AssetLocate | AssetRemove | AssetRemoveUnused | ClipCreate | ClipMove | ClipResize | ClipSplit | ClipRemove | ClipDuplicate | ClipSetLoop | ClipAddNote | ClipRemoveNote | ClipEditNote | BusAdd | BusRemove | BusRename | BusSetVolume | BusSetPan | BusSetMute | BusSetEffect | TrackSetSend;
 
 // Events: native -> UI
 export interface EngineStatus {
@@ -700,6 +721,13 @@ export interface TimelineAssets {
   };
 }
 
+export interface ProjectAssets {
+  readonly type: 'project.assets';
+  readonly payload: {
+    readonly assets: readonly ProjectAsset[];
+  };
+}
+
 export interface TimelinePeaks {
   readonly type: 'timeline.peaks';
   readonly payload: {
@@ -709,7 +737,7 @@ export interface TimelinePeaks {
   };
 }
 
-export type NativeEvent = EngineStatus | EngineMeters | TransportState | TransportPosition | ParamValue | HistoryState | ProjectState | ExportState | AppNotice | InstrumentState | SamplerState | DrumsKit | DrumsPad | TimelineState | TimelineAssets | TimelinePeaks;
+export type NativeEvent = EngineStatus | EngineMeters | TransportState | TransportPosition | ParamValue | HistoryState | ProjectState | ExportState | AppNotice | InstrumentState | SamplerState | DrumsKit | DrumsPad | TimelineState | TimelineAssets | ProjectAssets | TimelinePeaks;
 export type NativeEventType = NativeEvent['type'];
 
 /** Payload type for each native event type. */
@@ -729,6 +757,7 @@ export interface NativeEventPayloads {
   'drums.pad': DrumsPad['payload'];
   'timeline.state': TimelineState['payload'];
   'timeline.assets': TimelineAssets['payload'];
+  'project.assets': ProjectAssets['payload'];
   'timeline.peaks': TimelinePeaks['payload'];
 }
 
@@ -860,6 +889,20 @@ function isTimelineAsset(value: unknown): boolean {
   );
 }
 
+function isProjectAsset(value: unknown): boolean {
+  if (!isPayload(value)) return false;
+  const payload = value;
+  return (
+    hasOnlyKeys(payload, ['id', 'name', 'clips', 'pads', 'sampler', 'missing']) &&
+    Number.isInteger(payload['id']) && (payload['id'] as number) >= 1 && (payload['id'] as number) <= 2147483647 &&
+    typeof payload['name'] === 'string' && payload['name'].length <= 256 &&
+    Number.isInteger(payload['clips']) && (payload['clips'] as number) >= 0 && (payload['clips'] as number) <= 1000000 &&
+    Number.isInteger(payload['pads']) && (payload['pads'] as number) >= 0 && (payload['pads'] as number) <= 16 &&
+    typeof payload['sampler'] === 'boolean' &&
+    typeof payload['missing'] === 'boolean'
+  );
+}
+
 const eventValidators: Record<NativeEventType, (payload: Payload) => boolean> = {
   'engine.status': (payload) =>
     hasOnlyKeys(payload, ['deviceName', 'sampleRate', 'bufferSize', 'outputLatencyMs', 'inputName', 'inputChannels', 'roundTripLatencyMs', 'error', 'toneEnabled']) &&
@@ -950,6 +993,9 @@ const eventValidators: Record<NativeEventType, (payload: Payload) => boolean> = 
   'timeline.assets': (payload) =>
     hasOnlyKeys(payload, ['assets']) &&
     isList(payload['assets'], 1024, isTimelineAsset),
+  'project.assets': (payload) =>
+    hasOnlyKeys(payload, ['assets']) &&
+    isList(payload['assets'], 1024, isProjectAsset),
   'timeline.peaks': (payload) =>
     hasOnlyKeys(payload, ['asset', 'peaksPerSecond', 'data']) &&
     Number.isInteger(payload['asset']) && (payload['asset'] as number) >= 1 && (payload['asset'] as number) <= 2147483647 &&

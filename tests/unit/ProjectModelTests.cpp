@@ -373,3 +373,62 @@ TEST_CASE ("Relinking an asset changes its file for everything that uses it, und
     REQUIRE (doc.undo());
     CHECK (doc.project().assets[0].relativePath == "audio/1-gone.wav");
 }
+
+TEST_CASE ("Unused audio can be removed from the project, and undo puts it back in place", "[model][assets]")
+{
+    ProjectDocument doc;
+    for (const char* name : {"a", "b", "c", "d"})
+        REQUIRE (
+            doc.perform (AddAsset {std::string ("audio/") + name + ".wav", std::string (name) + ".wav"}));
+    const auto id = [&] (std::size_t i) { return doc.project().assets[i].id; };
+    const auto a = id (0), b = id (1), c = id (2), d = id (3);
+
+    // a is on a clip, b is the sampler's, c is on a drum pad, d is unused.
+    REQUIRE (doc.perform (AddTrack {TrackKind::audio}));
+    Clip clip;
+    clip.length = ap::core::ticksPerQuarterNote;
+    clip.asset = a;
+    REQUIRE (doc.perform (AddClip {doc.project().tracks.back().id, clip}));
+    REQUIRE (doc.perform (SetSamplerAsset {b}));
+    DrumPad pad;
+    pad.sample = c;
+    REQUIRE (doc.perform (SetDrumPad {3, pad}));
+
+    CHECK (doc.project().assetUse (a).clips == 1);
+    CHECK (doc.project().assetUse (b).sampler);
+    CHECK (doc.project().assetUse (c).pads == 1);
+    CHECK_FALSE (doc.project().assetUse (d).any());
+
+    // Anything in use, unknown or empty is refused, and nothing is removed.
+    CHECK_FALSE (doc.perform (RemoveAssets {{a}}));
+    CHECK_FALSE (doc.perform (RemoveAssets {{b}}));
+    CHECK_FALSE (doc.perform (RemoveAssets {{c}}));
+    CHECK_FALSE (doc.perform (RemoveAssets {{d, AssetId {99}}}));
+    CHECK_FALSE (doc.perform (RemoveAssets {{}}));
+    CHECK (doc.project().assets.size() == 4);
+
+    REQUIRE (doc.perform (RemoveAssets {{d}}));
+    CHECK (doc.project().assets.size() == 3);
+    CHECK (doc.project().findAsset (d) == nullptr);
+    CHECK (doc.undoDescription() == "Remove unused audio");
+
+    // Ids are never reused: the next import does not take d's id.
+    REQUIRE (doc.perform (AddAsset {"audio/e.wav", "e.wav"}));
+    CHECK (doc.project().assets.back().id.value > d.value);
+    REQUIRE (doc.undo()); // the import
+    REQUIRE (doc.undo()); // the removal: d is back
+    CHECK (doc.project().assets.size() == 4);
+
+    // Clearing the clip, the sampler and the pad frees everything; undo restores the order.
+    REQUIRE (doc.perform (RemoveClip {doc.project().tracks.back().clips[0].id}));
+    REQUIRE (doc.perform (SetSamplerAsset {AssetId {}}));
+    REQUIRE (doc.perform (SetDrumPad {3, DrumPad {}}));
+    REQUIRE (doc.perform (RemoveAssets {{c, a, d, b}}));
+    CHECK (doc.project().assets.empty());
+    REQUIRE (doc.undo());
+    REQUIRE (doc.project().assets.size() == 4);
+    CHECK (doc.project().assets[0].id == a);
+    CHECK (doc.project().assets[1].id == b);
+    CHECK (doc.project().assets[2].id == c);
+    CHECK (doc.project().assets[3].id == d);
+}

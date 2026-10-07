@@ -171,6 +171,26 @@ struct TimelineAsset
     bool operator== (const TimelineAsset&) const = default;
 };
 
+struct ProjectAsset
+{
+    static constexpr int idMin = 1;
+    static constexpr int idMax = 2147483647;
+    static constexpr std::size_t nameMaxLength = 256;
+    static constexpr int clipsMin = 0;
+    static constexpr int clipsMax = 1000000;
+    static constexpr int padsMin = 0;
+    static constexpr int padsMax = 16;
+
+    int id = 0;
+    std::string name {};
+    int clips = 0;
+    int pads = 0;
+    bool sampler = false;
+    bool missing = false;
+
+    bool operator== (const ProjectAsset&) const = default;
+};
+
 struct AppReady
 {
     static constexpr std::string_view type = "app.ready";
@@ -675,6 +695,24 @@ struct AssetLocate
     int asset = 0;
 
     bool operator== (const AssetLocate&) const = default;
+};
+
+struct AssetRemove
+{
+    static constexpr std::string_view type = "asset.remove";
+    static constexpr int assetMin = 1;
+    static constexpr int assetMax = 2147483647;
+
+    int asset = 0;
+
+    bool operator== (const AssetRemove&) const = default;
+};
+
+struct AssetRemoveUnused
+{
+    static constexpr std::string_view type = "asset.removeUnused";
+
+    bool operator== (const AssetRemoveUnused&) const = default;
 };
 
 struct ClipCreate
@@ -1219,6 +1257,16 @@ struct TimelineAssets
     bool operator== (const TimelineAssets&) const = default;
 };
 
+struct ProjectAssets
+{
+    static constexpr std::string_view type = "project.assets";
+    static constexpr std::size_t assetsMaxItems = 1024;
+
+    std::vector<ProjectAsset> assets {};
+
+    bool operator== (const ProjectAssets&) const = default;
+};
+
 struct TimelinePeaks
 {
     static constexpr std::string_view type = "timeline.peaks";
@@ -1235,7 +1283,7 @@ struct TimelinePeaks
     bool operator== (const TimelinePeaks&) const = default;
 };
 
-using Intent = std::variant<AppReady, AudioOpenSettings, ToneSetEnabled, TransportPlay, TransportStop, TransportReturnToStart, TransportSetTempo, TransportSetCountIn, MetronomeSetEnabled, ParamSet, EditUndo, EditRedo, ProjectNew, ProjectOpen, ProjectSave, ProjectSaveAs, ProjectRename, ProjectExport, ProjectCancelExport, NoteOn, NoteOff, NoteAllOff, InstrumentSelect, SamplerLoad, DrumsSetStep, DrumsClear, DrumsTrigger, DrumsSetPad, DrumsLoadPad, DrumsResetPad, DrumsSetKit, TransportRecord, TransportCapture, TransportSeek, TransportSetLoop, TrackAdd, TrackRemove, TrackRename, TrackSetVolume, TrackSetPan, TrackSetMute, TrackSetSolo, TrackSetArmed, TrackSetEffect, TrackImportAudio, AssetLocate, ClipCreate, ClipMove, ClipResize, ClipSplit, ClipRemove, ClipDuplicate, ClipSetLoop, ClipAddNote, ClipRemoveNote, ClipEditNote, BusAdd, BusRemove, BusRename, BusSetVolume, BusSetPan, BusSetMute, BusSetEffect, TrackSetSend>;
-using Event = std::variant<EngineStatus, EngineMeters, TransportState, TransportPosition, ParamValue, HistoryState, ProjectState, ExportState, AppNotice, InstrumentState, SamplerState, DrumsKit, DrumsPad, TimelineState, TimelineAssets, TimelinePeaks>;
+using Intent = std::variant<AppReady, AudioOpenSettings, ToneSetEnabled, TransportPlay, TransportStop, TransportReturnToStart, TransportSetTempo, TransportSetCountIn, MetronomeSetEnabled, ParamSet, EditUndo, EditRedo, ProjectNew, ProjectOpen, ProjectSave, ProjectSaveAs, ProjectRename, ProjectExport, ProjectCancelExport, NoteOn, NoteOff, NoteAllOff, InstrumentSelect, SamplerLoad, DrumsSetStep, DrumsClear, DrumsTrigger, DrumsSetPad, DrumsLoadPad, DrumsResetPad, DrumsSetKit, TransportRecord, TransportCapture, TransportSeek, TransportSetLoop, TrackAdd, TrackRemove, TrackRename, TrackSetVolume, TrackSetPan, TrackSetMute, TrackSetSolo, TrackSetArmed, TrackSetEffect, TrackImportAudio, AssetLocate, AssetRemove, AssetRemoveUnused, ClipCreate, ClipMove, ClipResize, ClipSplit, ClipRemove, ClipDuplicate, ClipSetLoop, ClipAddNote, ClipRemoveNote, ClipEditNote, BusAdd, BusRemove, BusRename, BusSetVolume, BusSetPan, BusSetMute, BusSetEffect, TrackSetSend>;
+using Event = std::variant<EngineStatus, EngineMeters, TransportState, TransportPosition, ParamValue, HistoryState, ProjectState, ExportState, AppNotice, InstrumentState, SamplerState, DrumsKit, DrumsPad, TimelineState, TimelineAssets, ProjectAssets, TimelinePeaks>;
 
 } // namespace ap::bridge

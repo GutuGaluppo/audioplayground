@@ -228,6 +228,20 @@ struct RelinkAsset
     Asset previous; // captured
 };
 
+// Takes unused audio out of the project (one undo step). Refuses assets that a clip, the sampler
+// or a drum pad still uses, unknown ids and an empty list. The files stay on disk, and ids are not
+// reused (nextAssetId is unchanged), so undo brings each asset back exactly where it was.
+struct RemoveAssets
+{
+    explicit RemoveAssets (std::vector<AssetId> assetIds)
+        : ids (std::move (assetIds))
+    {
+    }
+
+    std::vector<AssetId> ids;
+    std::vector<std::pair<std::size_t, Asset>> removed; // captured: index in the list, ascending
+};
+
 struct SetSamplerAsset
 {
     explicit SetSamplerAsset (AssetId newAsset) noexcept
@@ -462,9 +476,9 @@ struct SplitClip
 
 using Command = std::variant<SetTempo, SetTimeSignature, RenameProject, AddTrack, RemoveTrack, MoveTrack,
                              RenameTrack, SetTrackVolume, SetTrackPan, SetTrackEffect, SetTrackMute,
-                             SetTrackSolo, SetParameter, AddAsset, RelinkAsset, SetSamplerAsset, SetDrumPad, SetDrumKit,
-                             AddBus, RemoveBus, RenameBus, SetBusVolume, SetBusPan, SetBusMute, SetBusEffect, SetTrackSend,
-                             AddClip, RemoveClip, SetClip, SplitClip>;
+                             SetTrackSolo, SetParameter, AddAsset, RelinkAsset, RemoveAssets, SetSamplerAsset,
+                             SetDrumPad, SetDrumKit, AddBus, RemoveBus, RenameBus, SetBusVolume, SetBusPan,
+                             SetBusMute, SetBusEffect, SetTrackSend, AddClip, RemoveClip, SetClip, SplitClip>;
 
 enum class ApplyResult
 {

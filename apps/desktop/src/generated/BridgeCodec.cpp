@@ -105,6 +105,7 @@ juce::var toVar (const TimelineTrack& m);
 juce::var toVar (const BusEffect& m);
 juce::var toVar (const TimelineBus& m);
 juce::var toVar (const TimelineAsset& m);
+juce::var toVar (const ProjectAsset& m);
 
 template <typename Item>
 [[maybe_unused]] juce::var toVarList (const std::vector<Item>& items)
@@ -202,6 +203,18 @@ template <typename Item>
     object->setProperty ("loading", m.loading);
     object->setProperty ("durationSeconds", m.durationSeconds);
     object->setProperty ("overview", toVarArray (m.overview));
+    return juce::var (object);
+}
+
+[[maybe_unused]] juce::var toVar (const ProjectAsset& m)
+{
+    auto* object = new juce::DynamicObject();
+    object->setProperty ("id", m.id);
+    object->setProperty ("name", juce::String (m.name));
+    object->setProperty ("clips", m.clips);
+    object->setProperty ("pads", m.pads);
+    object->setProperty ("sampler", m.sampler);
+    object->setProperty ("missing", m.missing);
     return juce::var (object);
 }
 
@@ -753,6 +766,28 @@ std::optional<Intent> parseAssetLocate (const juce::var& payloadVar)
     return Intent {message};
 }
 
+std::optional<Intent> parseAssetRemove (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"asset"}))
+        return std::nullopt;
+
+    AssetRemove message;
+    if (!readInt (*payload, "asset", AssetRemove::assetMin, AssetRemove::assetMax, message.asset)) return std::nullopt;
+    return Intent {message};
+}
+
+std::optional<Intent> parseAssetRemoveUnused (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {}))
+        return std::nullopt;
+
+    AssetRemoveUnused message;
+
+    return Intent {message};
+}
+
 std::optional<Intent> parseClipCreate (const juce::var& payloadVar)
 {
     const auto* payload = payloadVar.getDynamicObject();
@@ -1092,6 +1127,10 @@ std::optional<Intent> parseIntent (const juce::var& message)
         return parseTrackImportAudio (payload);
     if (typeName == AssetLocate::type)
         return parseAssetLocate (payload);
+    if (typeName == AssetRemove::type)
+        return parseAssetRemove (payload);
+    if (typeName == AssetRemoveUnused::type)
+        return parseAssetRemoveUnused (payload);
     if (typeName == ClipCreate::type)
         return parseClipCreate (payload);
     if (typeName == ClipMove::type)
@@ -1269,6 +1308,12 @@ juce::var toVar (const Event& event)
                 auto* payload = new juce::DynamicObject();
                 payload->setProperty ("assets", toVarList (m.assets));
                 return envelope (TimelineAssets::type, payload);
+            },
+            [] (const ProjectAssets& m) -> juce::var
+            {
+                auto* payload = new juce::DynamicObject();
+                payload->setProperty ("assets", toVarList (m.assets));
+                return envelope (ProjectAssets::type, payload);
             },
             [] (const TimelinePeaks& m) -> juce::var
             {

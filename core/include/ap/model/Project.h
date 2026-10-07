@@ -276,6 +276,17 @@ struct Project
     [[nodiscard]] const Bus* findBus (BusId id) const noexcept;
     [[nodiscard]] Bus* findBus (BusId id) noexcept;
     [[nodiscard]] const Asset* findAsset (AssetId id) const noexcept;
+
+    // What uses an audio asset: audio clips, the sampler, drum pads.
+    struct AssetUse
+    {
+        std::size_t clips = 0;
+        std::size_t pads = 0;
+        bool sampler = false;
+
+        [[nodiscard]] bool any() const noexcept { return clips > 0 || pads > 0 || sampler; }
+    };
+    [[nodiscard]] AssetUse assetUse (AssetId id) const noexcept;
     [[nodiscard]] const Track* findInstrumentTrack (InstrumentKind instrument) const noexcept;
 
     struct ClipLocation

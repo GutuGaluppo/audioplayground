@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <set>
 #include <type_traits>
 #include <utility>
 
@@ -250,6 +251,25 @@ ApplyResult apply (Command& command, Project& project)
                 c.previousNextAssetId = project.nextAssetId;
                 project.assets.push_back ({c.created, c.relativePath, c.name});
                 ++project.nextAssetId;
+                return ApplyResult::applied;
+            },
+            [&project] (RemoveAssets& c) -> ApplyResult
+            {
+                if (c.ids.empty())
+                    return ApplyResult::rejected;
+                std::vector<std::pair<std::size_t, Asset>> removed;
+                for (std::size_t i = 0; i < project.assets.size(); ++i)
+                    if (std::find (c.ids.begin(), c.ids.end(), project.assets[i].id) != c.ids.end())
+                        removed.emplace_back (i, project.assets[i]);
+                const auto distinct = std::set<AssetId> (c.ids.begin(), c.ids.end());
+                if (removed.size() != distinct.size())
+                    return ApplyResult::rejected; // an unknown id
+                for (const auto& [index, asset] : removed)
+                    if (project.assetUse (asset.id).any())
+                        return ApplyResult::rejected;
+                for (auto it = removed.rbegin(); it != removed.rend(); ++it)
+                    project.assets.erase (project.assets.begin() + static_cast<std::ptrdiff_t> (it->first));
+                c.removed = std::move (removed);
                 return ApplyResult::applied;
             },
             [&project] (SetSamplerAsset& c) -> ApplyResult
@@ -578,6 +598,12 @@ void revert (const Command& command, Project& project)
                 std::erase_if (project.assets, [&c] (const Asset& a) { return a.id == c.created; });
                 project.nextAssetId = c.previousNextAssetId;
             },
+            [&project] (const RemoveAssets& c)
+            {
+                for (const auto& [index, asset] : c.removed) // ascending: each lands at its old index
+                    project.assets.insert (project.assets.begin() + static_cast<std::ptrdiff_t> (index),
+                                           asset);
+            },
             [&project] (const SetSamplerAsset& c) { project.samplerAsset = c.previous; },
             [&project] (const SetDrumPad& c) { project.drums.pads[c.pad] = c.previous; },
             [&project] (const SetDrumKit& c) { project.drums.kit = c.previous; },
@@ -588,13 +614,15 @@ void revert (const Command& command, Project& project)
             },
             [&project] (const RemoveBus& c)
             {
-                project.buses.insert (project.buses.begin() + static_cast<std::ptrdiff_t> (c.index), c.removed);
+                project.buses.insert (project.buses.begin() + static_cast<std::ptrdiff_t> (c.index),
+                                      c.removed);
                 // Sends go back in the order they were taken out, each to its old position.
                 for (auto it = c.removedSends.rbegin(); it != c.removedSends.rend(); ++it)
                     if (auto* t = project.findTrack (it->track))
-                        t->sends.insert (t->sends.begin()
-                                             + static_cast<std::ptrdiff_t> (std::min (it->position, t->sends.size())),
-                                         it->send);
+                        t->sends.insert (
+                            t->sends.begin()
+                                + static_cast<std::ptrdiff_t> (std::min (it->position, t->sends.size())),
+                            it->send);
             },
             [&project] (const RenameBus& c)
             {
@@ -636,9 +664,10 @@ void revert (const Command& command, Project& project)
                 else if (it != t->sends.end())
                     it->levelDb = *c.previous;
                 else
-                    t->sends.insert (t->sends.begin()
-                                         + static_cast<std::ptrdiff_t> (std::min (c.position, t->sends.size())),
-                                     Send {c.bus, *c.previous}); // it had been removed by this edit
+                    t->sends.insert (
+                        t->sends.begin()
+                            + static_cast<std::ptrdiff_t> (std::min (c.position, t->sends.size())),
+                        Send {c.bus, *c.previous}); // it had been removed by this edit
             },
             [&project] (const SetParameter& c)
             { project.parameters[static_cast<std::size_t> (c.id)] = c.previous; },
@@ -690,6 +719,7 @@ std::string_view describe (const Command& command) noexcept
             [] (const SetParameter& c) { return params::descriptor (c.id).name; },
             [] (const AddAsset&) { return std::string_view ("Import audio"); },
             [] (const RelinkAsset&) { return std::string_view ("Locate audio"); },
+            [] (const RemoveAssets&) { return std::string_view ("Remove unused audio"); },
             [] (const SetSamplerAsset&) { return std::string_view ("Change sample"); },
             [] (const SetDrumPad&) { return std::string_view ("Change pad"); },
             [] (const SetDrumKit&) { return std::string_view ("Change drum kit"); },

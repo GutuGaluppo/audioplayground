@@ -238,9 +238,9 @@ void WebUiHost::handle (const ap::bridge::TrackSetEffect& intent)
 
 void WebUiHost::handle (const ap::bridge::TrackSetSend& intent)
 {
-    if (!session.perform (
-            model::SetTrackSend {toTrack (intent.track), toBus (intent.bus), static_cast<float> (intent.levelDb)},
-            toGesture (intent.gesture)))
+    if (!session.perform (model::SetTrackSend {toTrack (intent.track), toBus (intent.bus),
+                                               static_cast<float> (intent.levelDb)},
+                          toGesture (intent.gesture)))
         sendTimeline();
 }
 
@@ -294,7 +294,8 @@ void WebUiHost::handle (const ap::bridge::BusSetEffect& intent)
         return;
     }
     std::copy (intent.values.begin(), intent.values.end(), state.values.begin());
-    if (!session.perform (model::SetBusEffect {toBus (intent.bus), effect, state}, toGesture (intent.gesture)))
+    if (!session.perform (model::SetBusEffect {toBus (intent.bus), effect, state},
+                          toGesture (intent.gesture)))
         sendTimeline();
 }
 
@@ -308,6 +309,58 @@ void WebUiHost::handle (const ap::bridge::TrackImportAudio& intent)
 void WebUiHost::handle (const ap::bridge::AssetLocate& intent)
 {
     samples.chooseAndRelink (model::AssetId {static_cast<std::uint64_t> (intent.asset)});
+}
+
+void WebUiHost::handle (const ap::bridge::AssetRemove& intent)
+{
+    const model::AssetId id {static_cast<std::uint64_t> (intent.asset)};
+    if (!session.perform (model::RemoveAssets {{id}}))
+        showNotice (ProjectActions::NoticeLevel::warning, "That audio is still in use.");
+}
+
+void WebUiHost::handle (const ap::bridge::AssetRemoveUnused&)
+{
+    std::vector<model::AssetId> unused;
+    for (const auto& asset : session.project().assets)
+        if (!session.project().assetUse (asset.id).any())
+            unused.push_back (asset.id);
+    if (!unused.empty())
+        session.perform (model::RemoveAssets {std::move (unused)});
+}
+
+void WebUiHost::sendProjectAssets (bool recheckFiles)
+{
+    using ap::bridge::ProjectAsset;
+
+    const auto& project = session.project();
+    if (recheckFiles)
+        assetMissing.clear();
+
+    ap::bridge::ProjectAssets event;
+    std::map<std::uint64_t, bool> missing;
+    for (const auto& asset : project.assets)
+    {
+        const auto known = assetMissing.find (asset.id.value);
+        const bool isMissing
+            = known != assetMissing.end() ? known->second : !samples.assetFileExists (asset.id);
+        missing[asset.id.value] = isMissing;
+
+        const auto use = project.assetUse (asset.id);
+        ProjectAsset a;
+        a.id = toInt (asset.id.value);
+        a.name = model::sanitiseName (asset.name, ProjectAsset::nameMaxLength).value_or ("Audio");
+        a.clips = static_cast<int> (std::min<std::size_t> (use.clips, ProjectAsset::clipsMax));
+        a.pads = static_cast<int> (std::min<std::size_t> (use.pads, ProjectAsset::padsMax));
+        a.sampler = use.sampler;
+        a.missing = isMissing;
+        event.assets.push_back (std::move (a));
+    }
+    assetMissing = std::move (missing);
+
+    if (sentProjectAssets && *sentProjectAssets == event)
+        return;
+    sentProjectAssets = event;
+    emit (event);
 }
 
 // --- Clips -----------------------------------------------------------------------------------
