@@ -55,6 +55,7 @@ endif()
 if(AP_BUILD_DESKTOP)
     add_executable(ap_desktop_tests
         desktop/AudioDeviceHostTests.cpp
+        desktop/BridgeIntegrationTests.cpp
         desktop/AudioRecorderTests.cpp
         desktop/BridgeCodecTests.cpp
         desktop/ExporterTests.cpp
@@ -67,11 +68,15 @@ if(AP_BUILD_DESKTOP)
         "${PROJECT_SOURCE_DIR}/apps/desktop/src/Exporter.cpp"
         "${PROJECT_SOURCE_DIR}/apps/desktop/src/NoteCapture.cpp"
         "${PROJECT_SOURCE_DIR}/apps/desktop/src/NoteRecorder.cpp"
+        "${PROJECT_SOURCE_DIR}/apps/desktop/src/ProjectActions.cpp"
         "${PROJECT_SOURCE_DIR}/apps/desktop/src/SampleLoader.cpp"
         "${PROJECT_SOURCE_DIR}/apps/desktop/src/Session.cpp"
+        "${PROJECT_SOURCE_DIR}/apps/desktop/src/WebUiHost.cpp"
+        "${PROJECT_SOURCE_DIR}/apps/desktop/src/WebUiHostTimeline.cpp"
         "${PROJECT_SOURCE_DIR}/apps/desktop/src/generated/BridgeCodec.cpp")
     target_include_directories(ap_desktop_tests PRIVATE "${PROJECT_SOURCE_DIR}/apps/desktop/src" support)
     target_compile_definitions(ap_desktop_tests PRIVATE
+        AP_HEADLESS_UI=1
         JUCE_STANDALONE_APPLICATION=1
         JUCE_USE_CURL=0
         JUCE_WEB_BROWSER=0
@@ -80,11 +85,12 @@ if(AP_BUILD_DESKTOP)
         ap::core
         juce::juce_audio_devices
         juce::juce_audio_formats
+        juce::juce_audio_utils
         juce::juce_gui_basics
         juce::juce_recommended_config_flags
         Catch2::Catch2WithMain)
     get_target_property(_ap_test_opts ap_project_options INTERFACE_COMPILE_OPTIONS)
-    set_source_files_properties(desktop/AudioDeviceHostTests.cpp desktop/AudioRecorderTests.cpp desktop/BridgeCodecTests.cpp desktop/ExporterTests.cpp desktop/NoteCaptureTests.cpp desktop/NoteRecorderTests.cpp desktop/SampleLoaderTests.cpp desktop/SessionTests.cpp
+    set_source_files_properties(desktop/AudioDeviceHostTests.cpp desktop/BridgeIntegrationTests.cpp desktop/AudioRecorderTests.cpp desktop/BridgeCodecTests.cpp desktop/ExporterTests.cpp desktop/NoteCaptureTests.cpp desktop/NoteRecorderTests.cpp desktop/SampleLoaderTests.cpp desktop/SessionTests.cpp
         PROPERTIES COMPILE_OPTIONS "${_ap_test_opts}")
     catch_discover_tests(ap_desktop_tests)
 endif()

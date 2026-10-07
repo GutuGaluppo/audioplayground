@@ -84,6 +84,7 @@ target_sources(ap_desktop PRIVATE ${AP_DESKTOP_SOURCES} "${AP_EMBEDDED_UI_SOURCE
 target_include_directories(ap_desktop PRIVATE src)
 
 target_compile_definitions(ap_desktop PRIVATE
+    AP_HEADLESS_UI=0
     JUCE_WEB_BROWSER=1
     JUCE_USE_WIN_WEBVIEW2_WITH_STATIC_LINKING=1
     JUCE_USE_CURL=0         # No network access from the app

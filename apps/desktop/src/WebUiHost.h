@@ -11,7 +11,11 @@
 #include "ap/bridge/generated/Messages.h"
 #include "ap/engine/Engine.h"
 
+#include <functional>
+#include <juce_gui_basics/juce_gui_basics.h>
+#if !AP_HEADLESS_UI
 #include <juce_gui_extra/juce_gui_extra.h>
+#endif
 #include <map>
 #include <memory>
 
@@ -38,6 +42,13 @@ public:
     ~WebUiHost() override;
 
     void resized() override;
+
+#if AP_HEADLESS_UI
+    // Integration tests build this class without a web view (AP_HEADLESS_UI): they feed intents
+    // exactly as the page would send them and read the events the host would have emitted.
+    void receiveIntent (const juce::var& message) { handleIntent (message); }
+    std::function<void (const juce::var&)> eventSink;
+#endif
 
 private:
     class LockedDownWebView;

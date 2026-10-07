@@ -1,8 +1,10 @@
 #include "WebUiHost.h"
 
+#include "generated/BridgeCodec.h"
+#if !AP_HEADLESS_UI
 #include "AppPaths.h"
 #include "EmbeddedResources.h"
-#include "generated/BridgeCodec.h"
+#endif
 
 #include <array>
 #include <cstdio>
@@ -14,9 +16,12 @@ namespace
 {
 const juce::Colour background {0xff111214};
 constexpr int meterRefreshHz = 30;
+#if !AP_HEADLESS_UI
 constexpr auto intentEventId = "ap.intent";
 constexpr auto nativeEventId = "ap.event";
+#endif
 
+#if !AP_HEADLESS_UI
 juce::String mimeTypeFor (const juce::String& path)
 {
     const auto extension = path.fromLastOccurrenceOf (".", false, false).toLowerCase();
@@ -81,8 +86,14 @@ juce::File webViewDataFolder()
 {
     return appDataDirectory().getChildFile ("WebView");
 }
+#endif
 } // namespace
 
+#if AP_HEADLESS_UI
+class WebUiHost::LockedDownWebView
+{
+};
+#else
 class WebUiHost::LockedDownWebView final : public juce::WebBrowserComponent
 {
 public:
@@ -112,6 +123,7 @@ public:
 private:
     juce::String developmentUrl;
 };
+#endif
 
 WebUiHost::WebUiHost (AudioDeviceHost& hostToUse, engine::Engine& engineToUse, Session& sessionToUse,
                       ProjectActions& actionsToUse, SampleLoader& samplesToUse,
@@ -126,6 +138,7 @@ WebUiHost::WebUiHost (AudioDeviceHost& hostToUse, engine::Engine& engineToUse, S
     , capture (sessionToUse)
     , exporter (sessionToUse, samplesToUse)
 {
+#if !AP_HEADLESS_UI
     const auto devUrl = developmentServerUrl();
 
     auto options = juce::WebBrowserComponent::Options {}
@@ -147,6 +160,7 @@ WebUiHost::WebUiHost (AudioDeviceHost& hostToUse, engine::Engine& engineToUse, S
     webView = std::make_unique<LockedDownWebView> (options, devUrl);
     addAndMakeVisible (*webView);
     webView->goToURL (devUrl.isNotEmpty() ? devUrl : juce::WebBrowserComponent::getResourceProviderRoot());
+#endif
 
     host.onStatusChanged = [this]
     {
@@ -196,7 +210,10 @@ WebUiHost::~WebUiHost()
 
 void WebUiHost::resized()
 {
-    webView->setBounds (getLocalBounds());
+#if !AP_HEADLESS_UI
+    if (webView)
+        webView->setBounds (getLocalBounds());
+#endif
 }
 
 void WebUiHost::handleIntent (const juce::var& message)
@@ -615,7 +632,12 @@ void WebUiHost::handle (const ap::bridge::MetronomeSetEnabled& intent)
 
 void WebUiHost::emit (const ap::bridge::Event& event)
 {
+#if AP_HEADLESS_UI
+    if (eventSink)
+        eventSink (bridge::toVar (event));
+#else
     webView->emitEventIfBrowserIsVisible (nativeEventId, bridge::toVar (event));
+#endif
 }
 
 void WebUiHost::sendStatus()

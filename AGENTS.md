@@ -56,6 +56,7 @@ pnpm ui:build
 - Timeline: one track per instrument, clip offsets in flicks, drum patterns are note clips (ADR-007).
 - Recording: the input opens only when a track is armed, never monitored; takes are journalled for crash recovery (ADR-008).
 - Effects: fixed per-track chain, settings in the project, constant engine latency (`Engine::getOutputLatency`) that offline renders and recordings compensate (ADR-009).
+- Bridge integration tests (`tests/desktop/BridgeIntegrationTests.cpp`) build `WebUiHost` without its web view (`AP_HEADLESS_UI=1`): they send intents as JSON and read the emitted events. A new intent that changes the project needs a case there. Keep WebView-only code inside `#if !AP_HEADLESS_UI`.
 - Never rename parameter IDs or change persisted schemas without a migration and an ADR.
 - New dependency: justify it (guide §29), pin version and hash, and add it to `docs/THIRD_PARTY_LICENSES.md`.
 - First-party C++ builds with warnings as errors. Do not silence warnings to pass CI.
