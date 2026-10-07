@@ -1204,3 +1204,28 @@ kbd {
 .audio-files p {
   margin: 0;
 }
+
+.menu--up .menu__list {
+  top: auto;
+  bottom: calc(100% + 4px);
+}
+
+.audio-devices {
+  display: flex;
+  min-width: 320px;
+  flex-direction: column;
+  gap: var(--ap-space-2);
+}
+
+.audio-devices label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ap-space-1);
+  font-size: var(--ap-text-xs);
+}
+
+.audio-devices p {
+  margin: 0;
+  color: var(--ap-text-muted);
+  font-size: var(--ap-text-xs);
+}

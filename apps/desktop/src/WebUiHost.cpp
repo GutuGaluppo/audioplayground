@@ -155,7 +155,10 @@ WebUiHost::WebUiHost (AudioDeviceHost& hostToUse, engine::Engine& engineToUse, S
         engine.setRecordingLatency (
             static_cast<core::Samples> (std::llround (status.outputLatencyMs * status.sampleRate / 1000.0)));
         sendStatus();
+        sendAudioDevices();
     };
+    host.onDeviceRecovered = [this] (const juce::String& message)
+    { showNotice (ProjectActions::NoticeLevel::warning, message.toStdString()); };
     session.onChanged = [this] { onProjectChanged(); };
     samples.onStateChanged = [this] (std::size_t slot)
     {
@@ -183,6 +186,7 @@ WebUiHost::~WebUiHost()
 {
     stopTimer();
     host.onStatusChanged = nullptr;
+    host.onDeviceRecovered = nullptr;
     session.onChanged = nullptr;
     samples.onStateChanged = nullptr;
     samples.onClipAudioChanged = nullptr;
@@ -210,6 +214,7 @@ void WebUiHost::handleIntent (const juce::var& message)
 void WebUiHost::handle (const ap::bridge::AppReady&)
 {
     sendStatus();
+    sendAudioDevices();
     sendTransportState();
     sendTransportPosition (true);
 
@@ -232,6 +237,40 @@ void WebUiHost::handle (const ap::bridge::AppReady&)
 void WebUiHost::handle (const ap::bridge::AudioOpenSettings&)
 {
     showAudioSettings();
+}
+
+void WebUiHost::changeDevice (const std::function<juce::String()>& change)
+{
+    if (isRecording())
+    {
+        showNotice (ProjectActions::NoticeLevel::warning, "Stop recording before changing the audio device.");
+        sendAudioDevices(); // put the menu back on what is really in use
+        return;
+    }
+    if (const auto error = change(); error.isNotEmpty())
+        showNotice (ProjectActions::NoticeLevel::error, error.toStdString());
+    sendStatus();
+    sendAudioDevices();
+}
+
+void WebUiHost::handle (const ap::bridge::AudioSetOutput& intent)
+{
+    changeDevice ([&] { return host.setOutputDevice (juce::String::fromUTF8 (intent.name.c_str())); });
+}
+
+void WebUiHost::handle (const ap::bridge::AudioSetInput& intent)
+{
+    changeDevice ([&] { return host.setPreferredInput (juce::String::fromUTF8 (intent.name.c_str())); });
+}
+
+void WebUiHost::handle (const ap::bridge::AudioSetSampleRate& intent)
+{
+    changeDevice ([&] { return host.setSampleRate (intent.rate); });
+}
+
+void WebUiHost::handle (const ap::bridge::AudioSetBufferSize& intent)
+{
+    changeDevice ([&] { return host.setBufferSize (intent.size); });
 }
 
 void WebUiHost::handle (const ap::bridge::ToneSetEnabled& intent)
@@ -571,6 +610,31 @@ void WebUiHost::sendStatus()
                     : status.error.substring (0, 900).toStdString();
     event.toneEnabled = engine.isTestToneEnabled();
 
+    emit (event);
+}
+
+void WebUiHost::sendAudioDevices()
+{
+    using ap::bridge::AudioDevices;
+    const auto list = host.getDevices();
+
+    AudioDevices event;
+    for (const auto& name : list.outputs)
+        if (event.outputs.size() < AudioDevices::outputsMaxItems)
+            event.outputs.push_back ({name.substring (0, 200).toStdString()});
+    for (const auto& name : list.inputs)
+        if (event.inputs.size() < AudioDevices::inputsMaxItems)
+            event.inputs.push_back ({name.substring (0, 200).toStdString()});
+    event.output = list.output.substring (0, 200).toStdString();
+    event.input = list.preferredInput.substring (0, 200).toStdString();
+    for (const auto rate : list.sampleRates)
+        if (event.sampleRates.size() < AudioDevices::sampleRatesMaxItems)
+            event.sampleRates.push_back (static_cast<float> (rate));
+    for (const auto size : list.bufferSizes)
+        if (event.bufferSizes.size() < AudioDevices::bufferSizesMaxItems)
+            event.bufferSizes.push_back (static_cast<float> (size));
+    event.sampleRate = juce::jlimit (0.0, AudioDevices::sampleRateMax, list.sampleRate);
+    event.bufferSize = juce::jlimit (0, AudioDevices::bufferSizeMax, list.bufferSize);
     emit (event);
 }
 

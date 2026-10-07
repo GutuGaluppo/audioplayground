@@ -5,6 +5,7 @@
 #include <functional>
 #include <juce_audio_devices/juce_audio_devices.h>
 #include <memory>
+#include <vector>
 
 namespace ap::desktop
 {
@@ -49,6 +50,33 @@ public:
     // Returns an error message for the user, or an empty string.
     juce::String setInputEnabled (bool enabled);
 
+    // What the device menu offers: the current device type's devices and the current device's
+    // sample rates and buffer sizes.
+    struct DeviceList
+    {
+        std::vector<juce::String> outputs;
+        std::vector<juce::String> inputs;
+        juce::String output;         // the open output device ("" = none)
+        juce::String preferredInput; // the input opened when a track is armed ("" = the default)
+        std::vector<double> sampleRates;
+        std::vector<int> bufferSizes;
+        double sampleRate = 0.0;
+        int bufferSize = 0;
+    };
+    [[nodiscard]] DeviceList getDevices() const;
+
+    // Message thread. Each returns an error message for the user, or an empty string. The device
+    // restarts; the input stays closed (it opens when a track is armed).
+    juce::String setOutputDevice (const juce::String& name);
+    juce::String setSampleRate (double rate);
+    juce::String setBufferSize (int size);
+    // Which input a later arm opens; if the input is open now it switches to the new one.
+    juce::String setPreferredInput (const juce::String& name);
+
+    // Called when the open device stopped (unplugged, driver gone) and the system default took over (the
+    // message says which), so the user is told instead of finding silence.
+    std::function<void (const juce::String&)> onDeviceRecovered;
+
     // Called on the message thread whenever the device starts, stops, changes or fails.
     std::function<void()> onStatusChanged;
 
@@ -68,6 +96,7 @@ private:
     void notifyStatusChanged();
     void handleAsyncUpdate() override;
     void setError (const juce::String& message);
+    void recoverLostDevice();
 
     engine::Engine& engine;
     juce::AudioDeviceManager deviceManager;
@@ -75,7 +104,8 @@ private:
 
     mutable juce::CriticalSection errorLock; // never taken on the audio thread
     juce::String lastError;
-    juce::String preferredInput; // input device to reopen (from the saved settings or the dialog)
+    bool recoveryAttempted = false; // one try per loss, so a failing default cannot loop
+    juce::String preferredInput;    // input device to reopen (from the saved settings or the dialog)
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioDeviceHost)
 };

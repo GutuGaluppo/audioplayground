@@ -105,6 +105,83 @@ juce::String AudioDeviceHost::setInputEnabled (bool enabled)
     return {};
 }
 
+AudioDeviceHost::DeviceList AudioDeviceHost::getDevices() const
+{
+    DeviceList list;
+    if (auto* type = deviceManager.getCurrentDeviceTypeObject())
+    {
+        for (const auto& name : type->getDeviceNames (false))
+            list.outputs.push_back (name);
+        for (const auto& name : type->getDeviceNames (true))
+            list.inputs.push_back (name);
+    }
+
+    const auto setup = deviceManager.getAudioDeviceSetup();
+    list.preferredInput = setup.inputDeviceName.isNotEmpty() ? setup.inputDeviceName : preferredInput;
+
+    if (auto* device = deviceManager.getCurrentAudioDevice(); device != nullptr && device->isOpen())
+    {
+        list.output = setup.outputDeviceName.isNotEmpty() ? setup.outputDeviceName : device->getName();
+        for (const auto rate : device->getAvailableSampleRates())
+            list.sampleRates.push_back (rate);
+        for (const auto size : device->getAvailableBufferSizes())
+            list.bufferSizes.push_back (size);
+        list.sampleRate = device->getCurrentSampleRate();
+        list.bufferSize = device->getCurrentBufferSizeSamples();
+    }
+    return list;
+}
+
+juce::String AudioDeviceHost::setOutputDevice (const juce::String& name)
+{
+    auto* type = deviceManager.getCurrentDeviceTypeObject();
+    if (type == nullptr || !type->getDeviceNames (false).contains (name))
+        return "That audio output is not available.";
+
+    auto setup = deviceManager.getAudioDeviceSetup();
+    setup.outputDeviceName = name;
+    setup.useDefaultOutputChannels = true;
+    setup.sampleRate = 0.0; // the new device's own default
+    setup.bufferSize = 0;
+    if (setup.inputDeviceName.isNotEmpty())
+    {
+        // An armed input belongs to the old device pair: close it, arming opens it again.
+        preferredInput = setup.inputDeviceName;
+        setup.inputDeviceName = {};
+        setup.inputChannels.clear();
+        setup.useDefaultInputChannels = false;
+    }
+    return deviceManager.setAudioDeviceSetup (setup, true);
+}
+
+juce::String AudioDeviceHost::setSampleRate (double rate)
+{
+    auto setup = deviceManager.getAudioDeviceSetup();
+    setup.sampleRate = rate;
+    return deviceManager.setAudioDeviceSetup (setup, true);
+}
+
+juce::String AudioDeviceHost::setBufferSize (int size)
+{
+    auto setup = deviceManager.getAudioDeviceSetup();
+    setup.bufferSize = size;
+    return deviceManager.setAudioDeviceSetup (setup, true);
+}
+
+juce::String AudioDeviceHost::setPreferredInput (const juce::String& name)
+{
+    auto* type = deviceManager.getCurrentDeviceTypeObject();
+    if (type == nullptr || (name.isNotEmpty() && !type->getDeviceNames (true).contains (name)))
+        return "That audio input is not available.";
+
+    preferredInput = name;
+    if (deviceManager.getAudioDeviceSetup().inputDeviceName.isEmpty())
+        return {}; // closed: it opens when a track is armed
+    auto setup = deviceManager.getAudioDeviceSetup();
+    setup.inputDeviceName = name;
+    return deviceManager.setAudioDeviceSetup (setup, true);
+}
+
 std::unique_ptr<juce::XmlElement> AudioDeviceHost::createStateXml() const
 {
     return deviceManager.createStateXml();
@@ -171,7 +248,28 @@ void AudioDeviceHost::audioDeviceError (const juce::String& errorMessage)
 
 void AudioDeviceHost::changeListenerCallback (juce::ChangeBroadcaster*)
 {
+    if (auto* device = deviceManager.getCurrentAudioDevice(); device != nullptr && device->isOpen())
+        recoveryAttempted = false;
+    else
+        recoverLostDevice();
     notifyStatusChanged();
+}
+
+void AudioDeviceHost::recoverLostDevice()
+{
+    // The open device was unplugged (or its driver went away): move to the system default once.
+    if (recoveryAttempted)
+        return;
+    recoveryAttempted = true;
+
+    const auto error = deviceManager.initialise (numInputChannels, numOutputChannels, nullptr, true);
+    setError (error);
+    if (auto* device = deviceManager.getCurrentAudioDevice(); error.isEmpty() && device != nullptr)
+    {
+        if (onDeviceRecovered)
+            onDeviceRecovered ("The audio device stopped. Now using " + device->getName() + ".");
+        recoveryAttempted = false;
+    }
 }
 
 void AudioDeviceHost::setError (const juce::String& message)

@@ -54,6 +54,7 @@ endif()
 # Desktop adapter tests (JUCE-based bridge codec). Only built with the desktop app.
 if(AP_BUILD_DESKTOP)
     add_executable(ap_desktop_tests
+        desktop/AudioDeviceHostTests.cpp
         desktop/AudioRecorderTests.cpp
         desktop/BridgeCodecTests.cpp
         desktop/ExporterTests.cpp
@@ -61,6 +62,7 @@ if(AP_BUILD_DESKTOP)
         desktop/NoteRecorderTests.cpp
         desktop/SampleLoaderTests.cpp
         desktop/SessionTests.cpp
+        "${PROJECT_SOURCE_DIR}/apps/desktop/src/AudioDeviceHost.cpp"
         "${PROJECT_SOURCE_DIR}/apps/desktop/src/AudioRecorder.cpp"
         "${PROJECT_SOURCE_DIR}/apps/desktop/src/Exporter.cpp"
         "${PROJECT_SOURCE_DIR}/apps/desktop/src/NoteCapture.cpp"
@@ -76,12 +78,13 @@ if(AP_BUILD_DESKTOP)
         JUCE_MODAL_LOOPS_PERMITTED=1)
     target_link_libraries(ap_desktop_tests PRIVATE
         ap::core
+        juce::juce_audio_devices
         juce::juce_audio_formats
         juce::juce_gui_basics
         juce::juce_recommended_config_flags
         Catch2::Catch2WithMain)
     get_target_property(_ap_test_opts ap_project_options INTERFACE_COMPILE_OPTIONS)
-    set_source_files_properties(desktop/AudioRecorderTests.cpp desktop/BridgeCodecTests.cpp desktop/ExporterTests.cpp desktop/NoteCaptureTests.cpp desktop/NoteRecorderTests.cpp desktop/SampleLoaderTests.cpp desktop/SessionTests.cpp
+    set_source_files_properties(desktop/AudioDeviceHostTests.cpp desktop/AudioRecorderTests.cpp desktop/BridgeCodecTests.cpp desktop/ExporterTests.cpp desktop/NoteCaptureTests.cpp desktop/NoteRecorderTests.cpp desktop/SampleLoaderTests.cpp desktop/SessionTests.cpp
         PROPERTIES COMPILE_OPTIONS "${_ap_test_opts}")
     catch_discover_tests(ap_desktop_tests)
 endif()

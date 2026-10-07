@@ -97,6 +97,8 @@ bool hasOnlyKeys (const juce::DynamicObject& object, std::initializer_list<const
     return array;
 }
 
+juce::var toVar (const AudioDevice& m);
+juce::var toVar (const AudioInputDevice& m);
 juce::var toVar (const TimelineNote& m);
 juce::var toVar (const TimelineClip& m);
 juce::var toVar (const TimelineEffect& m);
@@ -115,6 +117,20 @@ template <typename Item>
     for (const auto& item : items)
         array.add (toVar (item));
     return array;
+}
+
+[[maybe_unused]] juce::var toVar (const AudioDevice& m)
+{
+    auto* object = new juce::DynamicObject();
+    object->setProperty ("name", juce::String (m.name));
+    return juce::var (object);
+}
+
+[[maybe_unused]] juce::var toVar (const AudioInputDevice& m)
+{
+    auto* object = new juce::DynamicObject();
+    object->setProperty ("name", juce::String (m.name));
+    return juce::var (object);
 }
 
 [[maybe_unused]] juce::var toVar (const TimelineNote& m)
@@ -251,6 +267,50 @@ std::optional<Intent> parseAudioOpenSettings (const juce::var& payloadVar)
 
     AudioOpenSettings message;
 
+    return Intent {message};
+}
+
+std::optional<Intent> parseAudioSetOutput (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"name"}))
+        return std::nullopt;
+
+    AudioSetOutput message;
+    if (!readString (*payload, "name", AudioSetOutput::nameMaxLength, message.name)) return std::nullopt;
+    return Intent {message};
+}
+
+std::optional<Intent> parseAudioSetInput (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"name"}))
+        return std::nullopt;
+
+    AudioSetInput message;
+    if (!readString (*payload, "name", AudioSetInput::nameMaxLength, message.name)) return std::nullopt;
+    return Intent {message};
+}
+
+std::optional<Intent> parseAudioSetSampleRate (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"rate"}))
+        return std::nullopt;
+
+    AudioSetSampleRate message;
+    if (!readNumber (*payload, "rate", AudioSetSampleRate::rateMin, AudioSetSampleRate::rateMax, message.rate)) return std::nullopt;
+    return Intent {message};
+}
+
+std::optional<Intent> parseAudioSetBufferSize (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"size"}))
+        return std::nullopt;
+
+    AudioSetBufferSize message;
+    if (!readInt (*payload, "size", AudioSetBufferSize::sizeMin, AudioSetBufferSize::sizeMax, message.size)) return std::nullopt;
     return Intent {message};
 }
 
@@ -1039,6 +1099,14 @@ std::optional<Intent> parseIntent (const juce::var& message)
         return parseAppReady (payload);
     if (typeName == AudioOpenSettings::type)
         return parseAudioOpenSettings (payload);
+    if (typeName == AudioSetOutput::type)
+        return parseAudioSetOutput (payload);
+    if (typeName == AudioSetInput::type)
+        return parseAudioSetInput (payload);
+    if (typeName == AudioSetSampleRate::type)
+        return parseAudioSetSampleRate (payload);
+    if (typeName == AudioSetBufferSize::type)
+        return parseAudioSetBufferSize (payload);
     if (typeName == ToneSetEnabled::type)
         return parseToneSetEnabled (payload);
     if (typeName == TransportPlay::type)
@@ -1188,6 +1256,19 @@ juce::var toVar (const Event& event)
                 payload->setProperty ("error", juce::String (m.error));
                 payload->setProperty ("toneEnabled", m.toneEnabled);
                 return envelope (EngineStatus::type, payload);
+            },
+            [] (const AudioDevices& m) -> juce::var
+            {
+                auto* payload = new juce::DynamicObject();
+                payload->setProperty ("outputs", toVarList (m.outputs));
+                payload->setProperty ("inputs", toVarList (m.inputs));
+                payload->setProperty ("output", juce::String (m.output));
+                payload->setProperty ("input", juce::String (m.input));
+                payload->setProperty ("sampleRates", toVarArray (m.sampleRates));
+                payload->setProperty ("bufferSizes", toVarArray (m.bufferSizes));
+                payload->setProperty ("sampleRate", m.sampleRate);
+                payload->setProperty ("bufferSize", m.bufferSize);
+                return envelope (AudioDevices::type, payload);
             },
             [] (const EngineMeters& m) -> juce::var
             {

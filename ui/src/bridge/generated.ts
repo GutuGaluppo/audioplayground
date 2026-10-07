@@ -5,6 +5,14 @@
 export const PROTOCOL_VERSION = 1;
 
 // Records used inside events
+export interface AudioDevice {
+  readonly name: string;
+}
+
+export interface AudioInputDevice {
+  readonly name: string;
+}
+
 export interface TimelineNote {
   readonly start: number;
   readonly length: number;
@@ -88,6 +96,34 @@ export interface AppReady {
 export interface AudioOpenSettings {
   readonly type: 'audio.openSettings';
   readonly payload: {};
+}
+
+export interface AudioSetOutput {
+  readonly type: 'audio.setOutput';
+  readonly payload: {
+    readonly name: string;
+  };
+}
+
+export interface AudioSetInput {
+  readonly type: 'audio.setInput';
+  readonly payload: {
+    readonly name: string;
+  };
+}
+
+export interface AudioSetSampleRate {
+  readonly type: 'audio.setSampleRate';
+  readonly payload: {
+    readonly rate: number;
+  };
+}
+
+export interface AudioSetBufferSize {
+  readonly type: 'audio.setBufferSize';
+  readonly payload: {
+    readonly size: number;
+  };
 }
 
 export interface ToneSetEnabled {
@@ -569,7 +605,7 @@ export interface TrackSetSend {
   };
 }
 
-export type Intent = AppReady | AudioOpenSettings | ToneSetEnabled | TransportPlay | TransportStop | TransportReturnToStart | TransportSetTempo | TransportSetCountIn | MetronomeSetEnabled | ParamSet | EditUndo | EditRedo | ProjectNew | ProjectOpen | ProjectSave | ProjectSaveAs | ProjectRename | ProjectExport | ProjectCancelExport | NoteOn | NoteOff | NoteAllOff | InstrumentSelect | SamplerLoad | DrumsSetStep | DrumsClear | DrumsTrigger | DrumsSetPad | DrumsLoadPad | DrumsResetPad | DrumsSetKit | TransportRecord | TransportCapture | TransportSeek | TransportSetLoop | TrackAdd | TrackRemove | TrackRename | TrackSetVolume | TrackSetPan | TrackSetMute | TrackSetSolo | TrackSetArmed | TrackSetEffect | TrackImportAudio | AssetLocate | AssetRemove | AssetRemoveUnused | ClipCreate | ClipMove | ClipResize | ClipSplit | ClipRemove | ClipDuplicate | ClipSetLoop | ClipAddNote | ClipRemoveNote | ClipEditNote | BusAdd | BusRemove | BusRename | BusSetVolume | BusSetPan | BusSetMute | BusSetEffect | TrackSetSend;
+export type Intent = AppReady | AudioOpenSettings | AudioSetOutput | AudioSetInput | AudioSetSampleRate | AudioSetBufferSize | ToneSetEnabled | TransportPlay | TransportStop | TransportReturnToStart | TransportSetTempo | TransportSetCountIn | MetronomeSetEnabled | ParamSet | EditUndo | EditRedo | ProjectNew | ProjectOpen | ProjectSave | ProjectSaveAs | ProjectRename | ProjectExport | ProjectCancelExport | NoteOn | NoteOff | NoteAllOff | InstrumentSelect | SamplerLoad | DrumsSetStep | DrumsClear | DrumsTrigger | DrumsSetPad | DrumsLoadPad | DrumsResetPad | DrumsSetKit | TransportRecord | TransportCapture | TransportSeek | TransportSetLoop | TrackAdd | TrackRemove | TrackRename | TrackSetVolume | TrackSetPan | TrackSetMute | TrackSetSolo | TrackSetArmed | TrackSetEffect | TrackImportAudio | AssetLocate | AssetRemove | AssetRemoveUnused | ClipCreate | ClipMove | ClipResize | ClipSplit | ClipRemove | ClipDuplicate | ClipSetLoop | ClipAddNote | ClipRemoveNote | ClipEditNote | BusAdd | BusRemove | BusRename | BusSetVolume | BusSetPan | BusSetMute | BusSetEffect | TrackSetSend;
 
 // Events: native -> UI
 export interface EngineStatus {
@@ -584,6 +620,20 @@ export interface EngineStatus {
     readonly roundTripLatencyMs: number;
     readonly error: string;
     readonly toneEnabled: boolean;
+  };
+}
+
+export interface AudioDevices {
+  readonly type: 'audio.devices';
+  readonly payload: {
+    readonly outputs: readonly AudioDevice[];
+    readonly inputs: readonly AudioInputDevice[];
+    readonly output: string;
+    readonly input: string;
+    readonly sampleRates: readonly number[];
+    readonly bufferSizes: readonly number[];
+    readonly sampleRate: number;
+    readonly bufferSize: number;
   };
 }
 
@@ -737,12 +787,13 @@ export interface TimelinePeaks {
   };
 }
 
-export type NativeEvent = EngineStatus | EngineMeters | TransportState | TransportPosition | ParamValue | HistoryState | ProjectState | ExportState | AppNotice | InstrumentState | SamplerState | DrumsKit | DrumsPad | TimelineState | TimelineAssets | ProjectAssets | TimelinePeaks;
+export type NativeEvent = EngineStatus | AudioDevices | EngineMeters | TransportState | TransportPosition | ParamValue | HistoryState | ProjectState | ExportState | AppNotice | InstrumentState | SamplerState | DrumsKit | DrumsPad | TimelineState | TimelineAssets | ProjectAssets | TimelinePeaks;
 export type NativeEventType = NativeEvent['type'];
 
 /** Payload type for each native event type. */
 export interface NativeEventPayloads {
   'engine.status': EngineStatus['payload'];
+  'audio.devices': AudioDevices['payload'];
   'engine.meters': EngineMeters['payload'];
   'transport.state': TransportState['payload'];
   'transport.position': TransportPosition['payload'];
@@ -782,6 +833,24 @@ function hasOnlyKeys(payload: Payload, keys: readonly string[]): boolean {
 
 function isList(value: unknown, maxItems: number, isItem: (item: unknown) => boolean): boolean {
   return Array.isArray(value) && value.length <= maxItems && value.every((item: unknown) => isItem(item));
+}
+
+function isAudioDevice(value: unknown): boolean {
+  if (!isPayload(value)) return false;
+  const payload = value;
+  return (
+    hasOnlyKeys(payload, ['name']) &&
+    typeof payload['name'] === 'string' && payload['name'].length <= 256
+  );
+}
+
+function isAudioInputDevice(value: unknown): boolean {
+  if (!isPayload(value)) return false;
+  const payload = value;
+  return (
+    hasOnlyKeys(payload, ['name']) &&
+    typeof payload['name'] === 'string' && payload['name'].length <= 256
+  );
 }
 
 function isTimelineNote(value: unknown): boolean {
@@ -915,6 +984,16 @@ const eventValidators: Record<NativeEventType, (payload: Payload) => boolean> = 
     typeof payload['roundTripLatencyMs'] === 'number' && Number.isFinite(payload['roundTripLatencyMs']) && payload['roundTripLatencyMs'] >= 0 && payload['roundTripLatencyMs'] <= 10000 &&
     typeof payload['error'] === 'string' && payload['error'].length <= 1024 &&
     typeof payload['toneEnabled'] === 'boolean',
+  'audio.devices': (payload) =>
+    hasOnlyKeys(payload, ['outputs', 'inputs', 'output', 'input', 'sampleRates', 'bufferSizes', 'sampleRate', 'bufferSize']) &&
+    isList(payload['outputs'], 64, isAudioDevice) &&
+    isList(payload['inputs'], 64, isAudioInputDevice) &&
+    typeof payload['output'] === 'string' && payload['output'].length <= 256 &&
+    typeof payload['input'] === 'string' && payload['input'].length <= 256 &&
+    isNumberArray(payload['sampleRates'], 0, 768000, 32) &&
+    isNumberArray(payload['bufferSizes'], 0, 65536, 32) &&
+    typeof payload['sampleRate'] === 'number' && Number.isFinite(payload['sampleRate']) && payload['sampleRate'] >= 0 && payload['sampleRate'] <= 768000 &&
+    Number.isInteger(payload['bufferSize']) && (payload['bufferSize'] as number) >= 0 && (payload['bufferSize'] as number) <= 65536,
   'engine.meters': (payload) =>
     hasOnlyKeys(payload, ['peak', 'inputPeak', 'limiterDb']) &&
     typeof payload['peak'] === 'number' && Number.isFinite(payload['peak']) && payload['peak'] >= 0 && payload['peak'] <= 1 &&

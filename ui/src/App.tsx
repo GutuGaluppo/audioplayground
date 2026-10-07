@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 
 import { useBridge } from './bridge/BridgeContext';
 import type { EngineStatus } from './bridge/generated';
+import { AudioDevicesMenu } from './components/AudioDevicesMenu';
 import { Notices } from './components/Notices';
 import { QuickStart } from './components/QuickStart';
 import { ParamSlider } from './components/ParamSlider';
@@ -130,9 +131,7 @@ export function App() {
           Reset layout
         </button>
         {bridge.isNative ? (
-          <button type="button" className="button button--quiet" onClick={openSettings}>
-            Audio settings
-          </button>
+          <AudioDevicesMenu />
         ) : (
           <span className="statusbar__badge">Simulated engine</span>
         )}

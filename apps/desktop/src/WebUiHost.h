@@ -45,6 +45,10 @@ private:
     void handleIntent (const juce::var& message);
     void handle (const ap::bridge::AppReady&);
     void handle (const ap::bridge::AudioOpenSettings&);
+    void handle (const ap::bridge::AudioSetOutput&);
+    void handle (const ap::bridge::AudioSetInput&);
+    void handle (const ap::bridge::AudioSetSampleRate&);
+    void handle (const ap::bridge::AudioSetBufferSize&);
     void handle (const ap::bridge::ToneSetEnabled&);
     void handle (const ap::bridge::ParamSet&);
     void handle (const ap::bridge::EditUndo&);
@@ -131,6 +135,9 @@ private:
 
     void emit (const ap::bridge::Event& event);
     void sendStatus();
+    void sendAudioDevices();
+    // Runs a device change unless a take is being recorded; shows the error, if any.
+    void changeDevice (const std::function<juce::String()>& change);
     void sendTransportState();
     void sendParameter (params::ParamId id);
     void sendHistory();

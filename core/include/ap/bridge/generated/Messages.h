@@ -13,6 +13,24 @@ namespace ap::bridge
 
 inline constexpr int protocolVersion = 1;
 
+struct AudioDevice
+{
+    static constexpr std::size_t nameMaxLength = 256;
+
+    std::string name {};
+
+    bool operator== (const AudioDevice&) const = default;
+};
+
+struct AudioInputDevice
+{
+    static constexpr std::size_t nameMaxLength = 256;
+
+    std::string name {};
+
+    bool operator== (const AudioInputDevice&) const = default;
+};
+
 struct TimelineNote
 {
     static constexpr int startMin = 0;
@@ -203,6 +221,48 @@ struct AudioOpenSettings
     static constexpr std::string_view type = "audio.openSettings";
 
     bool operator== (const AudioOpenSettings&) const = default;
+};
+
+struct AudioSetOutput
+{
+    static constexpr std::string_view type = "audio.setOutput";
+    static constexpr std::size_t nameMaxLength = 256;
+
+    std::string name {};
+
+    bool operator== (const AudioSetOutput&) const = default;
+};
+
+struct AudioSetInput
+{
+    static constexpr std::string_view type = "audio.setInput";
+    static constexpr std::size_t nameMaxLength = 256;
+
+    std::string name {};
+
+    bool operator== (const AudioSetInput&) const = default;
+};
+
+struct AudioSetSampleRate
+{
+    static constexpr std::string_view type = "audio.setSampleRate";
+    static constexpr double rateMin = 8000.0;
+    static constexpr double rateMax = 768000.0;
+
+    double rate = 0.0;
+
+    bool operator== (const AudioSetSampleRate&) const = default;
+};
+
+struct AudioSetBufferSize
+{
+    static constexpr std::string_view type = "audio.setBufferSize";
+    static constexpr int sizeMin = 16;
+    static constexpr int sizeMax = 65536;
+
+    int size = 0;
+
+    bool operator== (const AudioSetBufferSize&) const = default;
 };
 
 struct ToneSetEnabled
@@ -1038,6 +1098,36 @@ struct EngineStatus
     bool operator== (const EngineStatus&) const = default;
 };
 
+struct AudioDevices
+{
+    static constexpr std::string_view type = "audio.devices";
+    static constexpr std::size_t outputsMaxItems = 64;
+    static constexpr std::size_t inputsMaxItems = 64;
+    static constexpr std::size_t outputMaxLength = 256;
+    static constexpr std::size_t inputMaxLength = 256;
+    static constexpr float sampleRatesMin = 0.0f;
+    static constexpr float sampleRatesMax = 768000.0f;
+    static constexpr std::size_t sampleRatesMaxItems = 32;
+    static constexpr float bufferSizesMin = 0.0f;
+    static constexpr float bufferSizesMax = 65536.0f;
+    static constexpr std::size_t bufferSizesMaxItems = 32;
+    static constexpr double sampleRateMin = 0.0;
+    static constexpr double sampleRateMax = 768000.0;
+    static constexpr int bufferSizeMin = 0;
+    static constexpr int bufferSizeMax = 65536;
+
+    std::vector<AudioDevice> outputs {};
+    std::vector<AudioInputDevice> inputs {};
+    std::string output {};
+    std::string input {};
+    std::vector<float> sampleRates {};
+    std::vector<float> bufferSizes {};
+    double sampleRate = 0.0;
+    int bufferSize = 0;
+
+    bool operator== (const AudioDevices&) const = default;
+};
+
 struct EngineMeters
 {
     static constexpr std::string_view type = "engine.meters";
@@ -1283,7 +1373,7 @@ struct TimelinePeaks
     bool operator== (const TimelinePeaks&) const = default;
 };
 
-using Intent = std::variant<AppReady, AudioOpenSettings, ToneSetEnabled, TransportPlay, TransportStop, TransportReturnToStart, TransportSetTempo, TransportSetCountIn, MetronomeSetEnabled, ParamSet, EditUndo, EditRedo, ProjectNew, ProjectOpen, ProjectSave, ProjectSaveAs, ProjectRename, ProjectExport, ProjectCancelExport, NoteOn, NoteOff, NoteAllOff, InstrumentSelect, SamplerLoad, DrumsSetStep, DrumsClear, DrumsTrigger, DrumsSetPad, DrumsLoadPad, DrumsResetPad, DrumsSetKit, TransportRecord, TransportCapture, TransportSeek, TransportSetLoop, TrackAdd, TrackRemove, TrackRename, TrackSetVolume, TrackSetPan, TrackSetMute, TrackSetSolo, TrackSetArmed, TrackSetEffect, TrackImportAudio, AssetLocate, AssetRemove, AssetRemoveUnused, ClipCreate, ClipMove, ClipResize, ClipSplit, ClipRemove, ClipDuplicate, ClipSetLoop, ClipAddNote, ClipRemoveNote, ClipEditNote, BusAdd, BusRemove, BusRename, BusSetVolume, BusSetPan, BusSetMute, BusSetEffect, TrackSetSend>;
-using Event = std::variant<EngineStatus, EngineMeters, TransportState, TransportPosition, ParamValue, HistoryState, ProjectState, ExportState, AppNotice, InstrumentState, SamplerState, DrumsKit, DrumsPad, TimelineState, TimelineAssets, ProjectAssets, TimelinePeaks>;
+using Intent = std::variant<AppReady, AudioOpenSettings, AudioSetOutput, AudioSetInput, AudioSetSampleRate, AudioSetBufferSize, ToneSetEnabled, TransportPlay, TransportStop, TransportReturnToStart, TransportSetTempo, TransportSetCountIn, MetronomeSetEnabled, ParamSet, EditUndo, EditRedo, ProjectNew, ProjectOpen, ProjectSave, ProjectSaveAs, ProjectRename, ProjectExport, ProjectCancelExport, NoteOn, NoteOff, NoteAllOff, InstrumentSelect, SamplerLoad, DrumsSetStep, DrumsClear, DrumsTrigger, DrumsSetPad, DrumsLoadPad, DrumsResetPad, DrumsSetKit, TransportRecord, TransportCapture, TransportSeek, TransportSetLoop, TrackAdd, TrackRemove, TrackRename, TrackSetVolume, TrackSetPan, TrackSetMute, TrackSetSolo, TrackSetArmed, TrackSetEffect, TrackImportAudio, AssetLocate, AssetRemove, AssetRemoveUnused, ClipCreate, ClipMove, ClipResize, ClipSplit, ClipRemove, ClipDuplicate, ClipSetLoop, ClipAddNote, ClipRemoveNote, ClipEditNote, BusAdd, BusRemove, BusRename, BusSetVolume, BusSetPan, BusSetMute, BusSetEffect, TrackSetSend>;
+using Event = std::variant<EngineStatus, AudioDevices, EngineMeters, TransportState, TransportPosition, ParamValue, HistoryState, ProjectState, ExportState, AppNotice, InstrumentState, SamplerState, DrumsKit, DrumsPad, TimelineState, TimelineAssets, ProjectAssets, TimelinePeaks>;
 
 } // namespace ap::bridge

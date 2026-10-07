@@ -4,6 +4,32 @@
   "intents": {
     "app.ready": {},
     "audio.openSettings": {},
+    "audio.setOutput": {
+      "name": {
+        "type": "string",
+        "maxLength": 256
+      }
+    },
+    "audio.setInput": {
+      "name": {
+        "type": "string",
+        "maxLength": 256
+      }
+    },
+    "audio.setSampleRate": {
+      "rate": {
+        "type": "number",
+        "min": 8000,
+        "max": 768000
+      }
+    },
+    "audio.setBufferSize": {
+      "size": {
+        "type": "int",
+        "min": 16,
+        "max": 65536
+      }
+    },
     "tone.setEnabled": {
       "enabled": {
         "type": "bool"
@@ -687,6 +713,60 @@
       },
       "toneEnabled": {
         "type": "bool"
+      }
+    },
+    "audio.devices": {
+      "outputs": {
+        "type": "list",
+        "item": "AudioDevice",
+        "maxItems": 64,
+        "fields": {
+          "name": {
+            "type": "string",
+            "maxLength": 256
+          }
+        }
+      },
+      "inputs": {
+        "type": "list",
+        "item": "AudioInputDevice",
+        "maxItems": 64,
+        "fields": {
+          "name": {
+            "type": "string",
+            "maxLength": 256
+          }
+        }
+      },
+      "output": {
+        "type": "string",
+        "maxLength": 256
+      },
+      "input": {
+        "type": "string",
+        "maxLength": 256
+      },
+      "sampleRates": {
+        "type": "floatArray",
+        "min": 0,
+        "max": 768000,
+        "maxItems": 32
+      },
+      "bufferSizes": {
+        "type": "floatArray",
+        "min": 0,
+        "max": 65536,
+        "maxItems": 32
+      },
+      "sampleRate": {
+        "type": "number",
+        "min": 0,
+        "max": 768000
+      },
+      "bufferSize": {
+        "type": "int",
+        "min": 0,
+        "max": 65536
       }
     },
     "engine.meters": {
