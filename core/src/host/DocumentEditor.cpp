@@ -58,6 +58,11 @@ void DocumentEditor::reset (model::Project project)
         onChanged();
 }
 
+void DocumentEditor::refresh()
+{
+    sync();
+}
+
 void DocumentEditor::setAudioLookup (engine::AudioLookup lookup)
 {
     audioLookup = std::move (lookup);

@@ -32,8 +32,7 @@ bool notInBrowser (const bridge::Intent& intent)
         || isAnyOf<bridge::SamplerLoad> (intent) || isAnyOf<bridge::DrumsLoadPad> (intent)
         || isAnyOf<bridge::TransportRecord> (intent) || isAnyOf<bridge::TransportCapture> (intent)
         || isAnyOf<bridge::TrackSetArmed> (intent) || isAnyOf<bridge::TrackImportAudio> (intent)
-        || isAnyOf<bridge::AssetLocate> (intent) || isAnyOf<bridge::AssetRemove> (intent)
-        || isAnyOf<bridge::AssetRemoveUnused> (intent) || isAnyOf<bridge::AccompanimentSuggest> (intent)
+        || isAnyOf<bridge::AssetLocate> (intent) || isAnyOf<bridge::AccompanimentSuggest> (intent)
         || isAnyOf<bridge::AccompanimentPreview> (intent)
         || isAnyOf<bridge::AccompanimentStopPreview> (intent) || isAnyOf<bridge::AccompanimentAdd> (intent)
         || isAnyOf<bridge::AccompanimentNext> (intent) || isAnyOf<bridge::AccompanimentDismiss> (intent);
@@ -54,6 +53,7 @@ WebHost::WebHost (double rate, int blockSize)
 {
     sentParameters.fill (std::numeric_limits<float>::quiet_NaN());
     engine.prepare (sampleRate, maxBlock);
+    editor.setAudioLookup ([this] (model::AssetId id) { return audioFor (id); });
     editor.onChanged = [this] { onProjectChanged(); };
     // The engine was given the project by the editor before it was prepared: give it again.
     resetProject (model::starterProject(), false, false);
@@ -154,7 +154,15 @@ void WebHost::sendParameters (bool everything)
 void WebHost::sendDrumPads()
 {
     for (std::size_t pad = 0; pad < model::DrumKit::numPads; ++pad)
-        emit (host::drumsPad (editor.project(), pad, {}));
+    {
+        host::PadSample sample;
+        if (const auto id = editor.project().drums.pads[pad].sample; id.isValid())
+        {
+            const auto state = assetAudio (id);
+            sample = {state.name, state.missing};
+        }
+        emit (host::drumsPad (editor.project(), pad, sample));
+    }
 }
 
 void WebHost::sendAll()
@@ -167,12 +175,10 @@ void WebHost::sendAll()
     emit (host::historyState (editor.document()));
     sendProjectState();
     emit (host::instrumentState (engine));
-    emit (bridge::SamplerState {});
     emit (host::drumsKit (editor.project()));
-    sendDrumPads();
     emit (host::timelineState (editor.project()));
-    emit (bridge::ProjectAssets {});
-    emit (bridge::TimelineAssets {});
+    sentSampler.reset();
+    sendAssetEvents (true); // audio files, the sampler and the pads
     emit (bridge::ExportState {false, 0.0});
     emit (bridge::AccompanimentState {});
 }
@@ -190,7 +196,8 @@ void WebHost::onProjectChanged()
     sendProjectState();
     emit (host::timelineState (editor.project()));
     emit (host::drumsKit (editor.project()));
-    sendDrumPads();
+    syncSlots();
+    sendAssetEvents (false);
     sendTransportState();
     sendParameters (false);
     emit (host::historyState (editor.document()));
@@ -201,6 +208,13 @@ void WebHost::resetProject (model::Project project, bool dirty, bool location)
     loading = true;
     editor.reset (std::move (project));
     loading = false;
+    // The audio of the song that was open is not this song's: free it. The page loads what the
+    // new song needs.
+    audio.clear();
+    missingAudio.clear();
+    incoming.reset();
+    editor.refresh();
+    syncSlots();
     // A different song starts from the top, silent.
     engine.getTransport().requestStop();
     engine.getTransport().requestSeek (0);

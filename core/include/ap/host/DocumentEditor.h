@@ -30,6 +30,8 @@ public:
 
     // Where the render graph finds decoded audio for audio clips (none by default).
     void setAudioLookup (engine::AudioLookup lookup);
+    // Gives the engine the project again, e.g. after audio that clips use has finished loading.
+    void refresh();
 
     // Called after every change to the project, once the engine has it.
     std::function<void()> onChanged;

@@ -13,6 +13,7 @@ std::unique_ptr<ap::web::WebHost> host;
 std::string lastEvents;
 std::string projectText;
 std::string projectError;
+std::string audioError;
 } // namespace
 
 #define AP_EXPORT extern "C" __attribute__ ((used, visibility ("default")))
@@ -101,6 +102,54 @@ AP_EXPORT void ap_project_saved (int hasLocation)
 {
     if (host)
         host->projectSaved (hasLocation != 0);
+}
+
+// Audio files. begin -> write each channel (ap_audio_channel) -> end. Returns 1, or 0 with a
+// message in ap_audio_error().
+AP_EXPORT int ap_audio_begin (const char* path, int pathLength, double sampleRate, int channels, int frames)
+{
+    if (!host || path == nullptr || pathLength < 0)
+        return 0;
+    audioError = host->beginAudio (std::string_view (path, static_cast<std::size_t> (pathLength)), sampleRate,
+                                   channels, frames);
+    return audioError.empty() ? 1 : 0;
+}
+
+AP_EXPORT float* ap_audio_channel (int index)
+{
+    return host ? host->audioChannel (index) : nullptr;
+}
+
+AP_EXPORT int ap_audio_end (int use, int a, int b, const char* name, int nameLength)
+{
+    if (!host || use < 0 || use > 4 || (name == nullptr && nameLength != 0) || nameLength < 0)
+        return 0;
+    audioError = host->endAudio (
+        static_cast<ap::web::WebHost::AudioUse> (use), a, b,
+        std::string_view (name != nullptr ? name : "", static_cast<std::size_t> (nameLength)));
+    return audioError.empty() ? 1 : 0;
+}
+
+AP_EXPORT void ap_audio_missing (const char* path, int length)
+{
+    if (host && path != nullptr && length >= 0)
+        host->audioMissing (std::string_view (path, static_cast<std::size_t> (length)));
+}
+
+AP_EXPORT void ap_audio_forget (const char* path, int length)
+{
+    if (host && path != nullptr && length >= 0)
+        host->forgetAudio (std::string_view (path, static_cast<std::size_t> (length)));
+}
+
+AP_EXPORT const char* ap_audio_error()
+{
+    return audioError.c_str();
+}
+
+AP_EXPORT int ap_audio_error_size()
+{
+    return static_cast<int> (audioError.size());
 }
 
 AP_EXPORT void ap_project_unsaved()

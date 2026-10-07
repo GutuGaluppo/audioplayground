@@ -56,6 +56,14 @@ class ApEngineProcessor extends AudioWorkletProcessor {
             hasLocation: !!command.hasLocation,
           }),
         );
+      } else if (command.kind === 'audio') {
+        reply(this.engine.loadAudio(command));
+      } else if (command.kind === 'audioMissing') {
+        this.engine.audioMissing(command.path);
+        reply({ ok: true });
+      } else if (command.kind === 'forgetAudio') {
+        this.engine.forgetAudio(command.path);
+        reply({ ok: true });
       } else if (command.kind === 'saved') {
         this.engine.projectSaved(!!command.hasLocation);
         reply({ ok: true });

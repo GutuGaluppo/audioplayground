@@ -12,6 +12,7 @@ endif()
 
 set(AP_WEB_SOURCES
     src/WebHost.cpp
+    src/WebHostAudio.cpp
     src/Exports.cpp
     src/compat/JsonText.cpp
     "${PROJECT_SOURCE_DIR}/apps/desktop/src/generated/BridgeCodec.cpp")
@@ -27,12 +28,15 @@ target_link_libraries(ap_web PRIVATE ap::core ap::project_options nlohmann_json:
 set(AP_WEB_EXPORTS
     _ap_alloc _ap_free _ap_create _ap_intent _ap_process _ap_events _ap_events_size _ap_set_output_latency
     _ap_project_export _ap_project_text _ap_project_import _ap_project_error _ap_project_error_size
-    _ap_project_saved _ap_project_unsaved)
+    _ap_project_saved _ap_project_unsaved
+    _ap_audio_begin _ap_audio_channel _ap_audio_end _ap_audio_missing _ap_audio_forget _ap_audio_error
+    _ap_audio_error_size)
 list(JOIN AP_WEB_EXPORTS "," AP_WEB_EXPORT_LIST)
 target_link_options(ap_web PRIVATE
     -sSTANDALONE_WASM=1
     -sALLOW_MEMORY_GROWTH=1
     -sINITIAL_MEMORY=33554432
+    -sMAXIMUM_MEMORY=1073741824
     -sSTACK_SIZE=1048576
     -sEXPORTED_FUNCTIONS=${AP_WEB_EXPORT_LIST}
     "-sEXPORTED_RUNTIME_METHODS=[]"
