@@ -497,16 +497,12 @@ void WebUiHost::handle (const ap::bridge::ClipEditNote& intent)
 
 // --- Drum patterns ---------------------------------------------------------------------------
 
-void WebUiHost::handle (const ap::bridge::DrumsSetStep& intent)
+void WebUiHost::editDrumPattern (std::uint64_t clipId, std::uint64_t gesture, bool createIfMissing,
+                                 const std::function<model::Clip (const model::Clip&)>& change)
 {
-    const auto pad = static_cast<std::size_t> (intent.pad);
-    const auto step = static_cast<std::size_t> (intent.step);
-
-    if (intent.clip != 0)
+    if (clipId != 0)
     {
-        editClip (static_cast<std::uint64_t> (intent.clip), model::ClipEdit::notes,
-                  toGesture (intent.gesture),
-                  [&] (const model::Clip& clip) { return model::withDrumStep (clip, pad, step, intent.on); });
+        editClip (clipId, model::ClipEdit::notes, gesture, change);
         return;
     }
 
@@ -520,16 +516,14 @@ void WebUiHost::handle (const ap::bridge::DrumsSetStep& intent)
         for (const auto& clip : drums->clips)
             if (clip.start <= barStart && barStart < clip.end())
             {
-                editClip (clip.id.value, model::ClipEdit::notes, toGesture (intent.gesture),
-                          [&] (const model::Clip& c)
-                          { return model::withDrumStep (c, pad, step, intent.on); });
+                editClip (clip.id.value, model::ClipEdit::notes, gesture, change);
                 return;
             }
 
-    if (!intent.on)
+    if (!createIfMissing)
         return;
 
-    auto pattern = model::withDrumStep (model::makePatternClip (barStart, 4 * bar), pad, step, true);
+    auto pattern = change (model::makePatternClip (barStart, 4 * bar));
     session.performGroup (
         "Add pattern",
         [&pattern] (model::ProjectDocument::Group& group)
@@ -541,7 +535,25 @@ void WebUiHost::handle (const ap::bridge::DrumsSetStep& intent)
                 track = std::get<model::AddTrack> (*added).created;
             (void)group.perform (model::AddClip {track, pattern});
         },
-        toGesture (intent.gesture));
+        gesture);
+}
+
+void WebUiHost::handle (const ap::bridge::DrumsSetStep& intent)
+{
+    const auto pad = static_cast<std::size_t> (intent.pad);
+    const auto step = static_cast<std::size_t> (intent.step);
+    editDrumPattern (static_cast<std::uint64_t> (intent.clip), toGesture (intent.gesture), intent.on,
+                     [&] (const model::Clip& clip)
+                     { return model::withDrumStep (clip, pad, step, intent.on); });
+}
+
+void WebUiHost::handle (const ap::bridge::DrumsSetPattern& intent)
+{
+    std::array<std::uint16_t, model::DrumKit::numPads> pads {};
+    for (std::size_t i = 0; i < pads.size() && i < intent.pads.size(); ++i)
+        pads[i] = static_cast<std::uint16_t> (std::lround (intent.pads[i]));
+    editDrumPattern (static_cast<std::uint64_t> (intent.clip), 0, true,
+                     [&] (const model::Clip& clip) { return model::withDrumPattern (clip, pads); });
 }
 
 void WebUiHost::handle (const ap::bridge::DrumsClear& intent)

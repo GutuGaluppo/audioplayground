@@ -73,6 +73,14 @@
         "max": 2147483647
       }
     },
+    "synth.setPreset": {
+      "values": {
+        "type": "floatArray",
+        "min": -100,
+        "max": 20000,
+        "maxItems": 10
+      }
+    },
     "edit.undo": {},
     "edit.redo": {},
     "project.new": {},
@@ -156,6 +164,19 @@
         "type": "int",
         "min": 1,
         "max": 2147483647
+      }
+    },
+    "drums.setPattern": {
+      "clip": {
+        "type": "int",
+        "min": 0,
+        "max": 2147483647
+      },
+      "pads": {
+        "type": "floatArray",
+        "min": 0,
+        "max": 65535,
+        "maxItems": 16
       }
     },
     "drums.trigger": {

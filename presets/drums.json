@@ -1,0 +1,13 @@
+{
+  "$comment": "Built-in drum patterns (guide §17): one bar of 16 steps. Each pad listed is 16 characters, 'x' = hit, '.' = rest; pads left out are silent. Pad names follow the factory kit slots (kick, snare, closedHat, openHat, clap, lowTom, midTom, highTom, rim, cowbell, shaker, crash, percLow, percHigh, bass, zap). ids are stable: never rename one after release.",
+  "presets": [
+    { "id": "drums.four-on-the-floor", "processor": "drums", "name": "Four on the floor", "version": 1, "pattern": { "kick": "x...x...x...x...", "clap": "....x.......x...", "closedHat": "..x...x...x...x.", "openHat": "..............x." } },
+    { "id": "drums.boom-bap", "processor": "drums", "name": "Boom bap", "version": 1, "pattern": { "kick": "x......x..x.....", "snare": "....x.......x...", "closedHat": "x.x.x.x.x.x.x.x." } },
+    { "id": "drums.rock", "processor": "drums", "name": "Rock", "version": 1, "pattern": { "kick": "x.......x.x.....", "snare": "....x.......x...", "closedHat": "x.x.x.x.x.x.x.x.", "crash": "x..............." } },
+    { "id": "drums.funk", "processor": "drums", "name": "Funk", "version": 1, "pattern": { "kick": "x..x......x.....", "snare": "....x.......x..x", "closedHat": "xxxxxxxxxxxxxxxx" } },
+    { "id": "drums.trap", "processor": "drums", "name": "Trap", "version": 1, "pattern": { "kick": "x......x..x.....", "clap": "........x.......", "closedHat": "xxxxxxxxxxxx.xxx", "openHat": "..............x." } },
+    { "id": "drums.dembow", "processor": "drums", "name": "Dembow", "version": 1, "pattern": { "kick": "x...x...x...x...", "snare": "...x..x...x..x..", "closedHat": "x.x.x.x.x.x.x.x." } },
+    { "id": "drums.bossa", "processor": "drums", "name": "Bossa nova", "version": 1, "pattern": { "kick": "x.....x.x.....x.", "rim": "x..x..x...x..x..", "closedHat": "x.x.x.x.x.x.x.x." } },
+    { "id": "drums.half-time-shuffle", "processor": "drums", "name": "Half-time shuffle", "version": 1, "pattern": { "kick": "x.......x.......", "snare": "........x.......", "closedHat": "x..xx..xx..xx..x" } }
+  ]
+}

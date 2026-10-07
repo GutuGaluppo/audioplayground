@@ -404,6 +404,17 @@ std::optional<Intent> parseParamSet (const juce::var& payloadVar)
     return Intent {message};
 }
 
+std::optional<Intent> parseSynthSetPreset (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"values"}))
+        return std::nullopt;
+
+    SynthSetPreset message;
+    if (!readFloatArray (*payload, "values", SynthSetPreset::valuesMin, SynthSetPreset::valuesMax, SynthSetPreset::valuesMaxItems, message.values)) return std::nullopt;
+    return Intent {message};
+}
+
 std::optional<Intent> parseEditUndo (const juce::var& payloadVar)
 {
     const auto* payload = payloadVar.getDynamicObject();
@@ -583,6 +594,18 @@ std::optional<Intent> parseDrumsClear (const juce::var& payloadVar)
 
     DrumsClear message;
     if (!readInt (*payload, "clip", DrumsClear::clipMin, DrumsClear::clipMax, message.clip)) return std::nullopt;
+    return Intent {message};
+}
+
+std::optional<Intent> parseDrumsSetPattern (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"clip", "pads"}))
+        return std::nullopt;
+
+    DrumsSetPattern message;
+    if (!readInt (*payload, "clip", DrumsSetPattern::clipMin, DrumsSetPattern::clipMax, message.clip)) return std::nullopt;
+    if (!readFloatArray (*payload, "pads", DrumsSetPattern::padsMin, DrumsSetPattern::padsMax, DrumsSetPattern::padsMaxItems, message.pads)) return std::nullopt;
     return Intent {message};
 }
 
@@ -1123,6 +1146,8 @@ std::optional<Intent> parseIntent (const juce::var& message)
         return parseMetronomeSetEnabled (payload);
     if (typeName == ParamSet::type)
         return parseParamSet (payload);
+    if (typeName == SynthSetPreset::type)
+        return parseSynthSetPreset (payload);
     if (typeName == EditUndo::type)
         return parseEditUndo (payload);
     if (typeName == EditRedo::type)
@@ -1155,6 +1180,8 @@ std::optional<Intent> parseIntent (const juce::var& message)
         return parseDrumsSetStep (payload);
     if (typeName == DrumsClear::type)
         return parseDrumsClear (payload);
+    if (typeName == DrumsSetPattern::type)
+        return parseDrumsSetPattern (payload);
     if (typeName == DrumsTrigger::type)
         return parseDrumsTrigger (payload);
     if (typeName == DrumsSetPad::type)

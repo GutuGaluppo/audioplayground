@@ -302,6 +302,7 @@ Cada fase termina num **gate**: CI verde (sanitizers inclusos), benchmarks dentr
 | Delay sincronizado (ADR-012) | ✅ Parâmetro `delay.sync` (1/16 … 1/2, tercinas e pontuadas); o motor converte nota → ms com o tempo do transporte a cada bloco; export idêntico ao tempo real; preset "Dotted eighth (follows tempo)" |
 | Gestão de assets (ADR-013) | ✅ `RemoveAssets` (desfazível, recusa o que está em uso), uso derivado de clipes/pads/sampler, evento `project.assets` com "missing", menu "Audio (N)" com Locate…, Remover e "Remove unused"; os arquivos continuam em `audio/` |
 | Seletor de dispositivos (ADR-014) | ✅ Menu "Audio settings" na UI (saída, entrada, taxa, buffer + latência), eventos/intents `audio.*`, entrada nunca abre pelo menu, troca recusada durante gravação, queda do dispositivo → padrão do sistema com aviso. ⏳ Desconectar o dispositivo de verdade precisa de hardware |
+| Presets de synth e de bateria (ADR-015) | ✅ `presets/synth.json` (8 sons) e `presets/drums.json` (8 padrões); aplicar é um único passo de undo (`synth.setPreset`, `drums.setPattern`); testes de arquivo e de UI. Precisa de escuta para ajustar os sons |
 | Escuta dos goldens de FX | ⏳ Precisa de um ouvinte humano (`tests/golden/*.wav`) |
 
 Decisões tomadas durante a execução:

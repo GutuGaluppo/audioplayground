@@ -51,6 +51,7 @@ private:
     void handle (const ap::bridge::AudioSetBufferSize&);
     void handle (const ap::bridge::ToneSetEnabled&);
     void handle (const ap::bridge::ParamSet&);
+    void handle (const ap::bridge::SynthSetPreset&);
     void handle (const ap::bridge::EditUndo&);
     void handle (const ap::bridge::EditRedo&);
     void handle (const ap::bridge::ProjectNew&);
@@ -69,6 +70,7 @@ private:
     void handle (const ap::bridge::SamplerLoad&);
     void handle (const ap::bridge::DrumsSetStep&);
     void handle (const ap::bridge::DrumsClear&);
+    void handle (const ap::bridge::DrumsSetPattern&);
     void handle (const ap::bridge::DrumsTrigger&);
     void handle (const ap::bridge::DrumsSetPad&);
     void handle (const ap::bridge::DrumsLoadPad&);
@@ -127,6 +129,10 @@ private:
     {
         return recorder.isRecording() || audioRecorder.isRecording();
     }
+    // Edits a drum pattern clip: the given one, or the one at the playhead (created when there is
+    // none and createIfMissing).
+    void editDrumPattern (std::uint64_t clipId, std::uint64_t gesture, bool createIfMissing,
+                          const std::function<model::Clip (const model::Clip&)>& change);
     void sendTimeline();
     void sendTimelineAssets();
     // Every audio file of the project and what uses it. recheckFiles stats each file again.

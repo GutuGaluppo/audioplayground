@@ -178,6 +178,13 @@ export interface ParamSet {
   };
 }
 
+export interface SynthSetPreset {
+  readonly type: 'synth.setPreset';
+  readonly payload: {
+    readonly values: readonly number[];
+  };
+}
+
 export interface EditUndo {
   readonly type: 'edit.undo';
   readonly payload: {};
@@ -275,6 +282,14 @@ export interface DrumsClear {
   readonly type: 'drums.clear';
   readonly payload: {
     readonly clip: number;
+  };
+}
+
+export interface DrumsSetPattern {
+  readonly type: 'drums.setPattern';
+  readonly payload: {
+    readonly clip: number;
+    readonly pads: readonly number[];
   };
 }
 
@@ -605,7 +620,7 @@ export interface TrackSetSend {
   };
 }
 
-export type Intent = AppReady | AudioOpenSettings | AudioSetOutput | AudioSetInput | AudioSetSampleRate | AudioSetBufferSize | ToneSetEnabled | TransportPlay | TransportStop | TransportReturnToStart | TransportSetTempo | TransportSetCountIn | MetronomeSetEnabled | ParamSet | EditUndo | EditRedo | ProjectNew | ProjectOpen | ProjectSave | ProjectSaveAs | ProjectRename | ProjectExport | ProjectCancelExport | NoteOn | NoteOff | NoteAllOff | InstrumentSelect | SamplerLoad | DrumsSetStep | DrumsClear | DrumsTrigger | DrumsSetPad | DrumsLoadPad | DrumsResetPad | DrumsSetKit | TransportRecord | TransportCapture | TransportSeek | TransportSetLoop | TrackAdd | TrackRemove | TrackRename | TrackSetVolume | TrackSetPan | TrackSetMute | TrackSetSolo | TrackSetArmed | TrackSetEffect | TrackImportAudio | AssetLocate | AssetRemove | AssetRemoveUnused | ClipCreate | ClipMove | ClipResize | ClipSplit | ClipRemove | ClipDuplicate | ClipSetLoop | ClipAddNote | ClipRemoveNote | ClipEditNote | BusAdd | BusRemove | BusRename | BusSetVolume | BusSetPan | BusSetMute | BusSetEffect | TrackSetSend;
+export type Intent = AppReady | AudioOpenSettings | AudioSetOutput | AudioSetInput | AudioSetSampleRate | AudioSetBufferSize | ToneSetEnabled | TransportPlay | TransportStop | TransportReturnToStart | TransportSetTempo | TransportSetCountIn | MetronomeSetEnabled | ParamSet | SynthSetPreset | EditUndo | EditRedo | ProjectNew | ProjectOpen | ProjectSave | ProjectSaveAs | ProjectRename | ProjectExport | ProjectCancelExport | NoteOn | NoteOff | NoteAllOff | InstrumentSelect | SamplerLoad | DrumsSetStep | DrumsClear | DrumsSetPattern | DrumsTrigger | DrumsSetPad | DrumsLoadPad | DrumsResetPad | DrumsSetKit | TransportRecord | TransportCapture | TransportSeek | TransportSetLoop | TrackAdd | TrackRemove | TrackRename | TrackSetVolume | TrackSetPan | TrackSetMute | TrackSetSolo | TrackSetArmed | TrackSetEffect | TrackImportAudio | AssetLocate | AssetRemove | AssetRemoveUnused | ClipCreate | ClipMove | ClipResize | ClipSplit | ClipRemove | ClipDuplicate | ClipSetLoop | ClipAddNote | ClipRemoveNote | ClipEditNote | BusAdd | BusRemove | BusRename | BusSetVolume | BusSetPan | BusSetMute | BusSetEffect | TrackSetSend;
 
 // Events: native -> UI
 export interface EngineStatus {

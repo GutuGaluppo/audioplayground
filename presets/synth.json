@@ -1,0 +1,13 @@
+{
+  "$comment": "Built-in synth presets (guide §17). Values use the units of schema/parameters.json (waveform: 0 sine, 1 triangle, 2 saw, 3 square); a value left out takes its default. ids are stable: never rename one after release.",
+  "presets": [
+    { "id": "synth.warm-pad", "processor": "synth", "name": "Warm pad", "version": 1, "parameters": { "waveform": 2, "pitch": 0, "detune": 14, "cutoff": 1400, "resonance": 0.8, "attack": 0.6, "decay": 0.8, "sustain": 0.8, "release": 1.5, "volume": -14 } },
+    { "id": "synth.airy-strings", "processor": "synth", "name": "Airy strings", "version": 1, "parameters": { "waveform": 2, "pitch": 0, "detune": 20, "cutoff": 3000, "resonance": 0.8, "attack": 0.35, "decay": 0.5, "sustain": 0.85, "release": 1.2, "volume": -15 } },
+    { "id": "synth.soft-keys", "processor": "synth", "name": "Soft keys", "version": 1, "parameters": { "waveform": 1, "pitch": 0, "detune": 4, "cutoff": 5000, "resonance": 0.7, "attack": 0.005, "decay": 0.9, "sustain": 0.3, "release": 0.6, "volume": -12 } },
+    { "id": "synth.pluck", "processor": "synth", "name": "Pluck", "version": 1, "parameters": { "waveform": 2, "pitch": 0, "detune": 6, "cutoff": 3500, "resonance": 1.2, "attack": 0.001, "decay": 0.22, "sustain": 0, "release": 0.2, "volume": -12 } },
+    { "id": "synth.bright-lead", "processor": "synth", "name": "Bright lead", "version": 1, "parameters": { "waveform": 3, "pitch": 0, "detune": 10, "cutoff": 6500, "resonance": 1.5, "attack": 0.005, "decay": 0.2, "sustain": 0.7, "release": 0.25, "volume": -16 } },
+    { "id": "synth.punchy-bass", "processor": "synth", "name": "Punchy bass", "version": 1, "parameters": { "waveform": 2, "pitch": -12, "detune": 3, "cutoff": 700, "resonance": 2.5, "attack": 0.002, "decay": 0.25, "sustain": 0.4, "release": 0.15, "volume": -10 } },
+    { "id": "synth.sub-bass", "processor": "synth", "name": "Sub bass", "version": 1, "parameters": { "waveform": 0, "pitch": -12, "detune": 0, "cutoff": 3000, "resonance": 0.7, "attack": 0.005, "decay": 0.3, "sustain": 0.9, "release": 0.2, "volume": -10 } },
+    { "id": "synth.glass-bell", "processor": "synth", "name": "Glass bell", "version": 1, "parameters": { "waveform": 0, "pitch": 12, "detune": 6, "cutoff": 12000, "resonance": 0.7, "attack": 0.001, "decay": 1.8, "sustain": 0, "release": 1.8, "volume": -14 } }
+  ]
+}

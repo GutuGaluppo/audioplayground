@@ -279,6 +279,36 @@ void WebUiHost::handle (const ap::bridge::ToneSetEnabled& intent)
     sendStatus();
 }
 
+void WebUiHost::handle (const ap::bridge::SynthSetPreset& intent)
+{
+    // The synth's parameters in a fixed order (the UI's preset files list them the same way).
+    static constexpr std::array<std::string_view, 10> ids {
+        "synth.waveform", "synth.pitch", "synth.detune",  "synth.cutoff",  "synth.resonance",
+        "synth.attack",   "synth.decay", "synth.sustain", "synth.release", "synth.volume"};
+    if (intent.values.size() != ids.size())
+        return;
+
+    std::array<std::pair<params::ParamId, float>, ids.size()> changes;
+    for (std::size_t i = 0; i < ids.size(); ++i)
+    {
+        const auto id = params::findParamId (ids[i]);
+        const auto value = intent.values[i];
+        if (!id || !params::isInRange (params::descriptor (*id), value))
+        {
+            DBG ("Rejected out-of-range synth preset");
+            return;
+        }
+        changes[i] = {*id, value};
+    }
+
+    session.performGroup ("Apply synth preset",
+                          [&changes] (model::ProjectDocument::Group& group)
+                          {
+                              for (const auto& [id, value] : changes)
+                                  (void)group.perform (model::SetParameter {id, value});
+                          });
+}
+
 void WebUiHost::handle (const ap::bridge::ParamSet& intent)
 {
     // The codec checked the envelope; the parameter system checks the ID and its own range.

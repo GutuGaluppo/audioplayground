@@ -2,7 +2,9 @@
 
 #include "ap/model/Project.h"
 
+#include <array>
 #include <cstddef>
+#include <cstdint>
 #include <optional>
 #include <utility>
 
@@ -47,6 +49,11 @@ namespace ap::model
 // played on pad notes 36..51.
 [[nodiscard]] bool hasDrumStep (const Clip& clip, std::size_t pad, std::size_t step) noexcept;
 [[nodiscard]] Clip withDrumStep (const Clip& clip, std::size_t pad, std::size_t step, bool on);
+
+// Replaces the whole pattern: pads[pad] has bit `step` set when that pad plays on that step. Notes
+// outside the 16 drum pad pitches are kept.
+[[nodiscard]] Clip withDrumPattern (const Clip& clip,
+                                    const std::array<std::uint16_t, DrumKit::numPads>& pads);
 
 // A new, empty drum pattern clip: its content is one pattern long and loops for the whole clip.
 [[nodiscard]] Clip makePatternClip (core::Ticks start, core::Ticks length);

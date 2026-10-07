@@ -2,6 +2,7 @@ import { isParamId, PARAMETERS } from '../params/generated';
 import type { ParamId } from '../params/generated';
 import { parseNativeEvent, PROTOCOL_VERSION } from './generated';
 import type { Intent, NativeEventPayloads, NativeEventType } from './generated';
+import { SYNTH_PRESET_IDS } from '../params/synthPreset';
 import { createSimulatedTimeline } from './simulatedTimeline';
 import type { SimulatedEdit } from './simulatedTimeline';
 
@@ -303,6 +304,36 @@ export function createSimulatedBridge(): Bridge {
                 after: value,
                 set: setParam(id),
               });
+          });
+          return;
+        }
+        case 'synth.setPreset': {
+          const ids = SYNTH_PRESET_IDS;
+          const values = intent.payload.values;
+          if (values.length !== ids.length) return;
+          if (
+            ids.some(
+              (id, i) =>
+                !((values[i] ?? NaN) >= PARAMETERS[id].min) ||
+                !((values[i] ?? NaN) <= PARAMETERS[id].max),
+            )
+          )
+            return;
+          const before = ids.map((id) => params.get(id) ?? PARAMETERS[id].defaultValue);
+          queueMicrotask(() => {
+            record({
+              key: 'synth.preset',
+              gesture: 0,
+              label: 'Apply synth preset',
+              before,
+              after: [...values],
+              set: (value) => {
+                (value as number[]).forEach((v, i) => {
+                  const id = ids[i];
+                  if (id !== undefined) setParam(id)(v);
+                });
+              },
+            });
           });
           return;
         }

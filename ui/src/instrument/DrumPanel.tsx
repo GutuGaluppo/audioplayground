@@ -18,6 +18,7 @@ import {
 import { useSelection } from '../timeline/selection';
 import { keyLabelForPad, padForKey } from './drumKeys';
 import { DRUM_KITS } from './drumKits';
+import { DRUM_PRESETS } from './presets';
 
 const PADS = Array.from({ length: 16 }, (_, i) => i);
 const STEPS = Array.from({ length: 16 }, (_, i) => i);
@@ -311,6 +312,26 @@ export function DrumPanel() {
             ))}
           </select>
         </label>
+        <select
+          className="effect__preset"
+          aria-label="Drum pattern preset"
+          value=""
+          onChange={(event) => {
+            const preset = DRUM_PRESETS.find((p) => p.id === event.currentTarget.value);
+            if (preset)
+              bridge.send({
+                type: 'drums.setPattern',
+                payload: { clip: clip?.id ?? 0, pads: preset.pads },
+              });
+          }}
+        >
+          <option value="">Patterns…</option>
+          {DRUM_PRESETS.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
         <button
           type="button"
           className="button button--quiet"

@@ -1,3 +1,4 @@
+#include "ap/model/ClipEditing.h"
 #include "ap/model/ProjectDocument.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -431,4 +432,31 @@ TEST_CASE ("Unused audio can be removed from the project, and undo puts it back 
     CHECK (doc.project().assets[1].id == b);
     CHECK (doc.project().assets[2].id == c);
     CHECK (doc.project().assets[3].id == d);
+}
+
+TEST_CASE ("A drum pattern replaces the pad notes of a clip and keeps the rest", "[model][drums]")
+{
+    auto clip = makePatternClip (0, 4 * DrumKit::patternLength);
+    clip = withDrumStep (clip, 0, 3, true);          // an old hit, to be replaced
+    clip = withNote (clip, Note {0, 240, 20, 0.5f}); // not a drum pad pitch: stays
+
+    std::array<std::uint16_t, DrumKit::numPads> pads {};
+    pads[0] = 0b0001000100010001; // kick on the beat
+    pads[15] = 1u << 15;          // the last pad, the last step
+    const auto pattern = withDrumPattern (clip, pads);
+
+    for (std::size_t step = 0; step < DrumKit::numSteps; ++step)
+    {
+        CHECK (hasDrumStep (pattern, 0, step) == (step % 4 == 0));
+        CHECK (hasDrumStep (pattern, 15, step) == (step == 15));
+        CHECK_FALSE (hasDrumStep (pattern, 1, step));
+    }
+    CHECK (findNote (pattern, 0, 20) != nullptr);
+    CHECK (pattern.notes.size() == 4 + 1 + 1);
+
+    // Applying the same pattern again changes nothing, and an empty one clears the pads only.
+    CHECK (withDrumPattern (pattern, pads).notes == pattern.notes);
+    const auto cleared = withDrumPattern (pattern, {});
+    CHECK (cleared.notes.size() == 1);
+    CHECK (findNote (cleared, 0, 20) != nullptr);
 }

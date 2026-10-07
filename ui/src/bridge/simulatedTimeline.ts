@@ -189,6 +189,56 @@ export function createSimulatedTimeline(host: Host) {
     });
   };
 
+  /** The drum pattern clip `clip`, or (0) the one at the playhead, created when missing. */
+  const editPattern = (
+    clip: number,
+    gesture: number,
+    createIfMissing: boolean,
+    change: (notes: SimNote[]) => SimNote[],
+  ) => {
+    if (clip !== 0) {
+      editNotes(gesture, clip, change);
+      return;
+    }
+    edit('Add pattern', `notes:pattern`, gesture, (draft) => {
+      const barStart = Math.floor(host.playhead() / BAR) * BAR;
+      let drums = draft.find((t) => t.kind === 3);
+      const existing = drums?.clips.find(
+        (c) => c.start <= barStart && barStart < c.start + c.length,
+      );
+      if (existing) {
+        existing.notes = change(existing.notes).sort(byNote);
+        return true;
+      }
+      if (!createIfMissing) return false;
+      if (!drums) {
+        drums = {
+          id: nextTrack++,
+          kind: 3,
+          name: 'Drums',
+          volumeDb: 0,
+          pan: 0,
+          muted: false,
+          soloed: false,
+          clips: [],
+          effects: defaultEffects(),
+          sends: [],
+        };
+        draft.push(drums);
+      }
+      addClip(draft, drums, {
+        start: barStart,
+        length: 4 * BAR,
+        asset: 0,
+        sourceOffsetSeconds: 0,
+        contentOffset: 0,
+        loopLength: PATTERN,
+        notes: change([]),
+      });
+      return true;
+    });
+  };
+
   const addClip = (draft: SimTrack[], track: SimTrack, clip: Omit<SimClip, 'id'>) => {
     track.clips.push({ ...clip, id: nextClip++ });
     track.clips.sort(byStart);
@@ -519,50 +569,28 @@ export function createSimulatedTimeline(host: Host) {
           const { clip, pad, step, on, gesture } = intent.payload;
           const pitch = 36 + pad;
           const start = step * (PPQ / 4);
-          const toggle = (notes: SimNote[]) => {
+          editPattern(clip, gesture, on, (notes) => {
             const rest = notes.filter((n) => !(n.start === start && n.pitch === pitch));
             return on ? [...rest, { start, length: PPQ / 4, pitch, velocity: 1 }] : rest;
-          };
-          if (clip !== 0) {
-            editNotes(gesture, clip, toggle);
-            return true;
-          }
-          edit('Add pattern', `notes:pattern`, gesture, (draft) => {
-            const barStart = Math.floor(host.playhead() / BAR) * BAR;
-            let drums = draft.find((t) => t.kind === 3);
-            const existing = drums?.clips.find(
-              (c) => c.start <= barStart && barStart < c.start + c.length,
-            );
-            if (existing) {
-              existing.notes = toggle(existing.notes).sort(byNote);
-              return true;
-            }
-            if (!on) return false;
-            if (!drums) {
-              drums = {
-                id: nextTrack++,
-                kind: 3,
-                name: 'Drums',
-                volumeDb: 0,
-                pan: 0,
-                muted: false,
-                soloed: false,
-                clips: [],
-                effects: defaultEffects(),
-                sends: [],
-              };
-              draft.push(drums);
-            }
-            addClip(draft, drums, {
-              start: barStart,
-              length: 4 * BAR,
-              asset: 0,
-              sourceOffsetSeconds: 0,
-              contentOffset: 0,
-              loopLength: PATTERN,
-              notes: toggle([]),
+          });
+          return true;
+        }
+        case 'drums.setPattern': {
+          const { clip, pads } = intent.payload;
+          editPattern(clip, 0, true, (notes) => {
+            const kept = notes.filter((n) => n.pitch < 36 || n.pitch >= 52);
+            const hits: SimNote[] = [];
+            pads.forEach((mask, pad) => {
+              for (let step = 0; step < 16; step++)
+                if ((mask >> step) & 1)
+                  hits.push({
+                    start: step * (PPQ / 4),
+                    length: PPQ / 4,
+                    pitch: 36 + pad,
+                    velocity: 1,
+                  });
             });
-            return true;
+            return [...kept, ...hits];
           });
           return true;
         }

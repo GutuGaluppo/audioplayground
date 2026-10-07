@@ -191,6 +191,19 @@ Clip withDrumStep (const Clip& clip, std::size_t pad, std::size_t step, bool on)
               : withoutNote (clip, start, pitch);
 }
 
+Clip withDrumPattern (const Clip& clip, const std::array<std::uint16_t, DrumKit::numPads>& pads)
+{
+    auto pattern = clip;
+    std::erase_if (
+        pattern.notes, [] (const Note& n)
+        { return n.pitch >= DrumKit::firstPadNote && n.pitch < DrumKit::firstPadNote + DrumKit::numPads; });
+    for (std::size_t pad = 0; pad < DrumKit::numPads; ++pad)
+        for (std::size_t step = 0; step < DrumKit::numSteps; ++step)
+            if ((pads[pad] >> step) & 1u)
+                pattern = withDrumStep (pattern, pad, step, true);
+    return pattern;
+}
+
 Clip makePatternClip (core::Ticks start, core::Ticks length)
 {
     Clip clip;
