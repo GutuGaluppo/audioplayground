@@ -31,5 +31,7 @@ Every third-party library, algorithm, sample, impulse response, preset source an
 | Prettier | 3.9.9 | MIT |
 | dom-accessibility-api | 0.5.16 | MIT (accessible-name checks in UI tests; already a Testing Library dependency) |
 
-## Audio content
-None yet.
+## Fonts, images and audio content
+- Fonts: system font stacks only (`ui/src/styles/tokens.css`); no font files are bundled.
+- Images: none. The wood and brushed-steel look is CSS gradients written for this project.
+- Audio: none. The drum kits and every preset sound are synthesised by our own code. The WAV files in `tests/golden/` are rendered by our own DSP and are test-only.

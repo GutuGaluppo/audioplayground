@@ -298,6 +298,7 @@ Cada fase termina num **gate**: CI verde (sanitizers inclusos), benchmarks dentr
 | Buses de efeito (ADR-010) | ✅ Concluída: até 8 buses com cadeia, fader e pan próprios, envios por faixa pós-fader, retorno no Master; mesma latência constante do motor; testes de modelo/undo, determinismo por tamanho de bloco, cauda e export com bus. Sem bus solo, bus→bus nem automação de envio (de propósito) |
 | Kits de bateria | ✅ Concluída: 5 kits sintetizados (Classic, 808, Lo-fi, Acoustic, Electro) escolhidos por `drums.setKit`, salvos no projeto |
 | Layout redimensionável | ✅ Concluída: divisores arrastáveis com preferência guardada (`layoutPrefs.ts`) |
+| Acabamento do MVP (Etapa 1) | ✅ Snap da timeline (Off, 1/4, 1/2, beat, compasso; preferência de UI), marcadores arrastáveis de início/fim do sampler (setas: 1 %, Shift: 5 %), nota de licenças para fontes/imagens/áudio. Já existiam: "Load sample…" por pad, `curve` linear/logarítmica nos parâmetros (§16), metadados do projeto do exemplo da §11 |
 | Escuta dos goldens de FX | ⏳ Precisa de um ouvinte humano (`tests/golden/*.wav`) |
 
 Decisões tomadas durante a execução:
