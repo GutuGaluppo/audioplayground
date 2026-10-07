@@ -40,10 +40,23 @@ handling in TypeScript would break ADR-003: two engines to keep in agreement.
   (WebAssembly only, not script `eval`) and carries the engine files; the desktop bundle carries
   none of them.
 - **Milestone 1 scope:** transport and tempo, synth and drums played from the keyboard and pads,
-  presets, effects and mixer, buses, timeline editing, undo/redo, the starter song. Not in the
-  browser yet, and each says so with a notice instead of failing silently: saving and opening
-  projects, importing audio, recording, the sampler, export, accompaniment suggestions, device
-  choice.
+  presets, effects and mixer, buses, timeline editing, undo/redo, the starter song, and saving
+  (below). Not in the browser yet, and each says so with a notice instead of failing silently:
+  importing audio, recording, the sampler, export, accompaniment suggestions, device choice.
+- **Saving and opening (IndexedDB).** The core turns the project into the desktop's project file
+  text (`ap_project_export`) and back through the same strict parser (`parseProject`: version,
+  keys, ranges, size and nesting limits), so a song stored in the browser is exactly a desktop
+  project file and anything read back is untrusted. The module has no clock: the page passes the
+  timestamp, and anything that is not a plausible time is replaced. The page keeps the songs
+  (`ui/src/web`): a listing store and a contents store written in one transaction, so a song is
+  saved whole or not at all, plus one autosave slot. `New`, `Open`, `Save` and `Save As` stay
+  ordinary intents; the browser bridge answers them itself with the same questions the desktop
+  asks ("Save changes to ...?", name, list of songs). Saving to the same name replaces that song;
+  deleting asks twice. Work in progress is written to the autosave slot two seconds after the last
+  change and when the page is hidden, cleared when saved, and offered back as unsaved work after a
+  crash or a closed tab. Leaving a page with unsaved changes asks the browser to confirm. The
+  page asks the browser to keep the songs when space is short (`storage.persist`), and says plainly
+  that songs live in this browser on this device.
 
 ## Alternatives
 - *Emscripten's own AudioWorklet support (`-sAUDIO_WORKLET`)*: needs Wasm workers and shared
@@ -56,19 +69,21 @@ handling in TypeScript would break ADR-003: two engines to keep in agreement.
 ## Consequences
 - The browser and the desktop behave the same for everything in the shared layer by construction;
   what differs is only what each platform provides (files, devices, recording).
-- Follow-ups, each small now that the shared layer exists: project storage in IndexedDB (the
-  project serializer already compiles to WebAssembly), audio import through `decodeAudioData`,
-  export, microphone input (`getUserMedia` into the worklet), Web MIDI, then mobile layouts.
+- Follow-ups, each small now that the shared layer exists: audio import through `decodeAudioData`
+  (stored beside the song in IndexedDB), export, microphone input (`getUserMedia` into the worklet), Web MIDI, then mobile layouts.
 - Latency is the Web Audio output latency plus one render quantum; keys and pads reach the engine in
   about one message-port hop. Measure it on real devices before promising a number.
 - The engine ran at about 1 % of real time for the starter song in Node. Heavier projects and phones
   still need measuring.
 
 ## Verification
-- Ten Node tests (`apps/web/test`) run the real module through the same `engine.js` the worklet
+- Fifteen Node tests (`apps/web/test`) run the real module through the same `engine.js` the worklet
   loads: starter song, playing, undo/redo, refusals, malformed and oversized messages, unicode,
-  determinism across block sizes, bounded memory.
+  determinism across block sizes, bounded memory, and saving: export and reopen gives the same
+  project and the same sound, dirty tracking, recovered-as-unsaved, and eleven kinds of untrusted
+  project text refused without touching the open song.
 - Headless C++ tests of the shared code; UI tests of the bridge and the gate.
 - A manual run in a browser (the UI with the real worklet: starter song loaded, playhead and meters
-  moving). It cannot be heard from the test environment, so listening on real browsers and devices
+  moving; and saving against the real IndexedDB: autosave written, restored after a reload, Save
+  As, Open, Cmd+S over an opened song, delete of the open song). It cannot be heard from the test environment, so listening on real browsers and devices
   is still a human check.

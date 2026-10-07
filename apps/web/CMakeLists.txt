@@ -25,7 +25,9 @@ target_link_libraries(ap_web PRIVATE ap::core ap::project_options nlohmann_json:
 
 # Standalone: no JavaScript glue, just the .wasm and the functions in Exports.cpp.
 set(AP_WEB_EXPORTS
-    _ap_alloc _ap_free _ap_create _ap_intent _ap_process _ap_events _ap_events_size _ap_set_output_latency)
+    _ap_alloc _ap_free _ap_create _ap_intent _ap_process _ap_events _ap_events_size _ap_set_output_latency
+    _ap_project_export _ap_project_text _ap_project_import _ap_project_error _ap_project_error_size
+    _ap_project_saved _ap_project_unsaved)
 list(JOIN AP_WEB_EXPORTS "," AP_WEB_EXPORT_LIST)
 target_link_options(ap_web PRIVATE
     -sSTANDALONE_WASM=1

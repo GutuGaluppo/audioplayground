@@ -1289,3 +1289,99 @@ kbd {
 .audio-gate__card p {
   margin: 0;
 }
+
+/* Questions the browser version asks about saved songs --------------------------------------- */
+
+.dialog {
+  position: fixed;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, #000 60%, transparent);
+  inset: 0;
+}
+
+.dialog__box {
+  display: grid;
+  width: min(480px, calc(100vw - 32px));
+  max-height: calc(100vh - 64px);
+  padding: var(--ap-space-5);
+  border: 1px solid var(--ap-border);
+  border-radius: var(--ap-radius-md);
+  background: var(--ap-surface);
+  gap: var(--ap-space-3);
+  overflow-y: auto;
+}
+
+.dialog__title {
+  margin: 0;
+  font-size: var(--ap-text-lg, 16px);
+}
+
+.dialog__text,
+.dialog__note {
+  margin: 0;
+}
+
+.dialog__note {
+  color: var(--ap-text-muted);
+  font-size: var(--ap-text-xs);
+}
+
+.dialog__list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  gap: var(--ap-space-1);
+  list-style: none;
+}
+
+.dialog__list li {
+  display: flex;
+  align-items: center;
+  gap: var(--ap-space-2);
+}
+
+.dialog__song {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  padding: var(--ap-space-2) var(--ap-space-3);
+  border: 1px solid var(--ap-border);
+  border-radius: var(--ap-radius-sm);
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dialog__song span {
+  color: var(--ap-text-muted);
+  font-size: var(--ap-text-xs);
+}
+
+.dialog__song:hover,
+.dialog__song:focus-visible {
+  background: color-mix(in srgb, var(--ap-accent) 18%, transparent);
+}
+
+.dialog__confirm {
+  display: flex;
+  gap: var(--ap-space-1);
+}
+
+.dialog__form {
+  display: grid;
+  gap: var(--ap-space-3);
+}
+
+.dialog__form label {
+  display: grid;
+  gap: var(--ap-space-1);
+}
+
+.dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--ap-space-2);
+}

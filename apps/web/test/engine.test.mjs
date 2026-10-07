@@ -273,3 +273,145 @@ test("the engine refuses unreasonable settings", async () => {
         WasmEngine.create(module, { sampleRate: 48000, blockSize: 0 }),
     );
 });
+
+const projectOf = (engine) => {
+    send(engine, "app.ready");
+    return engine.takeEvents();
+};
+
+test("a project is exported as the desktop file format and opens again, as it was", async () => {
+    const first = await create();
+    projectOf(first);
+    send(first, "project.rename", { name: "Late night" });
+    send(first, "param.set", { id: "synth.cutoff", value: 1500, gesture: 0 });
+    send(first, "drums.setStep", {
+        clip: 0,
+        pad: 7,
+        step: 9,
+        on: true,
+        gesture: 0,
+    });
+    send(first, "transport.setTempo", { bpm: 101 });
+    const text = first.exportProject("2026-10-07T12:00:00Z");
+
+    const file = JSON.parse(text);
+    assert.equal(file.schemaVersion, 1);
+    assert.equal(file.name, "Late night");
+    assert.equal(file.tempo, 101);
+    assert.equal(file.createdAt, "2026-10-07T12:00:00Z");
+
+    const second = await create();
+    projectOf(second);
+    second.takeEvents();
+    assert.deepEqual(second.importProject(text, { hasLocation: true }), {
+        ok: true,
+    });
+    const events = second.takeEvents();
+    assert.equal(last(events, "project.state").name, "Late night");
+    assert.equal(last(events, "project.state").dirty, false);
+    assert.equal(last(events, "project.state").hasLocation, true);
+    assert.equal(last(events, "transport.state").bpm, 101);
+    assert.equal(
+        events.find(
+            (e) => e.type === "param.value" && e.payload.id === "synth.cutoff",
+        ).payload.value,
+        1500,
+    );
+    assert.ok(
+        last(events, "timeline.state").tracks[0].clips[0].notes.some(
+            (n) => n.pitch === 43 && n.start === 9 * 240,
+        ),
+    );
+    assert.equal(last(events, "history.state").canUndo, false); // a fresh history, like the desktop
+
+    // Exporting again gives the same project (only the update time moves).
+    const again = JSON.parse(second.exportProject("2026-10-07T13:00:00Z"));
+    assert.equal(again.createdAt, "2026-10-07T12:00:00Z");
+    assert.equal(again.updatedAt, "2026-10-07T13:00:00Z");
+    delete file.updatedAt;
+    delete again.updatedAt;
+    assert.deepEqual(again, file);
+
+    // And it sounds the same.
+    send(first, "transport.play");
+    send(second, "transport.play");
+    assert.deepEqual(render(first, 1)[0], render(second, 1)[0]);
+});
+
+test("unsaved changes are tracked until the page says the project was stored", async () => {
+    const engine = await create();
+    assert.equal(last(projectOf(engine), "project.state").dirty, false); // the starter song is clean
+    send(engine, "param.set", { id: "synth.cutoff", value: 900, gesture: 0 });
+    assert.equal(last(engine.takeEvents(), "project.state").dirty, true);
+
+    engine.projectSaved(true);
+    const saved = last(engine.takeEvents(), "project.state");
+    assert.equal(saved.dirty, false);
+    assert.equal(saved.hasLocation, true);
+
+    send(engine, "edit.undo"); // back before the save: that is a change from what is stored
+    assert.equal(last(engine.takeEvents(), "project.state").dirty, true);
+
+    send(engine, "project.new");
+    const fresh = engine.takeEvents();
+    assert.equal(last(fresh, "project.state").dirty, false);
+    assert.equal(last(fresh, "project.state").hasLocation, false);
+    assert.equal(last(fresh, "timeline.state").tracks.length, 0);
+    assert.equal(last(fresh, "history.state").canUndo, false);
+});
+
+test("a recovered project can be opened as unsaved", async () => {
+    const source = await create();
+    projectOf(source);
+    const text = source.exportProject("2026-10-07T12:00:00Z");
+    const engine = await create();
+    projectOf(engine);
+    engine.takeEvents();
+    assert.deepEqual(
+        engine.importProject(text, { dirty: true, hasLocation: false }),
+        { ok: true },
+    );
+    const state = last(engine.takeEvents(), "project.state");
+    assert.equal(state.dirty, true);
+    assert.equal(state.hasLocation, false);
+});
+
+test("a project that cannot be trusted is refused with a reason, and the open one stays", async () => {
+    const engine = await create();
+    projectOf(engine);
+    send(engine, "project.rename", { name: "Keep me" });
+    engine.takeEvents();
+    const good = JSON.parse(engine.exportProject("2026-10-07T12:00:00Z"));
+
+    const refused = (text) => {
+        const result = engine.importProject(text);
+        assert.equal(result.ok, false, text.slice(0, 60));
+        assert.ok(result.error.length > 0);
+        assert.deepEqual(engine.takeEvents(), []); // nothing was announced: nothing changed
+        return result.error;
+    };
+    refused("not json at all");
+    refused("");
+    assert.match(
+        refused(JSON.stringify({ ...good, schemaVersion: 99 })),
+        /newer/i,
+    );
+    refused(JSON.stringify({ ...good, tempo: "fast" }));
+    refused(JSON.stringify({ ...good, tracks: "many" }));
+    refused(JSON.stringify({ ...good, surprise: true }));
+    refused(JSON.stringify({ ...good, name: "x".repeat(5000) }));
+    refused("[".repeat(200) + "]".repeat(200));
+    refused(JSON.stringify(good).slice(0, 40));
+    refused("x".repeat(17 * 1024 * 1024));
+
+    send(engine, "app.ready");
+    assert.equal(last(engine.takeEvents(), "project.state").name, "Keep me");
+});
+
+test("a time that is not a time cannot reach the project file", async () => {
+    const engine = await create();
+    projectOf(engine);
+    const file = JSON.parse(engine.exportProject("<script>alert(1)</script>"));
+    assert.match(file.createdAt, /^\d{4}-\d\d-\d\dT/);
+    assert.equal(file.createdAt.includes("<"), false);
+});

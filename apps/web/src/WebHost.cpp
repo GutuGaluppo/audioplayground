@@ -46,17 +46,16 @@ WebHost::WebHost (double rate, int blockSize)
     , editor (engine, model::starterProject())
     , applier (editor, engine,
                {[this] { sendTransportState(); }, [this] { emit (host::timelineState (editor.project())); },
-                [this] { emit (bridge::ProjectState {editor.project().name, false, false}); },
-                [this] { emit (host::drumsKit (editor.project())); },
+                [this] { sendProjectState(); }, [this] { emit (host::drumsKit (editor.project())); },
                 [this] { emit (host::instrumentState (engine)); }, [this] { sendStatus(); },
                 [this] (params::ParamId id) { emit (host::paramValue (editor.project(), id)); },
                 [this] (std::size_t pad) { emit (host::drumsPad (editor.project(), pad, {})); }})
 {
     sentParameters.fill (std::numeric_limits<float>::quiet_NaN());
     engine.prepare (sampleRate, maxBlock);
-    // The engine was given the project by the editor before it was prepared: give it again.
-    editor.reset (model::starterProject());
     editor.onChanged = [this] { onProjectChanged(); };
+    // The engine was given the project by the editor before it was prepared: give it again.
+    resetProject (model::starterProject(), false, false);
 }
 
 void WebHost::setOutputLatency (double milliseconds)
@@ -106,7 +105,8 @@ bool WebHost::handleIntent (std::string_view json)
     }
     if (std::holds_alternative<bridge::ProjectNew> (*intent))
     {
-        editor.reset (model::Project {});
+        metadata = {};
+        resetProject (model::Project {}, false, false);
         return true;
     }
     if (notInBrowser (*intent))
@@ -164,7 +164,7 @@ void WebHost::sendAll()
     emit (lastPosition);
     sendParameters (true);
     emit (host::historyState (editor.document()));
-    emit (bridge::ProjectState {editor.project().name, false, false});
+    sendProjectState();
     emit (host::instrumentState (engine));
     emit (bridge::SamplerState {});
     emit (host::drumsKit (editor.project()));
@@ -176,15 +176,78 @@ void WebHost::sendAll()
     emit (bridge::AccompanimentState {});
 }
 
+void WebHost::sendProjectState()
+{
+    emit (bridge::ProjectState {editor.project().name, editor.document().version() != savedVersion,
+                                hasLocation});
+}
+
 void WebHost::onProjectChanged()
 {
-    emit (bridge::ProjectState {editor.project().name, false, false});
+    if (loading)
+        return; // resetProject() reports everything once, when it is done
+    sendProjectState();
     emit (host::timelineState (editor.project()));
     emit (host::drumsKit (editor.project()));
     sendDrumPads();
     sendTransportState();
     sendParameters (false);
     emit (host::historyState (editor.document()));
+}
+
+void WebHost::resetProject (model::Project project, bool dirty, bool location)
+{
+    loading = true;
+    editor.reset (std::move (project));
+    loading = false;
+    // A different song starts from the top, silent.
+    engine.getTransport().requestStop();
+    engine.getTransport().requestSeek (0);
+    savedVersion = dirty ? editor.document().version() + 1 : editor.document().version();
+    hasLocation = location;
+    sentParameters.fill (std::numeric_limits<float>::quiet_NaN());
+    sendAll();
+}
+
+std::string WebHost::exportProject (std::string_view timestamp)
+{
+    // The clock comes from the page; anything that does not look like a time is not trusted.
+    const bool plausible
+        = !timestamp.empty() && timestamp.size() <= model::maxTimestampLength
+       && std::all_of (
+           timestamp.begin(), timestamp.end(), [] (char c)
+           { return (c >= '0' && c <= '9') || c == '-' || c == ':' || c == 'T' || c == 'Z' || c == '.'; });
+    const std::string now = plausible ? std::string (timestamp) : std::string ("1970-01-01T00:00:00Z");
+    if (metadata.createdAt.empty())
+        metadata.createdAt = now;
+    metadata.updatedAt = now;
+    return model::serialiseProject (editor.project(), metadata);
+}
+
+std::string WebHost::importProject (std::string_view json, bool dirty, bool location)
+{
+    auto result = model::parseProject (json);
+    if (const auto* error = std::get_if<model::LoadError> (&result))
+        return error->message.empty() ? std::string ("This project could not be opened.") : error->message;
+
+    auto& loaded = std::get<model::LoadedProject> (result);
+    metadata = std::move (loaded.metadata);
+    resetProject (std::move (loaded.project), dirty, location);
+    return {};
+}
+
+void WebHost::projectSaved (bool location)
+{
+    savedVersion = editor.document().version();
+    hasLocation = location;
+    sendProjectState();
+}
+
+void WebHost::projectUnsaved()
+{
+    savedVersion = editor.document().version() + 1;
+    hasLocation = false;
+    sendProjectState();
 }
 
 void WebHost::process (float* left, float* right, int frames)

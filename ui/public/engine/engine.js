@@ -79,16 +79,57 @@ export class WasmEngine {
     return this.exports.memory.buffer;
   }
 
-  /** Sends one UI message ({type, payload}). Returns false if the core dropped it as malformed. */
-  intent(message) {
-    const bytes = encodeUtf8(JSON.stringify(message));
+  /** Copies bytes into the module's scratch memory; returns how many. */
+  write(bytes) {
     if (bytes.length > this.scratchSize) {
       this.exports.ap_free(this.scratch);
       this.scratchSize = Math.max(bytes.length, this.scratchSize * 2);
       this.scratch = this.exports.ap_alloc(this.scratchSize);
     }
     new Uint8Array(this.memory, this.scratch, bytes.length).set(bytes);
-    return this.exports.ap_intent(this.scratch, bytes.length) === 1;
+    return bytes.length;
+  }
+
+  /** Sends one UI message ({type, payload}). Returns false if the core dropped it as malformed. */
+  intent(message) {
+    return (
+      this.exports.ap_intent(this.scratch, this.write(encodeUtf8(JSON.stringify(message)))) === 1
+    );
+  }
+
+  /** The open project as project-file text. `timestamp`: now, ISO 8601 UTC (the module has no clock). */
+  exportProject(timestamp) {
+    const size = this.exports.ap_project_export(this.scratch, this.write(encodeUtf8(timestamp)));
+    if (size < 0) throw new Error('The project could not be exported');
+    return decodeUtf8(new Uint8Array(this.memory, this.exports.ap_project_text(), size));
+  }
+
+  /**
+   * Opens a project from file text. {ok: true}, or {ok: false, error} with a message for the user and
+   * the open project untouched. dirty: it holds changes that were never saved (a recovered autosave);
+   * hasLocation: it belongs to a saved file.
+   */
+  importProject(text, { dirty = false, hasLocation = false } = {}) {
+    const length = this.write(encodeUtf8(text));
+    if (
+      this.exports.ap_project_import(this.scratch, length, dirty ? 1 : 0, hasLocation ? 1 : 0) === 1
+    )
+      return { ok: true };
+    const size = this.exports.ap_project_error_size();
+    return {
+      ok: false,
+      error: decodeUtf8(new Uint8Array(this.memory, this.exports.ap_project_error(), size)),
+    };
+  }
+
+  /** The file the project belonged to was deleted: it has changes nothing stores. */
+  projectUnsaved() {
+    this.exports.ap_project_unsaved();
+  }
+
+  /** The page stored the project: it is no longer "unsaved". */
+  projectSaved(hasLocation) {
+    this.exports.ap_project_saved(hasLocation ? 1 : 0);
   }
 
   /** Renders left.length frames (at most 4096) of stereo audio into the two arrays. */

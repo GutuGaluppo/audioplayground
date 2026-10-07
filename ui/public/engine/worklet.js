@@ -21,6 +21,8 @@ class ApEngineProcessor extends AudioWorkletProcessor {
         } else if (this.queue.length < 1000) {
           this.queue.push(data.intent);
         }
+      } else if (data.command) {
+        this.run(data.command);
       } else if (typeof data.latencyMs === 'number' && this.engine) {
         this.engine.setOutputLatency(data.latencyMs);
         this.flush();
@@ -38,6 +40,35 @@ class ApEngineProcessor extends AudioWorkletProcessor {
       .catch((error) => {
         this.port.postMessage({ failed: String(error && error.message ? error.message : error) });
       });
+  }
+
+  // Saving and opening: the page asks, the engine answers with the same request id.
+  run(command) {
+    const reply = (fields) => this.port.postMessage({ reply: { id: command.id, ...fields } });
+    if (!this.engine) return reply({ ok: false, error: 'The audio engine is not ready yet.' });
+    try {
+      if (command.kind === 'export') {
+        reply({ ok: true, json: this.engine.exportProject(command.timestamp) });
+      } else if (command.kind === 'import') {
+        reply(
+          this.engine.importProject(command.json, {
+            dirty: !!command.dirty,
+            hasLocation: !!command.hasLocation,
+          }),
+        );
+      } else if (command.kind === 'saved') {
+        this.engine.projectSaved(!!command.hasLocation);
+        reply({ ok: true });
+      } else if (command.kind === 'unsaved') {
+        this.engine.projectUnsaved();
+        reply({ ok: true });
+      } else {
+        reply({ ok: false, error: 'Unknown command.' });
+      }
+    } catch (error) {
+      reply({ ok: false, error: String(error && error.message ? error.message : error) });
+    }
+    this.flush();
   }
 
   flush() {

@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { useBridge } from './bridge/BridgeContext';
 import type { EngineStatus } from './bridge/generated';
 import { AudioGate } from './components/AudioGate';
+import { ProjectDialogs } from './components/ProjectDialogs';
 import { AccompanimentBar } from './components/AccompanimentBar';
 import { AudioDevicesMenu } from './components/AudioDevicesMenu';
 import { Notices } from './components/Notices';
@@ -107,6 +108,7 @@ export function App() {
 
       <Notices />
       <AudioGate />
+      <ProjectDialogs />
 
       <footer className="statusbar">
         <span>{status ? formatDevice(status) : 'Connecting to audio engine…'}</span>

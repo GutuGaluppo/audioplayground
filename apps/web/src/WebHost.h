@@ -3,6 +3,7 @@
 #include "ap/engine/Engine.h"
 #include "ap/host/DocumentEditor.h"
 #include "ap/host/IntentApplier.h"
+#include "ap/model/ProjectSerialization.h"
 
 #include <string>
 #include <string_view>
@@ -39,6 +40,19 @@ public:
     // What the browser reports about its output, shown in the status bar.
     void setOutputLatency (double milliseconds);
 
+    // Saving and opening: the page keeps the files (IndexedDB); the core turns the project into
+    // text and back, with the same strict parser the desktop uses for untrusted project files.
+    // `timestamp` is the page's clock as ISO 8601 UTC (the module has no clock).
+    [[nodiscard]] std::string exportProject (std::string_view timestamp);
+    // Replaces the open project (and its undo history) with the one in `json`. Returns an empty
+    // string, or a message for the user and the open project untouched. `dirty`: the project has
+    // changes that are not saved (a recovered autosave); `hasLocation`: it belongs to a saved file.
+    [[nodiscard]] std::string importProject (std::string_view json, bool dirty, bool hasLocation);
+    // The page saved the project: it is clean now.
+    void projectSaved (bool hasLocation);
+    // The file the project belonged to is gone: it has changes nothing stores.
+    void projectUnsaved();
+
 private:
     void emit (const bridge::Event& event);
     void notice (int level, std::string_view message);
@@ -48,6 +62,8 @@ private:
     void sendParameters (bool everything);
     void sendDrumPads();
     void onProjectChanged();
+    void sendProjectState();
+    void resetProject (model::Project project, bool dirty, bool hasLocation);
     void pulse();
 
     double sampleRate;
@@ -63,6 +79,10 @@ private:
     std::int64_t framesSincePulse = 0;
     bridge::TransportPosition lastPosition;
     bool lastPlaying = false;
+    bool loading = false;
+    bool hasLocation = false;
+    std::uint64_t savedVersion = 0;
+    model::ProjectMetadata metadata;
 };
 
 } // namespace ap::web

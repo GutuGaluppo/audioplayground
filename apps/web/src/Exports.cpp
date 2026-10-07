@@ -11,6 +11,8 @@ namespace
 {
 std::unique_ptr<ap::web::WebHost> host;
 std::string lastEvents;
+std::string projectText;
+std::string projectError;
 } // namespace
 
 #define AP_EXPORT extern "C" __attribute__ ((used, visibility ("default")))
@@ -59,6 +61,52 @@ AP_EXPORT const char* ap_events()
 AP_EXPORT int ap_events_size()
 {
     return static_cast<int> (lastEvents.size());
+}
+
+// Saving and opening. The text of an exported project stays valid until the next export; an import
+// error likewise. A page that is not allowed to send more than ap_max_project_bytes gets 0.
+AP_EXPORT int ap_project_export (const char* timestamp, int length)
+{
+    if (!host || timestamp == nullptr || length < 0)
+        return -1;
+    projectText = host->exportProject (std::string_view (timestamp, static_cast<std::size_t> (length)));
+    return static_cast<int> (projectText.size());
+}
+
+AP_EXPORT const char* ap_project_text()
+{
+    return projectText.c_str();
+}
+
+AP_EXPORT int ap_project_import (const char* json, int length, int dirty, int hasLocation)
+{
+    if (!host || json == nullptr || length < 0)
+        return 0;
+    projectError = host->importProject (std::string_view (json, static_cast<std::size_t> (length)),
+                                        dirty != 0, hasLocation != 0);
+    return projectError.empty() ? 1 : 0;
+}
+
+AP_EXPORT const char* ap_project_error()
+{
+    return projectError.c_str();
+}
+
+AP_EXPORT int ap_project_error_size()
+{
+    return static_cast<int> (projectError.size());
+}
+
+AP_EXPORT void ap_project_saved (int hasLocation)
+{
+    if (host)
+        host->projectSaved (hasLocation != 0);
+}
+
+AP_EXPORT void ap_project_unsaved()
+{
+    if (host)
+        host->projectUnsaved();
 }
 
 AP_EXPORT void ap_set_output_latency (double milliseconds)

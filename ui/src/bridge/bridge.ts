@@ -3,6 +3,7 @@ import type { ParamId } from '../params/generated';
 import { parseNativeEvent, PROTOCOL_VERSION } from './generated';
 import type { Intent, NativeEventPayloads, NativeEventType } from './generated';
 import { SYNTH_PRESET_IDS } from '../params/synthPreset';
+import type { ProjectLibrary } from '../web/projectLibrary';
 import { createSimulatedTimeline } from './simulatedTimeline';
 import type { SimulatedEdit } from './simulatedTimeline';
 
@@ -19,6 +20,8 @@ export interface Bridge {
   readonly isNative: boolean;
   /** Only the browser engine: it cannot make sound until the page is allowed to (a user gesture). */
   readonly audio?: AudioGate;
+  /** Only the browser engine: saved songs live in the browser, so it asks the questions (ADR-016). */
+  readonly projects?: ProjectLibrary;
   send(intent: Intent): void;
   on<T extends NativeEventType>(type: T, handler: Handler<T>): () => void;
 }
