@@ -1150,3 +1150,10 @@ kbd {
   gap: var(--ap-space-1);
   font-size: var(--ap-text-sm, 12px);
 }
+
+.effect__sync {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ap-space-1);
+  font-size: var(--ap-text-xs);
+}

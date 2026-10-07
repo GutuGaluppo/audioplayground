@@ -24,7 +24,7 @@ describe('effect presets', () => {
       ],
     });
     expect(presets.map((p) => p.id)).toEqual(['a']);
-    expect(presets[0]?.values).toEqual([100, 35, 30]);
+    expect(presets[0]?.values).toEqual([100, 35, 30, 0]);
     expect(rejected).toEqual(['b', 'c', 'd', 'e']);
   });
 });

@@ -110,6 +110,7 @@ export const EFFECTS: readonly EffectDescriptor[] = [
       { id: 'delay.time', name: "Time", unit: "ms", min: 1, max: 2000, defaultValue: 375, step: 1, curve: 'logarithmic' },
       { id: 'delay.feedback', name: "Feedback", unit: "%", min: 0, max: 95, defaultValue: 35, step: 1, curve: 'linear' },
       { id: 'delay.mix', name: "Mix", unit: "%", min: 0, max: 100, defaultValue: 30, step: 1, curve: 'linear' },
+      { id: 'delay.sync', name: "Sync", unit: "", min: 0, max: 8, defaultValue: 0, step: 1, curve: 'linear' },
     ],
   },
   {

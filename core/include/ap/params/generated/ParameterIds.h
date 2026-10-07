@@ -122,10 +122,11 @@ inline constexpr std::array<EffectDescriptor, numEffects> effectDescriptors {{
         {"distortion.output", "Output", "dB", -24.0f, 12.0f, 0.0f, 0.5f, Curve::linear},
         {"distortion.mix", "Mix", "%", 0.0f, 100.0f, 100.0f, 1.0f, Curve::linear},
     }}},
-    {"delay", "Delay", 3, {{
+    {"delay", "Delay", 4, {{
         {"delay.time", "Time", "ms", 1.0f, 2000.0f, 375.0f, 1.0f, Curve::logarithmic},
         {"delay.feedback", "Feedback", "%", 0.0f, 95.0f, 35.0f, 1.0f, Curve::linear},
         {"delay.mix", "Mix", "%", 0.0f, 100.0f, 30.0f, 1.0f, Curve::linear},
+        {"delay.sync", "Sync", "", 0.0f, 8.0f, 0.0f, 1.0f, Curve::linear},
     }}},
     {"reverb", "Reverb", 4, {{
         {"reverb.size", "Size", "%", 0.0f, 100.0f, 60.0f, 1.0f, Curve::linear},
@@ -180,6 +181,7 @@ enum class DelayParam : std::uint8_t
     time,
     feedback,
     mix,
+    sync,
 };
 
 // Value indices of the Reverb effect.

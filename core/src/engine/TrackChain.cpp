@@ -54,10 +54,18 @@ fx::DistortionSettings distortionSettings (const model::EffectState& s) noexcept
             value (s, P::mix) / 100.0f};
 }
 
-fx::DelaySettings delaySettings (const model::EffectState& s) noexcept
+fx::DelaySettings delaySettings (const model::EffectState& s, double tempoBpm) noexcept
 {
     using P = params::DelayParam;
-    return {value (s, P::time), value (s, P::feedback) / 100.0f, value (s, P::mix) / 100.0f};
+    float timeMs = value (s, P::time);
+    const auto sync = static_cast<std::size_t> (std::lround (value (s, P::sync)));
+    if (sync > 0 && sync < delaySyncBeats.size() && tempoBpm > 0.0)
+    {
+        const auto synced
+            = static_cast<float> (static_cast<double> (delaySyncBeats[sync]) * 60000.0 / tempoBpm);
+        timeMs = std::clamp (synced, fx::DelaySettings::minTimeMs, fx::DelaySettings::maxTimeMs);
+    }
+    return {timeMs, value (s, P::feedback) / 100.0f, value (s, P::mix) / 100.0f};
 }
 
 fx::ReverbSettings reverbSettings (const model::EffectState& s) noexcept
@@ -95,7 +103,7 @@ void TrackChain::prepare (double sampleRate, int maxBlockSize)
     distortion.reset();
 }
 
-void TrackChain::set (const model::TrackEffects& effects) noexcept AP_NONBLOCKING
+void TrackChain::set (const model::TrackEffects& effects, double tempoBpm) noexcept AP_NONBLOCKING
 {
     for (std::size_t e = 0; e < effects.size(); ++e)
     {
@@ -131,7 +139,7 @@ void TrackChain::set (const model::TrackEffects& effects) noexcept AP_NONBLOCKIN
     eq.set (eqSettings (effects[index (EffectKind::eq)]));
     compressor.set (compressorSettings (effects[index (EffectKind::compressor)]));
     filter.set (filterSettings (effects[index (EffectKind::filter)]));
-    delay.set (delaySettings (effects[index (EffectKind::delay)]));
+    delay.set (delaySettings (effects[index (EffectKind::delay)], tempoBpm));
     reverb.set (reverbSettings (effects[index (EffectKind::reverb)]));
 
     // The distortion crossfades through its own (latency-aligned) mix and output.

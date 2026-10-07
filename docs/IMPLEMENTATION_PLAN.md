@@ -299,6 +299,7 @@ Cada fase termina num **gate**: CI verde (sanitizers inclusos), benchmarks dentr
 | Kits de bateria | ✅ Concluída: 5 kits sintetizados (Classic, 808, Lo-fi, Acoustic, Electro) escolhidos por `drums.setKit`, salvos no projeto |
 | Layout redimensionável | ✅ Concluída: divisores arrastáveis com preferência guardada (`layoutPrefs.ts`) |
 | Acabamento do MVP (Etapa 1) | ✅ Snap da timeline (Off, 1/4, 1/2, beat, compasso; preferência de UI), marcadores arrastáveis de início/fim do sampler (setas: 1 %, Shift: 5 %), nota de licenças para fontes/imagens/áudio. Já existiam: "Load sample…" por pad, `curve` linear/logarítmica nos parâmetros (§16), metadados do projeto do exemplo da §11 |
+| Delay sincronizado (ADR-012) | ✅ Parâmetro `delay.sync` (1/16 … 1/2, tercinas e pontuadas); o motor converte nota → ms com o tempo do transporte a cada bloco; export idêntico ao tempo real; preset "Dotted eighth (follows tempo)" |
 | Escuta dos goldens de FX | ⏳ Precisa de um ouvinte humano (`tests/golden/*.wav`) |
 
 Decisões tomadas durante a execução:

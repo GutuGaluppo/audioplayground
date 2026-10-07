@@ -254,7 +254,7 @@ void Engine::mixTracks (const TrackBuses& buses, const TrackBuses& sends, int n)
         std::array<float*, 2> channels {buses.left (t), buses.right (t)};
         if (auto* chain = track.chain.get(); chain != nullptr && chain->getSampleRate() == sampleRate)
         {
-            chain->set (track.effects);
+            chain->set (track.effects, transport.getTempo());
             chain->process ({channels.data(), 2, n});
         }
 
@@ -286,7 +286,8 @@ void Engine::mixTracks (const TrackBuses& buses, const TrackBuses& sends, int n)
                 float* const toRight = sends.right (b);
                 for (int i = 0; i < n; ++i)
                 {
-                    const float level = from + (to - from) * static_cast<float> (i + 1) / static_cast<float> (n);
+                    const float level
+                        = from + (to - from) * static_cast<float> (i + 1) / static_cast<float> (n);
                     toLeft[i] += channels[0][i] * gain.left (i, n) * level;
                     toRight[i] += channels[1][i] * gain.right (i, n) * level;
                 }
@@ -310,7 +311,7 @@ void Engine::processBuses (const TrackBuses& sends, int n) noexcept AP_NONBLOCKI
         std::array<float*, 2> channels {sends.left (b), sends.right (b)};
         if (auto* chain = bus.chain.get(); chain != nullptr && chain->getSampleRate() == sampleRate)
         {
-            chain->set (bus.effects);
+            chain->set (bus.effects, transport.getTempo());
             chain->process ({channels.data(), 2, n});
         }
 

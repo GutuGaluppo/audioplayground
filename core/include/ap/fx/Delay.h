@@ -27,7 +27,7 @@ struct DelaySettings
 // between samples (cubic Hermite), so it bends pitch like tape instead of clicking. The feedback
 // path is gently damped (repeats get darker, like an analogue delay) and soft-saturated, so even
 // at the highest feedback the repeats stay bounded. Mix and feedback glide over 20 ms.
-// Tempo sync comes later (the time is in milliseconds).
+// The time is in milliseconds; tempo sync is resolved before it gets here (engine/TrackChain).
 class Delay
 {
 public:

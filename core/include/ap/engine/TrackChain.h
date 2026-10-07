@@ -35,7 +35,8 @@ public:
     void prepare (double sampleRate, int maxBlockSize);
     [[nodiscard]] double getSampleRate() const noexcept { return rate; }
 
-    void set (const model::TrackEffects& effects) noexcept AP_NONBLOCKING;
+    // tempoBpm turns a tempo-synced delay's note value into a time.
+    void set (const model::TrackEffects& effects, double tempoBpm = 120.0) noexcept AP_NONBLOCKING;
 
     // In place, stereo (or mono). numSamples must not exceed the prepared block size.
     void process (core::AudioBlock block) noexcept AP_NONBLOCKING;
@@ -64,7 +65,13 @@ private:
 [[nodiscard]] fx::CompressorSettings compressorSettings (const model::EffectState& state) noexcept;
 [[nodiscard]] fx::FilterSettings filterSettings (const model::EffectState& state) noexcept;
 [[nodiscard]] fx::DistortionSettings distortionSettings (const model::EffectState& state) noexcept;
-[[nodiscard]] fx::DelaySettings delaySettings (const model::EffectState& state) noexcept;
+// A synced delay (sync > 0) lasts a note value at tempoBpm, capped at the delay's maximum time.
+[[nodiscard]] fx::DelaySettings delaySettings (const model::EffectState& state,
+                                               double tempoBpm = 120.0) noexcept;
+
+// Length in beats (quarter notes) of each delay sync choice; index 0 is "free" (the time knob).
+inline constexpr std::array<float, 9> delaySyncBeats {0.0f,        0.25f, 1.0f / 3.0f, 0.5f, 0.75f,
+                                                      2.0f / 3.0f, 1.0f,  1.5f,        2.0f};
 [[nodiscard]] fx::ReverbSettings reverbSettings (const model::EffectState& state) noexcept;
 
 } // namespace ap::engine

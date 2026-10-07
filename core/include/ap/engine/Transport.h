@@ -56,7 +56,10 @@ public:
         return {loopEnabled.load (std::memory_order_relaxed), loopStartTicks.load (std::memory_order_relaxed),
                 loopEndTicks.load (std::memory_order_relaxed)};
     }
-    [[nodiscard]] double getTempo() const noexcept { return tempoBpm.load (std::memory_order_relaxed); }
+    [[nodiscard]] double getTempo() const noexcept AP_NONBLOCKING
+    {
+        return tempoBpm.load (std::memory_order_relaxed);
+    }
     [[nodiscard]] core::TimeSignature getTimeSignature() const noexcept;
     [[nodiscard]] int getCountInBars() const noexcept { return countInBars.load (std::memory_order_relaxed); }
 

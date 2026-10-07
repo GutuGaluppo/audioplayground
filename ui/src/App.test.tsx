@@ -429,6 +429,30 @@ describe('App', () => {
     expect(screen.getByRole('button', { name: 'Delay off' })).toBeTruthy();
   });
 
+  it('syncs the delay to the tempo: a note value replaces the Time knob', async () => {
+    await renderApp();
+    fireEvent.click(screen.getByRole('button', { name: '+ Track' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Audio' }));
+    await flush();
+    fireEvent.pointerDown(screen.getByRole('group', { name: 'Audio 1 track' }));
+    await flush();
+
+    expect(screen.getByRole('slider', { name: 'Time' })).toBeTruthy();
+    const sync = screen.getByRole<HTMLSelectElement>('combobox', { name: 'Delay sync' });
+    expect(sync.value).toBe('0');
+
+    fireEvent.change(sync, { target: { value: '4' } }); // 1/8 dotted
+    await flush();
+    expect(screen.getByRole<HTMLSelectElement>('combobox', { name: 'Delay sync' }).value).toBe('4');
+    expect(screen.queryByRole('slider', { name: 'Time' })).toBeNull();
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Delay sync' }), {
+      target: { value: '0' },
+    });
+    await flush();
+    expect(screen.getByRole('slider', { name: 'Time' })).toBeTruthy();
+  });
+
   it('exports with the chosen options, shows progress and can cancel', async () => {
     const bridge = await renderApp();
     const sent: unknown[] = [];

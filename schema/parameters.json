@@ -420,6 +420,16 @@
           "default": 30,
           "curve": "linear",
           "step": 1
+        },
+        {
+          "id": "sync",
+          "name": "Sync",
+          "unit": "",
+          "min": 0,
+          "max": 8,
+          "default": 0,
+          "curve": "linear",
+          "step": 1
         }
       ]
     },

@@ -6,6 +6,7 @@
 #include "ap/engine/TrackChain.h"
 #include "ap/fx/Limiter.h"
 
+#include <algorithm>
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <cmath>
@@ -208,4 +209,75 @@ TEST_CASE ("Effect tails keep ringing after the transport stops", "[engine][chai
     for (int b = 0; b < 20; ++b)
         engine.process (buffer.block());
     CHECK (test::rms (buffer.channel (0), 0, 512) > 1.0e-3); // 0.2 s after stopping
+}
+
+TEST_CASE ("A synced delay lasts a note value at the tempo, and free stays in milliseconds",
+           "[engine][chain][delay]")
+{
+    using P = params::DelayParam;
+    auto delay = model::defaultEffectState (params::EffectKind::delay);
+    delay.values[static_cast<std::size_t> (P::time)] = 250.0f;
+
+    // Free (sync = 0): the Time knob, whatever the tempo.
+    CHECK (engine::delaySettings (delay, 120.0).timeMs == 250.0f);
+    CHECK (engine::delaySettings (delay, 60.0).timeMs == 250.0f);
+
+    const auto synced = [&] (int choice, double bpm)
+    {
+        delay.values[static_cast<std::size_t> (P::sync)] = static_cast<float> (choice);
+        return engine::delaySettings (delay, bpm).timeMs;
+    };
+    CHECK (synced (6, 120.0) == Catch::Approx (500.0f));                      // 1/4
+    CHECK (synced (6, 60.0) == Catch::Approx (1000.0f));                      // follows the tempo
+    CHECK (synced (4, 120.0) == Catch::Approx (375.0f));                      // 1/8 dotted
+    CHECK (synced (3, 120.0) == Catch::Approx (250.0f));                      // 1/8
+    CHECK (synced (2, 120.0) == Catch::Approx (500.0f / 3.0f).margin (0.01)); // 1/8 triplet
+    CHECK (synced (1, 120.0) == Catch::Approx (125.0f));                      // 1/16
+
+    // The delay line holds 2 s: a long note at a slow tempo is capped, a fast one never reaches 0.
+    CHECK (synced (8, 30.0) == fx::DelaySettings::maxTimeMs);
+    CHECK (synced (1, 100000.0) == fx::DelaySettings::minTimeMs);
+}
+
+TEST_CASE ("The engine feeds the transport tempo to a synced delay", "[engine][chain][delay]")
+{
+    const core::ScopedNoDenormals noDenormals;
+    model::ProjectDocument doc;
+    doc.perform (model::AddTrack {model::TrackKind::audio});
+    const auto track = doc.project().tracks.back().id;
+    doc.perform (model::AddAsset {"audio/1-a.wav", "a.wav"});
+    model::Clip clip;
+    clip.length = 8 * core::ticksPerQuarterNote;
+    clip.asset = doc.project().assets.back().id;
+    doc.perform (model::AddClip {track, clip});
+    // Wet only, one repeat, a quarter note.
+    doc.perform (model::SetTrackEffect {track, EffectKind::delay,
+                                        on (EffectKind::delay, {{at (params::DelayParam::feedback), 0.0f},
+                                                                {at (params::DelayParam::mix), 100.0f},
+                                                                {at (params::DelayParam::sync), 6.0f}})});
+
+    // A short burst one second in, after the delay's own mix has settled (a lone sample would be
+    // smeared below the threshold).
+    const auto source = std::make_shared<instruments::SampleBuffer>();
+    source->sampleRate = fs;
+    source->channels.push_back (std::vector<float> (4 * 48000, 0.0f));
+    std::fill_n (source->channels[0].begin() + 48000, 480, 0.5f);
+
+    const auto echoAt = [&] (double bpm)
+    {
+        engine::Engine engine;
+        test::publish (engine, doc.project(), [&] (model::AssetId) { return source; });
+        engine.getTransport().setTempo (bpm);
+        engine.getTransport().requestPlay();
+        const auto audio = engine::renderOffline (engine, {fs, 1, 4 * 48000, 512});
+        for (std::size_t i = 48000; i < audio[0].size(); ++i)
+            if (std::abs (audio[0][i]) > 0.02f)
+                return i;
+        return std::size_t {0};
+    };
+
+    // A quarter note is 24000 samples at 120 BPM, 48000 at 60 (the delay reads between samples,
+    // so allow a few samples of interpolation).
+    CHECK (echoAt (120.0) == Catch::Approx (48000.0 + 24000.0).margin (64.0));
+    CHECK (echoAt (60.0) == Catch::Approx (48000.0 + 48000.0).margin (64.0));
 }

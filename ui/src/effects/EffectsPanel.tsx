@@ -11,6 +11,18 @@ import { CURVES } from './curves';
 import { PRESETS } from './presets';
 
 const FILTER_MODES = ['Low-pass', 'High-pass', 'Band-pass'] as const;
+/** Delay time choices; index = the delay.sync value (0 = the Time knob, in milliseconds). */
+export const DELAY_SYNC = [
+  'Free',
+  '1/16',
+  '1/8 triplet',
+  '1/8',
+  '1/8 dotted',
+  '1/4 triplet',
+  '1/4',
+  '1/4 dotted',
+  '1/2',
+] as const;
 
 interface EffectEdit {
   readonly enabled: boolean;
@@ -34,6 +46,7 @@ function EffectCard({
   const values = effect.parameters.map((d, i) => state?.values[i] ?? d.defaultValue);
   const Curve = CURVES[effect.id];
   const presets = PRESETS.filter((p) => p.effect === index);
+  const syncIndex = effect.parameters.findIndex((d) => d.id === 'delay.sync');
 
   const send = (next: { enabled?: boolean; values?: readonly number[] }, gesture = 0) => {
     onEdit({ enabled: next.enabled ?? enabled, values: next.values ?? values }, gesture);
@@ -83,7 +96,24 @@ function EffectCard({
       <div className="effect__body">
         <div className="effect__values">
           {effect.parameters.map((d, i) =>
-            d.id === 'filter.mode' ? (
+            d.id === 'delay.time' && (values[syncIndex] ?? 0) > 0 ? null : d.id === 'delay.sync' ? (
+              <label key={d.id} className="effect__sync">
+                Sync
+                <select
+                  aria-label="Delay sync"
+                  value={values[i]}
+                  onChange={(event) => {
+                    setValue(i, Number(event.currentTarget.value), 0);
+                  }}
+                >
+                  {DELAY_SYNC.map((name, choice) => (
+                    <option key={name} value={choice}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : d.id === 'filter.mode' ? (
               <div key={d.id} className="segmented" role="radiogroup" aria-label="Filter mode">
                 {FILTER_MODES.map((name, mode) => (
                   <button

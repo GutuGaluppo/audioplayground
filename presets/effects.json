@@ -16,6 +16,7 @@
     { "id": "delay.slap", "processor": "delay", "name": "Slapback", "version": 1, "parameters": { "time": 110, "feedback": 10, "mix": 25 } },
     { "id": "delay.space-echo", "processor": "delay", "name": "Space echo", "version": 1, "parameters": { "time": 380, "feedback": 62, "mix": 35 } },
     { "id": "delay.dotted-eighth", "processor": "delay", "name": "Dotted eighth (120 BPM)", "version": 1, "parameters": { "time": 375, "feedback": 40, "mix": 30 } },
+    { "id": "delay.dotted-eighth-sync", "processor": "delay", "name": "Dotted eighth (follows tempo)", "version": 1, "parameters": { "feedback": 40, "mix": 30, "sync": 4 } },
     { "id": "reverb.room", "processor": "reverb", "name": "Room", "version": 1, "parameters": { "size": 35, "decay": 40, "damping": 55, "mix": 20 } },
     { "id": "reverb.hall", "processor": "reverb", "name": "Hall", "version": 1, "parameters": { "size": 85, "decay": 80, "damping": 35, "mix": 30 } },
     { "id": "reverb.ambience", "processor": "reverb", "name": "Ambience", "version": 1, "parameters": { "size": 20, "decay": 25, "damping": 70, "mix": 15 } }
