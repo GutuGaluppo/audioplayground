@@ -320,9 +320,9 @@ Track parseTrack (const Json& json, const Project& project)
     else if (kind == "instrument")
     {
         track.kind = TrackKind::instrument;
-        requireKeys (
-            json, {"id", "kind", "instrument", "name", "volumeDb", "pan", "muted", "soloed", "clips"},
-            {"effects", "sends"}, "track");
+        requireKeys (json,
+                     {"id", "kind", "instrument", "name", "volumeDb", "pan", "muted", "soloed", "clips"},
+                     {"effects", "sends"}, "track");
         const auto& instrument = json["instrument"];
         if (instrument == "synth")
             track.instrument = InstrumentKind::synth;
@@ -358,9 +358,9 @@ Track parseTrack (const Json& json, const Project& project)
             send.bus = BusId {positiveInteger (s["bus"], "send bus")};
             if (project.findBus (send.bus) == nullptr)
                 invalid ("a send refers to a missing bus");
-            send.levelDb = static_cast<float> (numberInRange (
-                s["levelDb"], static_cast<double> (Send::minLevelDb), static_cast<double> (Send::maxLevelDb),
-                "send level"));
+            send.levelDb
+                = static_cast<float> (numberInRange (s["levelDb"], static_cast<double> (Send::minLevelDb),
+                                                     static_cast<double> (Send::maxLevelDb), "send level"));
             if (send.levelDb <= Send::minLevelDb)
                 invalid ("a send at minimum level must be left out");
             if (std::any_of (track.sends.begin(), track.sends.end(),
@@ -517,7 +517,8 @@ LoadedProject parseV1 (const Json& root)
     if (drums.is_object() && drums.contains ("kit"))
     {
         requireExactKeys (drums, {"pads", "kit"}, "drums");
-        project.drums.kit = static_cast<std::uint8_t> (ticks (drums["kit"], 0, DrumKit::kitCount - 1, "drum kit"));
+        project.drums.kit
+            = static_cast<std::uint8_t> (ticks (drums["kit"], 0, DrumKit::kitCount - 1, "drum kit"));
     }
     else
         requireExactKeys (drums, {"pads"}, "drums");

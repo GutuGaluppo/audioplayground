@@ -1,6 +1,6 @@
-// CPU budget of the reference project (plan §3.2): 8 tracks, 16 synth voices and every effect
-// switched on, rendered in 128-sample blocks at 48 kHz. The worst blocks matter, not the average:
-// a single late block is an audible dropout.
+// CPU budget of the reference project (plan §3.2): 8 tracks, 16 synth voices, every effect
+// switched on, and 3 effect buses (every effect on) that every track sends to, rendered in 128-sample blocks
+// at 48 kHz. The worst blocks matter, not the average: a single late block is an audible dropout.
 //
 //   cmake --preset release && cmake --build --preset release --target ap_benchmarks
 //   ./build/release/tests/ap_benchmarks
@@ -87,6 +87,21 @@ model::Project referenceProject()
             state.enabled = true;
             doc.perform (model::SetTrackEffect {track.id, static_cast<params::EffectKind> (e), state});
         }
+
+    // Three buses with every effect on, each fed by every track: the worst case for ADR-010.
+    for (std::size_t b = 0; b < 3; ++b)
+    {
+        doc.perform (model::AddBus {});
+        const auto bus = doc.project().buses.back().id;
+        for (std::size_t e = 0; e < params::numEffects; ++e)
+        {
+            auto state = model::defaultEffectState (static_cast<params::EffectKind> (e));
+            state.enabled = true;
+            doc.perform (model::SetBusEffect {bus, static_cast<params::EffectKind> (e), state});
+        }
+        for (const auto& track : doc.project().tracks)
+            doc.perform (model::SetTrackSend {track.id, bus, -6.0f});
+    }
     return doc.project();
 }
 } // namespace

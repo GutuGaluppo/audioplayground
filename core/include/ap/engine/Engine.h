@@ -168,8 +168,7 @@ public:
 
 private:
     // Fixed delay of a stereo signal, in place. N samples exactly.
-    template <std::size_t N>
-    struct StereoDelay
+    template <std::size_t N> struct StereoDelay
     {
         std::array<std::array<float, N>, 2> line {};
         std::size_t position = 0;
@@ -234,9 +233,9 @@ private:
     // Everything that does not go through a bus chain is delayed by one chain latency, and sources
     // that belong to no track (metronome, test tone, an instrument without a track) by two, so
     // every path takes exactly two chain latencies and nothing ever moves in time.
-    std::vector<float> directBus;   // 2 x maxBlock
-    std::vector<float> trackMix;    // 2 x maxBlock: the tracks, after chain and fader
-    std::vector<float> busReturn;   // 2 x maxBlock: the buses, after chain and fader
+    std::vector<float> directBus;    // 2 x maxBlock
+    std::vector<float> trackMix;     // 2 x maxBlock: the tracks, after chain and fader
+    std::vector<float> busReturn;    // 2 x maxBlock: the buses, after chain and fader
     std::vector<float> busStorageIn; // 2 x maxBlock per bus (Bus::maxBuses): what the sends collected
     StereoDelay<TrackChain::latency()> trackDelay;
     StereoDelay<2 * TrackChain::latency()> directDelay;

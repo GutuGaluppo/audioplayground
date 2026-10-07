@@ -42,7 +42,8 @@ void DrumMachine::setKit (int kit)
         if (!kits[index][pad])
             kits[index][pad] = makeFactorySound (pad, sampleRate, index);
     requestedKit = kit;
-    activeKit.store (kit, std::memory_order_release); // sounds are complete before the audio thread can see it
+    activeKit.store (kit,
+                     std::memory_order_release); // sounds are complete before the audio thread can see it
 }
 
 void DrumMachine::setPad (int pad, float volumeDb, float pitchSemitones, bool muted) noexcept

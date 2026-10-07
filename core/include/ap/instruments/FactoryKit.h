@@ -24,7 +24,7 @@ inline constexpr std::array<std::string_view, factoryKitSize> factoryKitNames {
 inline constexpr std::size_t factoryKitCount = 5;
 
 inline constexpr std::array<std::string_view, factoryKitCount> factoryKitTitles {"Classic", "808", "Lo-fi",
-                                                                                   "Acoustic", "Electro"};
+                                                                                 "Acoustic", "Electro"};
 
 // Not real-time safe (allocates); call from prepare() or the message thread.
 [[nodiscard]] std::unique_ptr<SampleBuffer> makeFactorySound (std::size_t pad, double sampleRate,

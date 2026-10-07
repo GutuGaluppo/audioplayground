@@ -1,3 +1,4 @@
+#include "Golden.h"
 #include "TimelineHelpers.h"
 #include "ap/engine/Engine.h"
 #include "ap/engine/OfflineRenderer.h"
@@ -180,10 +181,54 @@ TEST_CASE ("A bus effect rings on after the sound that fed it has ended", "[bus]
     doc.perform (SetBusEffect {bus, params::EffectKind::delay, delay}); // 375 ms echo
 
     const auto withDelay = render (doc.project());
-    doc.perform (SetBusEffect {bus, params::EffectKind::delay, defaultEffectState (params::EffectKind::delay)});
+    doc.perform (
+        SetBusEffect {bus, params::EffectKind::delay, defaultEffectState (params::EffectKind::delay)});
     const auto without = render (doc.project());
 
     // The hat is over after ~0.15 s; only the echo is left around 0.4 s.
     CHECK (energy (without, 20000, 28000) < 1.0e-9);
     CHECK (energy (withDelay, 20000, 28000) > 1.0e-4);
+}
+
+namespace
+{
+// A one-bar groove through a shared bus (echo and reverb) at -6 dB, in stereo.
+std::vector<std::vector<float>> renderBusMix (int blockSize)
+{
+    ProjectDocument doc {
+        test::drumPatternProject ({{0, {0, 8}}, {1, {4, 12}}, {2, {0, 2, 4, 6, 8, 10, 12, 14}}}, bar)};
+    doc.perform (AddBus {});
+    const auto bus = doc.project().buses[0].id;
+    doc.perform (RenameBus {bus, "Space"});
+    for (const auto effect : {params::EffectKind::delay, params::EffectKind::reverb})
+    {
+        auto state = defaultEffectState (effect);
+        state.enabled = true;
+        doc.perform (SetBusEffect {bus, effect, state});
+    }
+    doc.perform (SetTrackSend {doc.project().tracks.front().id, bus, -6.0f});
+
+    engine::Engine engine;
+    test::publish (engine, doc.project());
+    engine.getTransport().requestPlay();
+    return engine::renderOffline (engine, {fs, 2, static_cast<std::int64_t> (fs * 2.5), blockSize});
+}
+} // namespace
+
+TEST_CASE ("A bus mix does not depend on block size", "[bus][engine][determinism]")
+{
+    const auto reference = renderBusMix (512);
+    for (const int blockSize : {1, 333, 4096})
+    {
+        CAPTURE (blockSize);
+        CHECK (renderBusMix (blockSize) == reference);
+    }
+}
+
+TEST_CASE ("A groove through a shared echo and reverb bus matches the golden file", "[bus][golden]")
+{
+    const auto audio = renderBusMix (512);
+    const auto result = test::compareWithGolden ("bus_mix_48k", {fs, audio}, test::crossPlatformTolerance);
+    INFO (result.message);
+    CHECK (result.passed);
 }

@@ -115,25 +115,25 @@ struct Style
     double tomBase, tomSweep, tomDecay;
     double crashCut, crashDecay;
     double bassHz, bassDecay;
-    double drive;     // pre-clip gain; 1 = none
-    int crushStep;    // hold each sample this many times (sample-rate reduction); 1 = none
-    int crushLevels;  // amplitude levels (bit reduction); 0 = none
+    double drive;    // pre-clip gain; 1 = none
+    int crushStep;   // hold each sample this many times (sample-rate reduction); 1 = none
+    int crushLevels; // amplitude levels (bit reduction); 0 = none
 };
 
 constexpr std::array<Style, factoryKitCount> styles {{
     {}, // kit 0 is the hand-written classic kit below
     // 808: long sub kick, boomy toms, soft snare, sizzly hats.
-    {120.0, 38.0, 0.05, 0.75, 1.3, 0.12, 190.0, 2500.0, 0.16, 0.5, 9500.0, 0.028, 0.32, 1100.0, 0.16, 70.0,
-     2.0, 0.45, 6000.0, 0.9, 43.0, 1.2, 1.0, 1, 0},
+    {120.0,  38.0, 0.05, 0.75, 1.3,  0.12,   190.0, 2500.0, 0.16, 0.5, 9500.0, 0.028, 0.32,
+     1100.0, 0.16, 70.0, 2.0,  0.45, 6000.0, 0.9,   43.0,   1.2,  1.0, 1,      0},
     // Lo-fi: the classic shape, dusty and crunchy (crushed in post).
-    {150.0, 52.0, 0.04, 0.22, 0.5, 0.2, 210.0, 1500.0, 0.14, 0.5, 6500.0, 0.035, 0.18, 1300.0, 0.1, 100.0,
-     1.5, 0.2, 4500.0, 0.5, 60.0, 0.5, 1.4, 4, 48},
+    {150.0,  52.0, 0.04,  0.22, 0.5, 0.2,    210.0, 1500.0, 0.14, 0.5, 6500.0, 0.035, 0.18,
+     1300.0, 0.1,  100.0, 1.5,  0.2, 4500.0, 0.5,   60.0,   0.5,  1.4, 4,      48},
     // Acoustic-ish: round kick thump, noisy snare, washy cymbals.
-    {110.0, 62.0, 0.03, 0.2, 0.45, 0.35, 200.0, 1200.0, 0.2, 0.9, 7000.0, 0.05, 0.4, 1000.0, 0.14, 85.0, 1.35,
-     0.3, 4000.0, 1.4, 65.0, 0.4, 1.0, 1, 0},
+    {110.0,  62.0, 0.03, 0.2,  0.45, 0.35,   200.0, 1200.0, 0.2, 0.9, 7000.0, 0.05, 0.4,
+     1000.0, 0.14, 85.0, 1.35, 0.3,  4000.0, 1.4,   65.0,   0.4, 1.0, 1,      0},
     // Electro: tight, hard kick, bright zappy toms, clipped hats.
-    {230.0, 55.0, 0.02, 0.16, 0.4, 0.3, 330.0, 3000.0, 0.09, 0.6, 11000.0, 0.018, 0.12, 2200.0, 0.07, 160.0,
-     4.0, 0.14, 9000.0, 0.45, 55.0, 0.3, 3.0, 1, 0},
+    {230.0,  55.0, 0.02,  0.16, 0.4,  0.3,    330.0, 3000.0, 0.09, 0.6, 11000.0, 0.018, 0.12,
+     2200.0, 0.07, 160.0, 4.0,  0.14, 9000.0, 0.45,  55.0,   0.3,  3.0, 1,       0},
 }};
 
 std::unique_ptr<SampleBuffer> makeStyledSound (std::size_t pad, double rate, const Style& st,
@@ -254,7 +254,6 @@ std::unique_ptr<SampleBuffer> makeFactorySound (std::size_t pad, double sampleRa
     const double rate = sampleRate > 0.0 ? sampleRate : 48000.0;
     if (kit > 0 && kit < factoryKitCount)
         return makeStyledSound (pad, rate, styles[kit], static_cast<std::uint32_t> (kit) * 100u);
-
 
     switch (pad)
     {
