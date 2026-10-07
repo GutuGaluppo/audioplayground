@@ -173,6 +173,55 @@ export class WasmEngine {
     this.exports.ap_audio_forget(this.scratch, length);
   }
 
+  /**
+   * Starts exporting the open song as a WAV file (run it in an engine of its own: the render takes
+   * as long as the song). format: 0 16-bit, 1 24-bit, 2 32-bit float. Returns {ok: true} or
+   * {ok: false, error}.
+   */
+  exportBegin({ format = 1, sampleRate = 48000 } = {}) {
+    if (this.exports.ap_export_begin(format, sampleRate) === 1) return { ok: true };
+    return { ok: false, error: this.exportError() };
+  }
+
+  exportError() {
+    return decodeUtf8(
+      new Uint8Array(
+        this.memory,
+        this.exports.ap_export_error(),
+        this.exports.ap_export_error_size(),
+      ),
+    );
+  }
+
+  /** Renders a little more: {state: 'running', progress: 0..1}, {state: 'done'} or {state: 'failed', error}. */
+  exportStep() {
+    const code = this.exports.ap_export_step();
+    if (code === 1001) return { state: 'done' };
+    if (code < 0) return { state: 'failed', error: this.exportError() };
+    return { state: 'running', progress: code / 1000 };
+  }
+
+  /** The finished file and what is known about it. Call after exportStep() said 'done'. */
+  exportResult() {
+    const size = this.exports.ap_export_size();
+    return {
+      bytes: new Uint8Array(this.memory, this.exports.ap_export_data(), size).slice(),
+      seconds: this.exports.ap_export_seconds(),
+      lufs: this.exports.ap_export_lufs(),
+      truePeak: this.exports.ap_export_peak(),
+      missingAudio: this.exports.ap_export_missing_audio(),
+    };
+  }
+
+  exportCancel() {
+    this.exports.ap_export_cancel();
+  }
+
+  /** Frees the finished file. */
+  exportRelease() {
+    this.exports.ap_export_release();
+  }
+
   /** The file the project belonged to was deleted: it has changes nothing stores. */
   projectUnsaved() {
     this.exports.ap_project_unsaved();

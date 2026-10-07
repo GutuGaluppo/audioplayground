@@ -37,29 +37,37 @@ core::Ticks songEnd (const model::Project& project) noexcept
     return end;
 }
 
-std::optional<RenderedAudio> renderSong (Engine& engine, const SongRenderSettings& settings,
-                                         const std::function<bool (double)>& progress)
+SongRender::SongRender (Engine& engineToUse, const SongRenderSettings& settingsToUse)
+    : engine (engineToUse)
+    , settings (settingsToUse)
+    , block (std::max (16, settingsToUse.blockSize))
+    , output (2)
+    , buffer {std::vector<float> (static_cast<std::size_t> (std::max (16, settingsToUse.blockSize))),
+              std::vector<float> (static_cast<std::size_t> (std::max (16, settingsToUse.blockSize)))}
 {
-    const int block = std::max (16, settings.blockSize);
     engine.prepare (settings.sampleRate, block);
     engine.getTransport().requestSeek (0);
     engine.getTransport().requestPlay();
 
-    const auto latency = static_cast<std::int64_t> (engine.getOutputLatency());
-    const auto length = std::max<std::int64_t> (0, settings.length);
+    latency = static_cast<std::int64_t> (engine.getOutputLatency());
+    length = std::max<std::int64_t> (0, settings.length);
     const auto maxTail = static_cast<std::int64_t> (
         std::ceil (std::max (0.0, settings.maxTailSeconds) * settings.sampleRate));
-    const auto quiet = static_cast<std::int64_t> (std::ceil (settings.silenceSeconds * settings.sampleRate));
-    const auto limit = latency + length + maxTail;
+    quiet = static_cast<std::int64_t> (std::ceil (settings.silenceSeconds * settings.sampleRate));
+    limit = latency + length + maxTail;
+    finished = limit <= 0;
+}
 
-    RenderedAudio output (2);
-    std::array<std::vector<float>, 2> buffer {std::vector<float> (static_cast<std::size_t> (block)),
-                                              std::vector<float> (static_cast<std::size_t> (block))};
+double SongRender::progress() const noexcept
+{
+    return std::min (1.0, static_cast<double> (rendered)
+                              / static_cast<double> (std::max<std::int64_t> (1, latency + length)));
+}
+
+bool SongRender::step (int blocks)
+{
     std::array<float*, 2> pointers {buffer[0].data(), buffer[1].data()};
-    std::int64_t rendered = 0;
-    std::int64_t lastLoud = -1; // in rendered (output) samples
-
-    while (rendered < limit)
+    for (int done = 0; done < blocks && !finished; ++done)
     {
         const auto n = static_cast<int> (std::min<std::int64_t> (block, limit - rendered));
         engine.process ({pointers.data(), 2, n});
@@ -73,18 +81,18 @@ std::optional<RenderedAudio> renderSong (Engine& engine, const SongRenderSetting
         rendered += n;
 
         // The song is done once its timeline has played out and the tail has been quiet a while.
-        if (rendered >= latency + length && rendered - std::max (lastLoud, latency + length) >= quiet)
-            break;
-        if (progress
-            && !progress (
-                std::min (1.0, static_cast<double> (rendered)
-                                   / static_cast<double> (std::max<std::int64_t> (1, latency + length)))))
-        {
-            engine.releaseResources();
-            return std::nullopt;
-        }
+        if (rendered >= limit
+            || (rendered >= latency + length && rendered - std::max (lastLoud, latency + length) >= quiet))
+            finished = true;
     }
-    engine.releaseResources();
+    return !finished;
+}
+
+RenderedAudio SongRender::finish()
+{
+    if (!released)
+        engine.releaseResources();
+    released = true;
 
     // Drop the latency at the front and the silence after the tail (never cutting the song).
     const auto end = std::max (latency + length, std::min (rendered, lastLoud + 1));
@@ -94,9 +102,36 @@ std::optional<RenderedAudio> renderSong (Engine& engine, const SongRenderSetting
         channel.erase (channel.begin(),
                        channel.begin() + static_cast<std::ptrdiff_t> (std::min (latency, end)));
     }
+    return std::move (output);
+}
+
+void SongRender::abort()
+{
+    if (!released)
+        engine.releaseResources();
+    released = true;
+    finished = true;
+    output.clear();
+}
+
+std::optional<RenderedAudio> renderSong (Engine& engine, const SongRenderSettings& settings,
+                                         const std::function<bool (double)>& progress)
+{
+    SongRender render (engine, settings);
+    while (!render.done())
+    {
+        render.step (1);
+        // Not asked about the block that finished the song: it is done, there is nothing to stop.
+        if (!render.done() && progress && !progress (render.progress()))
+        {
+            render.abort();
+            return std::nullopt;
+        }
+    }
+    auto audio = render.finish();
     if (progress)
         (void)progress (1.0);
-    return output;
+    return audio;
 }
 
 } // namespace ap::engine

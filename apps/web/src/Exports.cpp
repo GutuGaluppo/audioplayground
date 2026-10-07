@@ -14,6 +14,7 @@ std::string lastEvents;
 std::string projectText;
 std::string projectError;
 std::string audioError;
+std::string exportError;
 } // namespace
 
 #define AP_EXPORT extern "C" __attribute__ ((used, visibility ("default")))
@@ -150,6 +151,77 @@ AP_EXPORT const char* ap_audio_error()
 AP_EXPORT int ap_audio_error_size()
 {
     return static_cast<int> (audioError.size());
+}
+
+// Exporting a WAV file (in a separate instance). begin -> step until 1001 (or -1) -> read the
+// result -> release.
+AP_EXPORT int ap_export_begin (int format, int sampleRate)
+{
+    if (!host)
+        return 0;
+    exportError = host->exportBegin (format, sampleRate);
+    return exportError.empty() ? 1 : 0;
+}
+
+AP_EXPORT int ap_export_step()
+{
+    return host ? host->exportStep() : -1;
+}
+
+AP_EXPORT const char* ap_export_error()
+{
+    if (host && !host->exportError().empty())
+        exportError = host->exportError();
+    return exportError.c_str();
+}
+
+AP_EXPORT int ap_export_error_size()
+{
+    if (host && !host->exportError().empty())
+        exportError = host->exportError();
+    return static_cast<int> (exportError.size());
+}
+
+AP_EXPORT const unsigned char* ap_export_data()
+{
+    return host ? host->exportBytes().data() : nullptr;
+}
+
+AP_EXPORT int ap_export_size()
+{
+    return host ? static_cast<int> (host->exportBytes().size()) : 0;
+}
+
+AP_EXPORT double ap_export_seconds()
+{
+    return host ? host->exportSeconds() : 0.0;
+}
+
+AP_EXPORT double ap_export_lufs()
+{
+    return host ? host->exportLufs() : 0.0;
+}
+
+AP_EXPORT double ap_export_peak()
+{
+    return host ? host->exportPeak() : 0.0;
+}
+
+AP_EXPORT int ap_export_missing_audio()
+{
+    return host ? host->exportMissingAudio() : 0;
+}
+
+AP_EXPORT void ap_export_cancel()
+{
+    if (host)
+        host->exportCancel();
+}
+
+AP_EXPORT void ap_export_release()
+{
+    if (host)
+        host->exportRelease();
 }
 
 AP_EXPORT void ap_project_unsaved()

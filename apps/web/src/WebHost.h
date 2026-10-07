@@ -1,9 +1,11 @@
 #pragma once
 
 #include "ap/engine/Engine.h"
+#include "ap/engine/Export.h"
 #include "ap/host/DocumentEditor.h"
 #include "ap/host/IntentApplier.h"
 #include "ap/host/Snapshots.h"
+#include "ap/io/WavExport.h"
 #include "ap/model/ProjectSerialization.h"
 
 #include <array>
@@ -75,6 +77,23 @@ public:
     void audioMissing (std::string_view path);
     void forgetAudio (std::string_view path);
 
+    // Exporting the song as a WAV file. The page runs this in a separate instance (a worker) so the
+    // music keeps playing: open the song and its audio there, begin, then step until it is done.
+    static constexpr double maxExportSeconds = 30.0 * 60.0;
+    // Empty, or a message for the user.
+    [[nodiscard]] std::string exportBegin (int format, int sampleRate);
+    // Renders a little more. 0..1000: progress, 1001: the file is ready (exportBytes), -1: it failed
+    // (exportError).
+    [[nodiscard]] int exportStep();
+    void exportCancel();
+    [[nodiscard]] const std::vector<std::uint8_t>& exportBytes() const noexcept { return exported.bytes; }
+    [[nodiscard]] const std::string& exportError() const noexcept { return exported.error; }
+    [[nodiscard]] double exportSeconds() const noexcept { return exported.seconds; }
+    [[nodiscard]] double exportLufs() const noexcept { return exported.lufs; }
+    [[nodiscard]] double exportPeak() const noexcept { return exported.truePeak; }
+    [[nodiscard]] int exportMissingAudio() const noexcept { return exported.missingAudio; }
+    void exportRelease();
+
     // The page saved the project: it is clean now.
     void projectSaved (bool hasLocation);
     // The file the project belonged to is gone: it has changes nothing stores.
@@ -115,6 +134,25 @@ private:
     void sendSamplerState();
     void syncSlots();
     void unregisterAudio (const std::string& path);
+
+    struct ExportJob
+    {
+        std::unique_ptr<engine::Engine> engine;
+        std::optional<engine::SongRender> render;
+        io::WavFormat format = io::WavFormat::pcm24;
+        std::uint32_t rate = 48000;
+    };
+    struct ExportResult
+    {
+        std::vector<std::uint8_t> bytes;
+        std::string error;
+        double seconds = 0.0;
+        double lufs = 0.0;
+        double truePeak = 0.0;
+        int missingAudio = 0;
+    };
+    std::unique_ptr<ExportJob> job;
+    ExportResult exported;
 
     double sampleRate;
     int maxBlock;

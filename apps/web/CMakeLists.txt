@@ -13,6 +13,7 @@ endif()
 set(AP_WEB_SOURCES
     src/WebHost.cpp
     src/WebHostAudio.cpp
+    src/WebHostExport.cpp
     src/Exports.cpp
     src/compat/JsonText.cpp
     "${PROJECT_SOURCE_DIR}/apps/desktop/src/generated/BridgeCodec.cpp")
@@ -30,7 +31,10 @@ set(AP_WEB_EXPORTS
     _ap_project_export _ap_project_text _ap_project_import _ap_project_error _ap_project_error_size
     _ap_project_saved _ap_project_unsaved
     _ap_audio_begin _ap_audio_channel _ap_audio_end _ap_audio_missing _ap_audio_forget _ap_audio_error
-    _ap_audio_error_size)
+    _ap_audio_error_size
+    _ap_export_begin _ap_export_step _ap_export_error _ap_export_error_size _ap_export_data _ap_export_size
+    _ap_export_seconds _ap_export_lufs _ap_export_peak _ap_export_missing_audio _ap_export_cancel
+    _ap_export_release)
 list(JOIN AP_WEB_EXPORTS "," AP_WEB_EXPORT_LIST)
 target_link_options(ap_web PRIVATE
     -sSTANDALONE_WASM=1

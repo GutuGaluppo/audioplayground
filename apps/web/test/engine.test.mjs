@@ -707,3 +707,190 @@ test("audio is capped, so a page cannot fill the engine's memory", async () => {
   assert.equal(third.ok, false);
   assert.match(third.error, /memory/);
 });
+
+// --- Exporting a WAV file -------------------------------------------------------------------------
+
+// What a WAV file says about itself.
+const wavInfo = (bytes) => {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const text = (at, n) => String.fromCharCode(...bytes.subarray(at, at + n));
+  return {
+    riff: text(0, 4),
+    wave: text(8, 4),
+    audioFormat: view.getUint16(20, true),
+    channels: view.getUint16(22, true),
+    rate: view.getUint32(24, true),
+    bits: view.getUint16(34, true),
+    dataBytes: view.getUint32(40, true),
+    size: bytes.length,
+    view,
+  };
+};
+const finishExport = (engine) => {
+  let step = engine.exportStep();
+  const seen = [];
+  while (step.state === 'running') {
+    seen.push(step.progress);
+    step = engine.exportStep();
+  }
+  return { step, seen };
+};
+
+test('the starter song exports as a WAV file in each format and rate', async () => {
+  for (const [format, bits, audioFormat] of [
+    [0, 16, 1],
+    [1, 24, 1],
+    [2, 32, 3],
+  ]) {
+    const engine = await create();
+    send(engine, 'app.ready');
+    assert.deepEqual(engine.exportBegin({ format, sampleRate: 44100 }), { ok: true });
+    const { step, seen } = finishExport(engine);
+    assert.equal(step.state, 'done');
+    assert.ok(seen.length > 0);
+    assert.ok(
+      seen.every((p, i) => p >= 0 && p <= 0.85 && (i === 0 || p >= seen[i - 1])),
+      'progress only goes forward',
+    );
+
+    const { bytes, seconds, lufs, truePeak, missingAudio } = engine.exportResult();
+    const info = wavInfo(bytes);
+    assert.equal(info.riff, 'RIFF');
+    assert.equal(info.wave, 'WAVE');
+    assert.equal(info.audioFormat, audioFormat);
+    assert.equal(info.channels, 2);
+    assert.equal(info.rate, 44100);
+    assert.equal(info.bits, bits);
+    assert.equal(info.size, 44 + info.dataBytes);
+    assert.ok(Math.abs(info.dataBytes / (2 * (bits / 8) * 44100) - seconds) < 1e-6);
+    assert.ok(
+      seconds > 7.9 && seconds < 20,
+      `a four-bar starter beat, with its tail (${seconds} s)`,
+    );
+    assert.ok(lufs < -5 && lufs > -50, `loudness ${lufs}`);
+    assert.ok(truePeak < 0.5 && truePeak > -40);
+    assert.equal(missingAudio, 0);
+    engine.exportRelease();
+    assert.equal(engine.exportResult().bytes.length, 0);
+  }
+});
+
+test('the export is what playing the song produces, at the engine rate', async () => {
+  const { engine: exporter, track } = await freshWithAudioTrack();
+  const samples = tone(1, 0.5);
+  exporter.loadAudio({
+    path: 'audio/eeeeeeee.wav',
+    sampleRate: RATE,
+    channels: [samples],
+    name: 'riff.wav',
+    use: { kind: 'clip', track, ticks: 0 },
+  });
+  assert.deepEqual(exporter.exportBegin({ format: 2, sampleRate: RATE }), { ok: true });
+  assert.equal(finishExport(exporter).step.state, 'done');
+  const { bytes } = exporter.exportResult();
+  const info = wavInfo(bytes);
+  const exported = new Float32Array(info.dataBytes / 4);
+  for (let i = 0; i < exported.length; i++) exported[i] = info.view.getFloat32(44 + i * 4, true);
+  const left = exported.filter((_, i) => i % 2 === 0);
+
+  // The same song, played live: the engine's own latency (a few dozen samples) is at the front of
+  // the live output and dropped from the export, and from there on they are the same samples.
+  const played = sounds(exporter, 1.2)[0];
+  const same = (delay) => {
+    for (let i = 4800; i < 40000; i += 997) if (left[i] !== played[i + delay]) return false;
+    return true;
+  };
+  const delay = Array.from({ length: 400 }, (_, d) => d).find(same);
+  assert.notEqual(delay, undefined, 'the export is the live output, minus the latency');
+  assert.ok(delay > 0 && delay < 400);
+  assert.ok(Math.abs(rms(left.subarray(4800, 40000)) - 0.5 / Math.SQRT2) < 0.03);
+});
+
+test('a song at another sample rate is resampled, and a longer file is not a different song', async () => {
+  const lengths = [];
+  for (const sampleRate of [44100, 48000, 96000]) {
+    const { engine, track } = await freshWithAudioTrack();
+    engine.loadAudio({
+      path: 'audio/ffffffff.wav',
+      sampleRate: RATE,
+      channels: [tone(1, 0.5)],
+      name: 'riff.wav',
+      use: { kind: 'clip', track, ticks: 0 },
+    });
+    assert.ok(engine.exportBegin({ format: 1, sampleRate }).ok);
+    finishExport(engine);
+    const result = engine.exportResult();
+    assert.equal(wavInfo(result.bytes).rate, sampleRate);
+    lengths.push(result.seconds);
+  }
+  assert.ok(Math.abs(lengths[0] - lengths[1]) < 0.01 && Math.abs(lengths[1] - lengths[2]) < 0.01);
+});
+
+test('an export that cannot go ahead says why, and can be abandoned part-way', async () => {
+  const engine = await create();
+  send(engine, 'app.ready');
+  send(engine, 'project.new');
+  assert.match(engine.exportBegin({ format: 1, sampleRate: 48000 }).error, /nothing to export/);
+
+  send(engine, 'app.ready');
+  engine.importProject(
+    JSON.stringify({ ...JSON.parse(engine.exportProject('2026-10-07T12:00:00Z')) }),
+    {},
+  );
+  assert.match(engine.exportBegin({ format: 9, sampleRate: 48000 }).error, /not supported/);
+  assert.match(engine.exportBegin({ format: 1, sampleRate: 100 }).error, /not supported/);
+  assert.equal(engine.exportStep().state, 'failed'); // nothing is running
+
+  const starter = await create();
+  send(starter, 'app.ready');
+  assert.ok(starter.exportBegin({ format: 1, sampleRate: 48000 }).ok);
+  assert.equal(starter.exportStep().state, 'running');
+  starter.exportCancel();
+  assert.equal(starter.exportStep().state, 'failed');
+  assert.ok(starter.exportBegin({ format: 1, sampleRate: 48000 }).ok); // and it can start again
+  assert.equal(finishExport(starter).step.state, 'done');
+});
+
+test('audio the song lists but the page could not provide is counted, and silent in the file', async () => {
+  const { engine: first, track } = await freshWithAudioTrack();
+  first.loadAudio({
+    path: 'audio/99999991.wav',
+    sampleRate: RATE,
+    channels: [tone()],
+    name: 'riff.wav',
+    use: { kind: 'clip', track, ticks: 0 },
+  });
+  const text = first.exportProject('2026-10-07T12:00:00Z');
+  const engine = await create();
+  send(engine, 'app.ready');
+  engine.importProject(text, {});
+  engine.audioMissing('audio/99999991.wav');
+  assert.ok(engine.exportBegin({ format: 1, sampleRate: 48000 }).ok);
+  assert.equal(finishExport(engine).step.state, 'done');
+  const result = engine.exportResult();
+  assert.equal(result.missingAudio, 1);
+  const info = wavInfo(result.bytes);
+  // The song is only that clip, so with its audio missing the file is digital silence.
+  assert.ok(result.bytes.subarray(44).every((byte) => byte === 0));
+});
+
+test('the sampler and the pads are in the export too', async () => {
+  const engine = await create();
+  send(engine, 'app.ready');
+  send(engine, 'project.new');
+  engine.loadAudio({
+    path: 'audio/aaaa1111.wav',
+    sampleRate: RATE,
+    channels: [tone(0.5, 0.5, 330)],
+    name: 'thump.wav',
+    use: { kind: 'pad', pad: 0 },
+  });
+  send(engine, 'drums.setStep', { clip: 0, pad: 0, step: 0, on: true, gesture: 0 });
+  assert.ok(engine.exportBegin({ format: 2, sampleRate: RATE }).ok);
+  assert.equal(finishExport(engine).step.state, 'done');
+  const info = wavInfo(engine.exportResult().bytes);
+  let peak = 0;
+  for (let i = 0; i < 12000; i++)
+    peak = Math.max(peak, Math.abs(info.view.getFloat32(44 + i * 8, true)));
+  assert.ok(peak > 0.1, `the pad's own sample is in the file (${peak})`);
+});

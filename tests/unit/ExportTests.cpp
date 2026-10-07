@@ -239,3 +239,81 @@ TEST_CASE ("Rendering a song can be cancelled", "[export][render]")
         engine::renderSong (engine, {fs, song.length()}, [&calls] (double) { return ++calls < 10; }));
     CHECK (calls == 10);
 }
+
+TEST_CASE ("A render taken a slice at a time is the render taken whole", "[export][render]")
+{
+    const core::ScopedNoDenormals noDenormals;
+    Song song (test::noise (36000, 0.4f)[0], true);
+
+    engine::Engine whole;
+    song.into (whole);
+    const auto reference = engine::renderSong (whole, {fs, song.length()});
+    REQUIRE (reference);
+
+    for (const int slice : {1, 7, 1000})
+    {
+        CAPTURE (slice);
+        engine::Engine engine;
+        song.into (engine);
+        engine::SongRender render (engine, {fs, song.length()});
+        double last = 0.0;
+        while (render.step (slice))
+        {
+            CHECK (render.progress() >= last); // never goes back
+            CHECK (render.progress() <= 1.0);
+            last = render.progress();
+        }
+        CHECK (render.done());
+        CHECK (render.finish() == *reference);
+    }
+}
+
+TEST_CASE ("A render can be given up between slices, and an empty song has nothing to render",
+           "[export][render]")
+{
+    Song song (test::noise (96000, 0.4f)[0], false);
+    engine::Engine engine;
+    song.into (engine);
+    engine::SongRender render (engine, {fs, song.length()});
+    CHECK (render.step (3));
+    render.abort();
+    CHECK (render.done());
+    CHECK_FALSE (render.step (3)); // nothing more happens
+
+    engine::Engine silent;
+    engine::SongRender nothing (silent, {fs, 0, 0.0});
+    while (nothing.step (100))
+    {
+    }
+    CHECK (nothing.finish()[0].empty()); // only the engine's own latency was rendered, and it is dropped
+}
+
+TEST_CASE ("An in-memory WAV is the file writeWav makes", "[export][io]")
+{
+    const test::TempDirectory dir;
+    const auto sine = tone (440.0, fs, 0.2, -6.0);
+    const auto noise = test::noise (9000, 0.3f)[0]; // long enough for several chunks of frames
+    for (const auto format : {io::WavFormat::pcm16, io::WavFormat::pcm24, io::WavFormat::float32})
+    {
+        CAPTURE (static_cast<int> (format));
+        const std::vector<std::vector<float>> audio {
+            sine,
+            std::vector<float> (noise.begin(), noise.begin() + static_cast<std::ptrdiff_t> (sine.size()))};
+        const auto path = dir.path() / "x.wav";
+        REQUIRE_FALSE (io::writeWav (path, audio, 44100, format));
+        const auto encoded = io::encodeWav (audio, 44100, format);
+        REQUIRE (std::holds_alternative<std::vector<std::uint8_t>> (encoded));
+        const auto& memory = std::get<std::vector<std::uint8_t>> (encoded);
+        const auto file = bytes (path);
+        REQUIRE (memory.size() == file.size());
+        CHECK (std::memcmp (memory.data(), file.data(), file.size()) == 0);
+        CHECK (std::memcmp (memory.data(), "RIFF", 4) == 0);
+    }
+
+    // Anything that cannot be a WAV file is refused with a message, like writeWav.
+    CHECK (std::holds_alternative<io::IoError> (
+        io::encodeWav ({sine, sine, sine}, 48000, io::WavFormat::pcm16)));
+    CHECK (std::holds_alternative<io::IoError> (io::encodeWav ({}, 48000, io::WavFormat::pcm16)));
+    CHECK (std::holds_alternative<io::IoError> (io::encodeWav ({sine}, 100, io::WavFormat::pcm16)));
+    CHECK (std::holds_alternative<io::IoError> (io::encodeWav ({sine, {1.0f}}, 48000, io::WavFormat::pcm16)));
+}
