@@ -3,6 +3,7 @@ include(Catch)
 add_executable(ap_unit_tests
     support/Golden.cpp
     support/WavFile.cpp
+    unit/AccompanimentTests.cpp
     unit/BuildInfoTests.cpp
     unit/ClipModelTests.cpp
     unit/CompressorTests.cpp

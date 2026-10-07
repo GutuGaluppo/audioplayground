@@ -1,8 +1,18 @@
 # ap_core: headless engine core (model, engine, DSP, I/O).
 # Must never depend on UI code, the WebView bridge, or platform windowing.
 
+# The groove library (presets/grooves.json) is compiled in as bytes, so the app needs no data file.
+set(AP_GROOVES_JSON "${PROJECT_SOURCE_DIR}/presets/grooves.json")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${AP_GROOVES_JSON}")
+file(READ "${AP_GROOVES_JSON}" AP_GROOVES_HEX HEX)
+string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," AP_GROOVES_BYTES "${AP_GROOVES_HEX}")
+configure_file("${PROJECT_SOURCE_DIR}/cmake/GrooveData.cpp.in" "${CMAKE_CURRENT_BINARY_DIR}/GrooveData.cpp" @ONLY)
+
 add_library(ap_core STATIC
     src/BuildInfo.cpp
+    src/accompaniment/Grooves.cpp
+    src/accompaniment/MusicalContext.cpp
+    "${CMAKE_CURRENT_BINARY_DIR}/GrooveData.cpp"
     src/analysis/RhythmAnalysis.cpp
     src/dsp/Loudness.cpp
     src/dsp/Oversampler.cpp
