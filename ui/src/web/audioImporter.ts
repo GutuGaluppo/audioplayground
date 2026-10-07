@@ -145,6 +145,26 @@ export class AudioImporter {
     });
   }
 
+  /** The audio files a song lists, decoded, for an export; and the paths that could not be had. */
+  async collect(
+    paths: readonly string[],
+    progress: (done: number) => void = () => undefined,
+  ): Promise<{ audio: { path: string; decoded: DecodedAudio }[]; missing: string[] }> {
+    const audio: { path: string; decoded: DecodedAudio }[] = [];
+    const missing: string[] = [];
+    for (const [index, path] of paths.entries()) {
+      const bytes = await this.deps.store.readAudio(path).catch(() => undefined);
+      try {
+        if (!bytes) throw new Error('not stored');
+        audio.push({ path, decoded: await this.deps.decode(bytes) });
+      } catch {
+        missing.push(path);
+      }
+      progress(index + 1);
+    }
+    return { audio, missing };
+  }
+
   /** A new, empty song: none of the audio is in use any more. */
   newSong(): void {
     this.inUse.clear();

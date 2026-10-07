@@ -197,3 +197,63 @@ describe('browser engine: audio files', () => {
     expect(t.notices.some((m) => m.includes('One audio file'))).toBe(true);
   });
 });
+
+describe('browser engine: export', () => {
+  class FakeWorker {
+    static all: FakeWorker[] = [];
+    posted: Record<string, unknown>[] = [];
+    terminated = false;
+    onmessage: ((event: { data: Record<string, unknown> }) => void) | null = null;
+    onerror: (() => void) | null = null;
+    constructor(
+      public url: URL,
+      public options: unknown,
+    ) {
+      FakeWorker.all.push(this);
+    }
+    postMessage(message: Record<string, unknown>) {
+      this.posted.push(message);
+    }
+    terminate() {
+      this.terminated = true;
+    }
+  }
+
+  it('the Export intent renders in a worker, and Cancel stops it', async () => {
+    FakeWorker.all.length = 0;
+    vi.stubGlobal('Worker', FakeWorker);
+    const t = await setup();
+    t.port.replies['export'] = { ok: true, json: JSON.stringify({ assets: [] }) };
+    const states: unknown[] = [];
+    t.bridge.on('export.state', (state) => states.push(state));
+    t.deliver([
+      { type: 'project.state', payload: { name: 'Late night', dirty: false, hasLocation: false } },
+    ]);
+
+    t.bridge.send({ type: 'project.export', payload: { format: 2, sampleRate: 96000 } });
+    await settle(80);
+    const worker = FakeWorker.all[0];
+    expect(worker?.url.pathname).toMatch(/export-worker\.js$/);
+    expect(worker?.options).toEqual({ type: 'module' });
+    expect(worker?.posted[0]).toMatchObject({
+      sampleRate: 48000,
+      options: { format: 2, sampleRate: 96000 },
+    });
+    expect(states[0]).toEqual({ running: true, progress: 0 });
+
+    worker?.onmessage?.({
+      data: {
+        done: { bytes: new Uint8Array(4), seconds: 2, lufs: -20, truePeak: -3, missingAudio: 0 },
+      },
+    });
+    await settle();
+    expect(t.bridge.exportFile?.result()).toMatchObject({ fileName: 'Late night.wav', seconds: 2 });
+    expect(states.at(-1)).toEqual({ running: false, progress: 1 });
+
+    t.bridge.send({ type: 'project.export', payload: { format: 1, sampleRate: 48000 } });
+    await settle(80);
+    t.bridge.send({ type: 'project.cancelExport', payload: {} });
+    expect(FakeWorker.all[1]?.terminated).toBe(true);
+    expect(t.notices).toContain('Export cancelled.');
+  });
+});

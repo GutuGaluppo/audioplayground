@@ -41,8 +41,21 @@ handling in TypeScript would break ADR-003: two engines to keep in agreement.
   none of them.
 - **Milestone 1 scope:** transport and tempo, synth and drums played from the keyboard and pads,
   presets, effects and mixer, buses, timeline editing, undo/redo, the starter song, saving, and
-  audio files (below). Not in the browser yet, and each says so with a notice instead of failing
-  silently: recording, export, accompaniment suggestions, device choice.
+  audio files and export to WAV (below). Not in the browser yet, and each says so with a notice
+  instead of failing silently: recording, accompaniment suggestions, device choice.
+- **Export to WAV.** The same render as the desktop, off the audio thread: the page asks the live
+  engine for the song, decodes the audio files it lists, and gives both to a **worker** that runs a
+  second engine instance (the module is compiled once and shared). The worker renders a slice at a
+  time (one second of music per step) so that progress is real and Cancel is immediate (the worker is
+  terminated), then does what the desktop does: resample to the chosen rate, measure loudness (EBU
+  R128, true peak), write the WAV (16-bit with dither, 24-bit or float). To make that possible the
+  core's `renderSong` is built on a new stepwise `SongRender`, and the WAV writer has an in-memory
+  twin (`encodeWav`) that produces the same bytes as `writeWav`, so the desktop's behaviour is
+  unchanged and tested against the new path. The finished file waits behind a "Download" button:
+  browsers only start a download from a click, and the render takes longer than a click stays valid.
+  Audio files the page could not find are silent in the file and counted in the message. Limits: 30
+  minutes, and a size estimate (render, resampled copy and file together) of 640 MB, which the engine
+  checks before starting.
 - **Audio files.** The browser decodes (`decodeAudioData`: WAV, MP3, AAC, Ogg, FLAC, whatever it can
   play) at the output's sample rate, so the engine needs no resampler; the page keeps the file as
   it was imported, in IndexedDB, under `audio/<random id>.<ext>`, which is what the song file lists
@@ -86,25 +99,31 @@ handling in TypeScript would break ADR-003: two engines to keep in agreement.
 ## Consequences
 - The browser and the desktop behave the same for everything in the shared layer by construction;
   what differs is only what each platform provides (files, devices, recording).
-- Follow-ups, each small now that the shared layer exists: export, microphone input (`getUserMedia` into the worklet), Web MIDI, then mobile layouts.
+- Follow-ups, each small now that the shared layer exists: microphone input (`getUserMedia` into the worklet), Web MIDI, then mobile layouts.
 - Latency is the Web Audio output latency plus one render quantum; keys and pads reach the engine in
   about one message-port hop. Measure it on real devices before promising a number.
 - The engine ran at about 1 % of real time for the starter song in Node. Heavier projects and phones
   still need measuring.
 
 ## Verification
-- Twenty-four Node tests (`apps/web/test`) run the real module through the same `engine.js` the worklet
+- Thirty Node tests (`apps/web/test`) run the real module through the same `engine.js` the worklet
   loads: starter song, playing, undo/redo, refusals, malformed and oversized messages, unicode,
   determinism across block sizes, bounded memory, and saving: export and reopen gives the same
   project and the same sound, dirty tracking, recovered-as-unsaved, and eleven kinds of untrusted
   project text refused without touching the open song; and audio: a file becomes a clip of its own
   length in one undo step and plays at its level, stereo stays stereo, a song opens before its audio
   arrives, missing and relinked files, the sampler and a pad playing their own samples, refused
-  paths, rates, formats and lengths, and the memory cap.
+  paths, rates, formats and lengths, and the memory cap; and export: each format and rate gives a
+  valid WAV of the song's length, the file equals what playing the song produces (sample for sample,
+  minus the engine's latency), progress only moves forward, cancel and restart, missing audio is
+  silent and counted, the sampler and the pads are in the file. C++ tests check that a render taken in
+  slices equals the whole render and that the in-memory WAV equals the file the desktop writes.
 - Headless C++ tests of the shared code; UI tests of the bridge and the gate.
 - A manual run in a browser (the UI with the real worklet: starter song loaded, playhead and meters
   moving; saving against the real IndexedDB: autosave written, restored after a reload, Save As,
   Open, Cmd+S over an opened song, delete of the open song; and audio: a 44.1 kHz WAV dropped on a
   lane becomes a clip with its waveform, survives a reload through Save and Open, and shows as
-  missing with Locate when its stored file is removed). It cannot be heard from the test environment, so listening on real browsers and devices
+  missing with Locate when its stored file is removed; and export: the starter song exported through
+  the Export menu in a real worker, with progress, a "Your song is ready" dialog, and a downloaded
+  file that is a valid 24-bit stereo 48 kHz WAV with signal in it). It cannot be heard from the test environment, so listening on real browsers and devices
   is still a human check.

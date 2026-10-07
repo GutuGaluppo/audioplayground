@@ -4,6 +4,7 @@ import { parseNativeEvent, PROTOCOL_VERSION } from './generated';
 import type { Intent, NativeEventPayloads, NativeEventType } from './generated';
 import { SYNTH_PRESET_IDS } from '../params/synthPreset';
 import type { ImportTarget } from '../web/audioFiles';
+import type { ExportDownload } from '../web/exporter';
 import type { ProjectLibrary } from '../web/projectLibrary';
 import { createSimulatedTimeline } from './simulatedTimeline';
 import type { SimulatedEdit } from './simulatedTimeline';
@@ -23,6 +24,8 @@ export interface Bridge {
   readonly audio?: AudioGate;
   /** Only the browser engine: saved songs live in the browser, so it asks the questions (ADR-016). */
   readonly projects?: ProjectLibrary;
+  /** Only the browser engine: a finished export waits here for a click that saves it. */
+  readonly exportFile?: ExportDownload;
   /** Only the browser engine: audio files dropped on the page (the desktop uses its file dialog). */
   readonly importFiles?: (files: readonly File[], target: ImportTarget) => Promise<void>;
   send(intent: Intent): void;

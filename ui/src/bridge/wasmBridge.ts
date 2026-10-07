@@ -1,6 +1,9 @@
 import { AudioImporter } from '../web/audioImporter';
 import { chooseAudioFile, decodeAudio, randomId } from '../web/audioFiles';
 import type { ImportTarget } from '../web/audioFiles';
+import { downloadFile } from '../web/download';
+import { WebExporter } from '../web/exporter';
+import type { RenderWorker } from '../web/exporter';
 import { WebProjectLibrary } from '../web/projectLibrary';
 import type { ProjectHost } from '../web/projectLibrary';
 import { openIndexedDbStore } from '../web/projectStore';
@@ -31,6 +34,7 @@ export function createWasmBridge(
   let context: AudioContext | null = null;
   let node: AudioWorkletNode | null = null;
   let booting: Promise<void> | null = null;
+  let compiledModule: WebAssembly.Module | null = null;
 
   // Requests to the engine that wait for an answer (saving and opening), and the engine being up.
   const waiting = new Map<number, (reply: Record<string, unknown>) => void>();
@@ -61,6 +65,7 @@ export function createWasmBridge(
     const wasm = await fetch(new URL(`${directory}ap_web.wasm`, document.baseURI));
     if (!wasm.ok) throw new Error('The audio engine could not be downloaded.');
     const module = await WebAssembly.compile(await wasm.arrayBuffer());
+    compiledModule = module;
 
     context = new AudioContext({ latencyHint: 'interactive' });
     context.onstatechange = follow;
@@ -181,6 +186,37 @@ export function createWasmBridge(
     },
     notice,
   };
+  // Exporting a WAV file happens in a worker with an engine of its own: the music keeps playing.
+  let songName = 'Song';
+  router.on('project.state', (state) => {
+    songName = state.name;
+  });
+  const exporter = new WebExporter({
+    exportProject: async () => {
+      const stamp = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
+      const reply = await call({ kind: 'export', timestamp: stamp });
+      if (reply['ok'] !== true || typeof reply['json'] !== 'string')
+        throw new Error('The song could not be read from the engine.');
+      return reply['json'];
+    },
+    collectAudio: (paths) => importer.collect(paths),
+    createWorker: () =>
+      new Worker(new URL(`${directory}export-worker.js`, document.baseURI), {
+        type: 'module',
+      }) as unknown as RenderWorker,
+    module: async () => {
+      await ensureBooted();
+      if (!compiledModule) throw new Error('The audio engine is not running.');
+      return compiledModule;
+    },
+    sampleRate: () => context?.sampleRate ?? 48000,
+    projectName: () => songName,
+    state: (running, progress) => {
+      router.dispatch({ type: 'export.state', payload: { running, progress } });
+    },
+    notice,
+    save: downloadFile,
+  });
   const projects = new WebProjectLibrary({
     store: lazyStore,
     host,
@@ -232,6 +268,7 @@ export function createWasmBridge(
     isNative: false,
     audio,
     projects,
+    exportFile: exporter,
     importFiles: async (files, target) => {
       const [first, ...others] = files;
       if (!first) return;
@@ -252,6 +289,15 @@ export function createWasmBridge(
           return;
         case 'project.saveAs':
           void projects.request('saveAs');
+          return;
+        case 'project.export':
+          void exporter.start({
+            format: intent.payload.format,
+            sampleRate: intent.payload.sampleRate,
+          });
+          return;
+        case 'project.cancelExport':
+          exporter.cancel();
           return;
         // Files are chosen with the browser's dialog; it opens only from the click that got here.
         case 'track.importAudio':
