@@ -134,6 +134,7 @@ export function createSimulatedBridge(): Bridge {
     'Zap',
   ];
   const drumPads = FACTORY.map((name) => ({ name, volumeDb: 0, pitch: 0, muted: false }));
+  let drumKit = 0;
   const sendPad = (pad: number) => {
     const info = drumPads[pad];
     if (!info) return;
@@ -264,6 +265,7 @@ export function createSimulatedBridge(): Bridge {
             sendProject();
             router.dispatch({ type: 'instrument.state', payload: { instrument: 0 } });
             timeline.ready();
+            router.dispatch({ type: 'drums.kit', payload: { kit: drumKit } });
             drumPads.forEach((_, pad) => {
               sendPad(pad);
             });
@@ -422,6 +424,12 @@ export function createSimulatedBridge(): Bridge {
             const info = drumPads[pad];
             if (info) Object.assign(info, { volumeDb, pitch, muted });
             sendPad(pad);
+          });
+          return;
+        case 'drums.setKit':
+          queueMicrotask(() => {
+            drumKit = intent.payload.kit;
+            router.dispatch({ type: 'drums.kit', payload: { kit: drumKit } });
           });
           return;
         case 'drums.trigger':

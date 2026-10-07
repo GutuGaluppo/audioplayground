@@ -309,6 +309,18 @@ TEST_CASE ("Drum pad settings are validated and clamped", "[model][drums]")
     CHECK (doc.project().drums.pads[0].pitch == -DrumPad::maxPitch);
 }
 
+TEST_CASE ("The drum kit is validated and undoable", "[model][drums]")
+{
+    ProjectDocument doc;
+    CHECK (doc.project().drums.kit == 0);
+    CHECK_FALSE (doc.perform (SetDrumKit {DrumKit::kitCount}));
+    CHECK_FALSE (doc.perform (SetDrumKit {0})); // unchanged: nothing to record
+    REQUIRE (doc.perform (SetDrumKit {3}));
+    CHECK (doc.project().drums.kit == 3);
+    REQUIRE (doc.undo());
+    CHECK (doc.project().drums.kit == 0);
+}
+
 TEST_CASE ("Track effects are clamped, snapped, undoable, and a gesture is one step", "[model][effects]")
 {
     using ap::params::EffectKind;

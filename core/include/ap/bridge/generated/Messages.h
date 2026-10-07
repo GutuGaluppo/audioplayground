@@ -74,6 +74,19 @@ struct TimelineEffect
     bool operator== (const TimelineEffect&) const = default;
 };
 
+struct TimelineSend
+{
+    static constexpr int busMin = 1;
+    static constexpr int busMax = 2147483647;
+    static constexpr double levelDbMin = -60.0;
+    static constexpr double levelDbMax = 6.0;
+
+    int bus = 0;
+    double levelDb = 0.0;
+
+    bool operator== (const TimelineSend&) const = default;
+};
+
 struct TimelineTrack
 {
     static constexpr int idMin = 1;
@@ -87,6 +100,7 @@ struct TimelineTrack
     static constexpr double panMax = 1.0;
     static constexpr std::size_t clipsMaxItems = 512;
     static constexpr std::size_t effectsMaxItems = 6;
+    static constexpr std::size_t sendsMaxItems = 8;
 
     int id = 0;
     int kind = 0;
@@ -97,8 +111,42 @@ struct TimelineTrack
     bool soloed = false;
     std::vector<TimelineClip> clips {};
     std::vector<TimelineEffect> effects {};
+    std::vector<TimelineSend> sends {};
 
     bool operator== (const TimelineTrack&) const = default;
+};
+
+struct BusEffect
+{
+    static constexpr float valuesMin = -100000.0f;
+    static constexpr float valuesMax = 100000.0f;
+    static constexpr std::size_t valuesMaxItems = 8;
+
+    bool enabled = false;
+    std::vector<float> values {};
+
+    bool operator== (const BusEffect&) const = default;
+};
+
+struct TimelineBus
+{
+    static constexpr int idMin = 1;
+    static constexpr int idMax = 2147483647;
+    static constexpr std::size_t nameMaxLength = 256;
+    static constexpr double volumeDbMin = -60.0;
+    static constexpr double volumeDbMax = 6.0;
+    static constexpr double panMin = -1.0;
+    static constexpr double panMax = 1.0;
+    static constexpr std::size_t effectsMaxItems = 6;
+
+    int id = 0;
+    std::string name {};
+    double volumeDb = 0.0;
+    double pan = 0.0;
+    bool muted = false;
+    std::vector<BusEffect> effects {};
+
+    bool operator== (const TimelineBus&) const = default;
 };
 
 struct TimelineAsset
@@ -424,6 +472,17 @@ struct DrumsResetPad
     int pad = 0;
 
     bool operator== (const DrumsResetPad&) const = default;
+};
+
+struct DrumsSetKit
+{
+    static constexpr std::string_view type = "drums.setKit";
+    static constexpr int kitMin = 0;
+    static constexpr int kitMax = 4;
+
+    int kit = 0;
+
+    bool operator== (const DrumsSetKit&) const = default;
 };
 
 struct TransportRecord
@@ -792,6 +851,125 @@ struct ClipEditNote
     bool operator== (const ClipEditNote&) const = default;
 };
 
+struct BusAdd
+{
+    static constexpr std::string_view type = "bus.add";
+
+    bool operator== (const BusAdd&) const = default;
+};
+
+struct BusRemove
+{
+    static constexpr std::string_view type = "bus.remove";
+    static constexpr int busMin = 1;
+    static constexpr int busMax = 2147483647;
+
+    int bus = 0;
+
+    bool operator== (const BusRemove&) const = default;
+};
+
+struct BusRename
+{
+    static constexpr std::string_view type = "bus.rename";
+    static constexpr int busMin = 1;
+    static constexpr int busMax = 2147483647;
+    static constexpr std::size_t nameMaxLength = 512;
+
+    int bus = 0;
+    std::string name {};
+
+    bool operator== (const BusRename&) const = default;
+};
+
+struct BusSetVolume
+{
+    static constexpr std::string_view type = "bus.setVolume";
+    static constexpr int busMin = 1;
+    static constexpr int busMax = 2147483647;
+    static constexpr double volumeDbMin = -60.0;
+    static constexpr double volumeDbMax = 6.0;
+    static constexpr int gestureMin = 0;
+    static constexpr int gestureMax = 2147483647;
+
+    int bus = 0;
+    double volumeDb = 0.0;
+    int gesture = 0;
+
+    bool operator== (const BusSetVolume&) const = default;
+};
+
+struct BusSetPan
+{
+    static constexpr std::string_view type = "bus.setPan";
+    static constexpr int busMin = 1;
+    static constexpr int busMax = 2147483647;
+    static constexpr double panMin = -1.0;
+    static constexpr double panMax = 1.0;
+    static constexpr int gestureMin = 0;
+    static constexpr int gestureMax = 2147483647;
+
+    int bus = 0;
+    double pan = 0.0;
+    int gesture = 0;
+
+    bool operator== (const BusSetPan&) const = default;
+};
+
+struct BusSetMute
+{
+    static constexpr std::string_view type = "bus.setMute";
+    static constexpr int busMin = 1;
+    static constexpr int busMax = 2147483647;
+
+    int bus = 0;
+    bool muted = false;
+
+    bool operator== (const BusSetMute&) const = default;
+};
+
+struct BusSetEffect
+{
+    static constexpr std::string_view type = "bus.setEffect";
+    static constexpr int busMin = 1;
+    static constexpr int busMax = 2147483647;
+    static constexpr int effectMin = 0;
+    static constexpr int effectMax = 5;
+    static constexpr float valuesMin = -100000.0f;
+    static constexpr float valuesMax = 100000.0f;
+    static constexpr std::size_t valuesMaxItems = 8;
+    static constexpr int gestureMin = 0;
+    static constexpr int gestureMax = 2147483647;
+
+    int bus = 0;
+    int effect = 0;
+    bool enabled = false;
+    std::vector<float> values {};
+    int gesture = 0;
+
+    bool operator== (const BusSetEffect&) const = default;
+};
+
+struct TrackSetSend
+{
+    static constexpr std::string_view type = "track.setSend";
+    static constexpr int trackMin = 1;
+    static constexpr int trackMax = 2147483647;
+    static constexpr int busMin = 1;
+    static constexpr int busMax = 2147483647;
+    static constexpr double levelDbMin = -60.0;
+    static constexpr double levelDbMax = 6.0;
+    static constexpr int gestureMin = 0;
+    static constexpr int gestureMax = 2147483647;
+
+    int track = 0;
+    int bus = 0;
+    double levelDb = 0.0;
+    int gesture = 0;
+
+    bool operator== (const TrackSetSend&) const = default;
+};
+
 struct EngineStatus
 {
     static constexpr std::string_view type = "engine.status";
@@ -986,6 +1164,17 @@ struct SamplerState
     bool operator== (const SamplerState&) const = default;
 };
 
+struct DrumsKit
+{
+    static constexpr std::string_view type = "drums.kit";
+    static constexpr int kitMin = 0;
+    static constexpr int kitMax = 4;
+
+    int kit = 0;
+
+    bool operator== (const DrumsKit&) const = default;
+};
+
 struct DrumsPad
 {
     static constexpr std::string_view type = "drums.pad";
@@ -1012,8 +1201,10 @@ struct TimelineState
 {
     static constexpr std::string_view type = "timeline.state";
     static constexpr std::size_t tracksMaxItems = 64;
+    static constexpr std::size_t busesMaxItems = 8;
 
     std::vector<TimelineTrack> tracks {};
+    std::vector<TimelineBus> buses {};
 
     bool operator== (const TimelineState&) const = default;
 };
@@ -1044,7 +1235,7 @@ struct TimelinePeaks
     bool operator== (const TimelinePeaks&) const = default;
 };
 
-using Intent = std::variant<AppReady, AudioOpenSettings, ToneSetEnabled, TransportPlay, TransportStop, TransportReturnToStart, TransportSetTempo, TransportSetCountIn, MetronomeSetEnabled, ParamSet, EditUndo, EditRedo, ProjectNew, ProjectOpen, ProjectSave, ProjectSaveAs, ProjectRename, ProjectExport, ProjectCancelExport, NoteOn, NoteOff, NoteAllOff, InstrumentSelect, SamplerLoad, DrumsSetStep, DrumsClear, DrumsTrigger, DrumsSetPad, DrumsLoadPad, DrumsResetPad, TransportRecord, TransportCapture, TransportSeek, TransportSetLoop, TrackAdd, TrackRemove, TrackRename, TrackSetVolume, TrackSetPan, TrackSetMute, TrackSetSolo, TrackSetArmed, TrackSetEffect, TrackImportAudio, AssetLocate, ClipCreate, ClipMove, ClipResize, ClipSplit, ClipRemove, ClipDuplicate, ClipSetLoop, ClipAddNote, ClipRemoveNote, ClipEditNote>;
-using Event = std::variant<EngineStatus, EngineMeters, TransportState, TransportPosition, ParamValue, HistoryState, ProjectState, ExportState, AppNotice, InstrumentState, SamplerState, DrumsPad, TimelineState, TimelineAssets, TimelinePeaks>;
+using Intent = std::variant<AppReady, AudioOpenSettings, ToneSetEnabled, TransportPlay, TransportStop, TransportReturnToStart, TransportSetTempo, TransportSetCountIn, MetronomeSetEnabled, ParamSet, EditUndo, EditRedo, ProjectNew, ProjectOpen, ProjectSave, ProjectSaveAs, ProjectRename, ProjectExport, ProjectCancelExport, NoteOn, NoteOff, NoteAllOff, InstrumentSelect, SamplerLoad, DrumsSetStep, DrumsClear, DrumsTrigger, DrumsSetPad, DrumsLoadPad, DrumsResetPad, DrumsSetKit, TransportRecord, TransportCapture, TransportSeek, TransportSetLoop, TrackAdd, TrackRemove, TrackRename, TrackSetVolume, TrackSetPan, TrackSetMute, TrackSetSolo, TrackSetArmed, TrackSetEffect, TrackImportAudio, AssetLocate, ClipCreate, ClipMove, ClipResize, ClipSplit, ClipRemove, ClipDuplicate, ClipSetLoop, ClipAddNote, ClipRemoveNote, ClipEditNote, BusAdd, BusRemove, BusRename, BusSetVolume, BusSetPan, BusSetMute, BusSetEffect, TrackSetSend>;
+using Event = std::variant<EngineStatus, EngineMeters, TransportState, TransportPosition, ParamValue, HistoryState, ProjectState, ExportState, AppNotice, InstrumentState, SamplerState, DrumsKit, DrumsPad, TimelineState, TimelineAssets, TimelinePeaks>;
 
 } // namespace ap::bridge

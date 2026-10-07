@@ -24,6 +24,15 @@ struct TrackId
     constexpr auto operator<=> (const TrackId&) const = default;
 };
 
+// Stable identity for an effect bus (ADR-010). Never reused within a project.
+struct BusId
+{
+    std::uint64_t value = 0;
+
+    [[nodiscard]] constexpr bool isValid() const noexcept { return value != 0; }
+    constexpr auto operator<=> (const BusId&) const = default;
+};
+
 // Stable identity for an imported audio file in the project folder. Never reused.
 struct AssetId
 {
@@ -135,6 +144,37 @@ using TrackEffects = std::array<EffectState, params::numEffects>;
 [[nodiscard]] std::optional<EffectState> normaliseEffect (params::EffectKind effect,
                                                           const EffectState& state) noexcept;
 
+// How much of a track (after its effects, volume and pan) is sent to an effect bus.
+struct Send
+{
+    static constexpr float minLevelDb = -60.0f; // at or below this the send is removed
+    static constexpr float maxLevelDb = 6.0f;
+
+    BusId bus;
+    float levelDb = 0.0f;
+
+    bool operator== (const Send&) const = default;
+};
+
+// An effect bus (ADR-010): collects the sends of tracks, runs them through its own fixed effect
+// chain (same as a track's) and mixes the result into the master. Buses never feed other buses.
+struct Bus
+{
+    static constexpr std::size_t maxBuses = 8;
+    static constexpr std::size_t maxNameLength = 64;
+    static constexpr float minVolumeDb = -60.0f; // treated as silence
+    static constexpr float maxVolumeDb = 6.0f;
+
+    BusId id;
+    std::string name;
+    float volumeDb = 0.0f;
+    float pan = 0.0f;
+    bool muted = false;
+    TrackEffects effects = defaultTrackEffects();
+
+    bool operator== (const Bus&) const = default;
+};
+
 struct Track
 {
     static constexpr float minVolumeDb = -60.0f; // treated as silence
@@ -153,6 +193,7 @@ struct Track
     bool soloed = false;
     std::vector<Clip> clips; // sorted by start, then id
     TrackEffects effects = defaultTrackEffects();
+    std::vector<Send> sends; // at most one per bus, in bus order of creation
 
     bool operator== (const Track&) const = default;
 };
@@ -180,6 +221,9 @@ struct DrumKit
     static constexpr core::Ticks patternLength = numSteps * ticksPerStep;      // one 4/4 bar
     static constexpr std::uint8_t firstPadNote = 36;                           // GM kick
 
+    static constexpr std::uint8_t kitCount = 5; // factory kits (ap::instruments::factoryKitCount)
+
+    std::uint8_t kit = 0; // which factory kit pads without a user sample play
     std::array<DrumPad, numPads> pads {};
 
     bool operator== (const DrumKit&) const = default;
@@ -198,6 +242,8 @@ struct Project
     core::TimeSignature timeSignature {}; // fixed per project in the MVP (decision D4)
     double exportSampleRate = 48000.0;    // default export rate only (ADR-006)
     std::vector<Track> tracks;
+    std::vector<Bus> buses;
+    std::uint64_t nextBusId = 1;
     std::array<float, params::numParameters> parameters = defaultParameterValues();
     std::uint64_t nextTrackId = 1;
     std::uint64_t nextClipId = 1;
@@ -227,6 +273,8 @@ struct Project
     [[nodiscard]] const Track* findTrack (TrackId id) const noexcept;
     [[nodiscard]] Track* findTrack (TrackId id) noexcept;
     [[nodiscard]] std::optional<std::size_t> indexOf (TrackId id) const noexcept;
+    [[nodiscard]] const Bus* findBus (BusId id) const noexcept;
+    [[nodiscard]] Bus* findBus (BusId id) noexcept;
     [[nodiscard]] const Asset* findAsset (AssetId id) const noexcept;
     [[nodiscard]] const Track* findInstrumentTrack (InstrumentKind instrument) const noexcept;
 

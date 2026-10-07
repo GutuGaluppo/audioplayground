@@ -20,3 +20,6 @@ compile_commands.json
 # Never commit user audio or local projects
 *.playground/
 /dist/
+
+# Documentation only
+refs/

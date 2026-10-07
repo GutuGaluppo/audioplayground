@@ -17,6 +17,7 @@ import {
 } from '../timeline/model';
 import { useSelection } from '../timeline/selection';
 import { keyLabelForPad, padForKey } from './drumKeys';
+import { DRUM_KITS } from './drumKits';
 
 const PADS = Array.from({ length: 16 }, (_, i) => i);
 const STEPS = Array.from({ length: 16 }, (_, i) => i);
@@ -246,6 +247,7 @@ export function DrumPanel() {
   const transport = useLatest(stores.transportState);
   const position = useLatest(stores.transportPosition);
   const selection = useSelection(stores.selection);
+  const kit = useLatest(stores.drumKit)?.kit ?? 0;
   const [selected, setSelected] = useState(0);
   const paint = useRef<{ on: boolean; gesture: number } | null>(null);
 
@@ -290,6 +292,25 @@ export function DrumPanel() {
               : ' · click a step to start a pattern'}
           </span>
         </h2>
+        <label className="drums__kit">
+          Kit
+          <select
+            aria-label="Drum kit"
+            value={kit}
+            onChange={(event) => {
+              bridge.send({
+                type: 'drums.setKit',
+                payload: { kit: Number(event.currentTarget.value) },
+              });
+            }}
+          >
+            {DRUM_KITS.map((name, index) => (
+              <option key={name} value={index}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </label>
         <button
           type="button"
           className="button button--quiet"

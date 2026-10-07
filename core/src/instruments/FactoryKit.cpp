@@ -2,6 +2,8 @@
 
 #include "ap/dsp/StateVariableFilter.h"
 
+#include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <numbers>
@@ -102,12 +104,157 @@ struct Builder
         return buffer;
     }
 };
+
+// Shape of a kit: the same pad roles as the classic kit, with different tuning, lengths and colour.
+struct Style
+{
+    double kickStart, kickEnd, kickGlide, kickDecay, kickLength, kickClick;
+    double snareTone, snareCut, snareDecay, snareNoise;
+    double hatCut, hatDecay, openDecay;
+    double clapCut, clapTail;
+    double tomBase, tomSweep, tomDecay;
+    double crashCut, crashDecay;
+    double bassHz, bassDecay;
+    double drive;     // pre-clip gain; 1 = none
+    int crushStep;    // hold each sample this many times (sample-rate reduction); 1 = none
+    int crushLevels;  // amplitude levels (bit reduction); 0 = none
+};
+
+constexpr std::array<Style, factoryKitCount> styles {{
+    {}, // kit 0 is the hand-written classic kit below
+    // 808: long sub kick, boomy toms, soft snare, sizzly hats.
+    {120.0, 38.0, 0.05, 0.75, 1.3, 0.12, 190.0, 2500.0, 0.16, 0.5, 9500.0, 0.028, 0.32, 1100.0, 0.16, 70.0,
+     2.0, 0.45, 6000.0, 0.9, 43.0, 1.2, 1.0, 1, 0},
+    // Lo-fi: the classic shape, dusty and crunchy (crushed in post).
+    {150.0, 52.0, 0.04, 0.22, 0.5, 0.2, 210.0, 1500.0, 0.14, 0.5, 6500.0, 0.035, 0.18, 1300.0, 0.1, 100.0,
+     1.5, 0.2, 4500.0, 0.5, 60.0, 0.5, 1.4, 4, 48},
+    // Acoustic-ish: round kick thump, noisy snare, washy cymbals.
+    {110.0, 62.0, 0.03, 0.2, 0.45, 0.35, 200.0, 1200.0, 0.2, 0.9, 7000.0, 0.05, 0.4, 1000.0, 0.14, 85.0, 1.35,
+     0.3, 4000.0, 1.4, 65.0, 0.4, 1.0, 1, 0},
+    // Electro: tight, hard kick, bright zappy toms, clipped hats.
+    {230.0, 55.0, 0.02, 0.16, 0.4, 0.3, 330.0, 3000.0, 0.09, 0.6, 11000.0, 0.018, 0.12, 2200.0, 0.07, 160.0,
+     4.0, 0.14, 9000.0, 0.45, 55.0, 0.3, 3.0, 1, 0},
+}};
+
+std::unique_ptr<SampleBuffer> makeStyledSound (std::size_t pad, double rate, const Style& st,
+                                               std::uint32_t seedOffset)
+{
+    using dsp::FilterMode;
+    const auto seed = [seedOffset] (std::uint32_t n) { return n + seedOffset; };
+    Builder b (rate, 0.5);
+
+    switch (pad)
+    {
+    case 0: // Kick
+        b = Builder (rate, st.kickLength);
+        b.sweptSine (st.kickStart, st.kickEnd, st.kickGlide, st.kickDecay, 0.95);
+        b.noise (seed (1), FilterMode::bandPass, 3500.0, 1.0, 0.004, st.kickClick);
+        break;
+    case 1: // Snare
+        b = Builder (rate, 0.4);
+        b.sweptSine (st.snareTone * 1.2, st.snareTone, 0.02, 0.08, 0.5);
+        b.noise (seed (2), FilterMode::highPass, st.snareCut, 0.7, st.snareDecay, st.snareNoise);
+        break;
+    case 2: // Closed hat
+        b = Builder (rate, 0.15);
+        b.noise (seed (3), FilterMode::highPass, st.hatCut, 0.8, st.hatDecay, 0.6);
+        break;
+    case 3: // Open hat
+        b = Builder (rate, 0.7);
+        b.noise (seed (4), FilterMode::highPass, st.hatCut * 0.95, 0.8, st.openDecay, 0.5);
+        break;
+    case 4: // Clap
+    {
+        b = Builder (rate, 0.45);
+        for (int burst = 0; burst < 3; ++burst)
+        {
+            Builder hit (rate, 0.45);
+            hit.noise (seed (5u + static_cast<std::uint32_t> (burst)), FilterMode::bandPass, st.clapCut, 1.2,
+                       burst == 2 ? st.clapTail : 0.008, 0.9);
+            const auto offset = static_cast<std::size_t> (burst * 0.011 * rate);
+            for (std::size_t n = 0; n + offset < b.samples.size(); ++n)
+                b.samples[n + offset] += hit.samples[n];
+        }
+        break;
+    }
+    case 5:
+    case 6:
+    case 7: // Toms
+    {
+        const double base = st.tomBase * (pad == 5 ? 1.0 : pad == 6 ? 1.42 : 2.0);
+        b = Builder (rate, 0.7);
+        b.sweptSine (base * st.tomSweep, base, 0.05, st.tomDecay, 0.85);
+        break;
+    }
+    case 8: // Rim
+        b = Builder (rate, 0.1);
+        b.noise (seed (9), FilterMode::bandPass, 2600.0, 4.0, 0.012, 1.6);
+        b.sweptSine (1700.0, 1600.0, 0.01, 0.015, 0.3);
+        break;
+    case 9: // Cowbell
+    {
+        b = Builder (rate, 0.5);
+        b.squareTone (540.0, 0.14, 0.25);
+        b.squareTone (800.0, 0.14, 0.25);
+        dsp::StateVariableFilter filter;
+        filter.prepare (rate);
+        filter.setMode (FilterMode::bandPass);
+        filter.setCutoffAndQ (900.0, 1.5);
+        for (auto& s : b.samples)
+            s = filter.process (s) * 1.6f;
+        break;
+    }
+    case 10: // Shaker
+        b = Builder (rate, 0.18);
+        b.noise (seed (11), FilterMode::highPass, st.hatCut * 0.75, 0.7, 0.04, 0.5, 0.015);
+        break;
+    case 11: // Crash
+        b = Builder (rate, 2.2);
+        b.noise (seed (12), FilterMode::highPass, st.crashCut, 0.6, st.crashDecay, 0.45);
+        break;
+    case 12: // Perc low
+        b = Builder (rate, 0.3);
+        b.sweptSine (420.0, 300.0, 0.01, 0.07, 0.7);
+        break;
+    case 13: // Perc high
+        b = Builder (rate, 0.22);
+        b.sweptSine (1100.0, 900.0, 0.008, 0.045, 0.6);
+        break;
+    case 14: // Bass hit
+        b = Builder (rate, 1.4);
+        b.sweptSine (st.bassHz * 1.3, st.bassHz, 0.05, st.bassDecay, 0.8);
+        b.sweptSine (st.bassHz * 2.6, st.bassHz * 2.0, 0.05, st.bassDecay * 0.3, 0.2);
+        break;
+    default: // Zap
+        b = Builder (rate, 0.35);
+        b.sweptSine (2400.0, 120.0, 0.03, 0.14, 0.6);
+        break;
+    }
+
+    // Colour: drive into the soft clip, then optional sample-rate and bit reduction (lo-fi).
+    for (auto& s : b.samples)
+        s = static_cast<float> (st.drive) * s;
+    if (st.crushStep > 1)
+        for (std::size_t n = 0; n < b.samples.size(); ++n)
+            if (n % static_cast<std::size_t> (st.crushStep) != 0)
+                b.samples[n] = b.samples[n - n % static_cast<std::size_t> (st.crushStep)];
+    if (st.crushLevels > 0)
+    {
+        const auto levels = static_cast<float> (st.crushLevels);
+        for (auto& s : b.samples)
+            s = std::round (s * levels) / levels;
+    }
+    return b.finish();
+}
 } // namespace
 
-std::unique_ptr<SampleBuffer> makeFactorySound (std::size_t pad, double sampleRate)
+std::unique_ptr<SampleBuffer> makeFactorySound (std::size_t pad, double sampleRate, std::size_t kit)
 {
     using dsp::FilterMode;
     const double rate = sampleRate > 0.0 ? sampleRate : 48000.0;
+    if (kit > 0 && kit < factoryKitCount)
+        return makeStyledSound (pad, rate, styles[kit], static_cast<std::uint32_t> (kit) * 100u);
+
 
     switch (pad)
     {

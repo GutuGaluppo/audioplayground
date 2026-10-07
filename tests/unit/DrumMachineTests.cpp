@@ -4,6 +4,7 @@
 #include "ap/engine/Engine.h"
 #include "ap/engine/OfflineRenderer.h"
 #include "ap/instruments/DrumMachine.h"
+#include "ap/model/Project.h"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
@@ -68,6 +69,49 @@ TEST_CASE ("Factory kit sounds are valid, bounded, audible and deterministic", "
         CHECK (std::abs (x.back()) < 1.0e-3f); // faded out: no click at the end
         CHECK (x == instruments::makeFactorySound (pad, fs)->channels[0]);
     }
+}
+
+TEST_CASE ("Every factory kit is valid, bounded, audible and deterministic", "[drums]")
+{
+    static_assert (instruments::factoryKitTitles.size() == model::DrumKit::kitCount);
+    for (std::size_t kit = 1; kit < instruments::factoryKitCount; ++kit)
+        for (std::size_t pad = 0; pad < instruments::factoryKitSize; ++pad)
+        {
+            CAPTURE (kit, pad, instruments::factoryKitNames[pad]);
+            const auto sound = instruments::makeFactorySound (pad, fs, kit);
+            REQUIRE (sound->isValid());
+            const auto& x = sound->channels[0];
+
+            float peak = 0.0f;
+            for (const float s : x)
+            {
+                REQUIRE (std::isfinite (s));
+                peak = std::max (peak, std::abs (s));
+            }
+            CHECK (peak > 0.1f);
+            CHECK (peak < 1.0f);
+            CHECK (std::abs (x.back()) < 1.0e-3f);
+            CHECK (x == instruments::makeFactorySound (pad, fs, kit)->channels[0]);
+            CHECK (x != instruments::makeFactorySound (pad, fs, 0)->channels[0]); // really a different kit
+        }
+}
+
+TEST_CASE ("Switching kits changes what a pad plays, and kit 0 is unchanged", "[drums]")
+{
+    const auto render = [] (int kit)
+    {
+        engine::Engine engine;
+        engine.prepare (fs, 512);
+        engine.getDrums().setKit (kit);
+        test::publish (engine, test::drumPatternProject ({{kick, {0}}}, 4 * bar));
+        engine.getTransport().requestPlay();
+        return engine::renderOffline (engine, {fs, 1, 48000, 512})[0];
+    };
+    const auto classic = render (0);
+    CHECK (render (1) != classic);
+    CHECK (render (2) != classic);
+    CHECK (render (0) == classic);
+    CHECK (render (99) == classic); // out of range: ignored
 }
 
 TEST_CASE ("Pattern clips trigger steps sample-accurately at any block size", "[drums]")

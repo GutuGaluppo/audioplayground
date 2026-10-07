@@ -1,6 +1,7 @@
 #include "Exporter.h"
 #include "TempDirectory.h"
 
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <juce_audio_formats/juce_audio_formats.h>
 
@@ -89,4 +90,28 @@ TEST_CASE ("Export refuses an empty song and can be cancelled", "[export]")
     f.waitForResult();
     CHECK (f.result->error == "cancelled");
     CHECK_FALSE (f.file ("cancelled.wav").exists());
+}
+
+TEST_CASE ("Export includes the effect buses a track sends to", "[export][bus]")
+{
+    const auto exportLufs = [] (bool withSend)
+    {
+        Fixture f;
+        f.addMelody();
+        const auto track = f.session.project().tracks.front().id;
+        REQUIRE (f.session.perform (model::SetTrackVolume {track, -12.0f}));
+        if (withSend)
+        {
+            REQUIRE (f.session.perform (model::AddBus {}));
+            REQUIRE (f.session.perform (model::SetTrackSend {track, f.session.project().buses[0].id, 0.0f}));
+        }
+        REQUIRE_FALSE (f.exporter.start (f.file ("song.wav"), {io::WavFormat::pcm24, 48000}).has_value());
+        f.waitForResult();
+        INFO (f.result->error);
+        REQUIRE (f.result->error.empty());
+        return f.result->loudness.integratedLufs;
+    };
+
+    // A transparent bus fed at unity adds a time-aligned copy of the track: +6 dB.
+    CHECK (exportLufs (true) - exportLufs (false) == Catch::Approx (6.0).margin (0.5));
 }

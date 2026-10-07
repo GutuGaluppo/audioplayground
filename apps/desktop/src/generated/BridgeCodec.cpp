@@ -100,7 +100,10 @@ bool hasOnlyKeys (const juce::DynamicObject& object, std::initializer_list<const
 juce::var toVar (const TimelineNote& m);
 juce::var toVar (const TimelineClip& m);
 juce::var toVar (const TimelineEffect& m);
+juce::var toVar (const TimelineSend& m);
 juce::var toVar (const TimelineTrack& m);
+juce::var toVar (const BusEffect& m);
+juce::var toVar (const TimelineBus& m);
 juce::var toVar (const TimelineAsset& m);
 
 template <typename Item>
@@ -145,6 +148,14 @@ template <typename Item>
     return juce::var (object);
 }
 
+[[maybe_unused]] juce::var toVar (const TimelineSend& m)
+{
+    auto* object = new juce::DynamicObject();
+    object->setProperty ("bus", m.bus);
+    object->setProperty ("levelDb", m.levelDb);
+    return juce::var (object);
+}
+
 [[maybe_unused]] juce::var toVar (const TimelineTrack& m)
 {
     auto* object = new juce::DynamicObject();
@@ -156,6 +167,27 @@ template <typename Item>
     object->setProperty ("muted", m.muted);
     object->setProperty ("soloed", m.soloed);
     object->setProperty ("clips", toVarList (m.clips));
+    object->setProperty ("effects", toVarList (m.effects));
+    object->setProperty ("sends", toVarList (m.sends));
+    return juce::var (object);
+}
+
+[[maybe_unused]] juce::var toVar (const BusEffect& m)
+{
+    auto* object = new juce::DynamicObject();
+    object->setProperty ("enabled", m.enabled);
+    object->setProperty ("values", toVarArray (m.values));
+    return juce::var (object);
+}
+
+[[maybe_unused]] juce::var toVar (const TimelineBus& m)
+{
+    auto* object = new juce::DynamicObject();
+    object->setProperty ("id", m.id);
+    object->setProperty ("name", juce::String (m.name));
+    object->setProperty ("volumeDb", m.volumeDb);
+    object->setProperty ("pan", m.pan);
+    object->setProperty ("muted", m.muted);
     object->setProperty ("effects", toVarList (m.effects));
     return juce::var (object);
 }
@@ -530,6 +562,17 @@ std::optional<Intent> parseDrumsResetPad (const juce::var& payloadVar)
     return Intent {message};
 }
 
+std::optional<Intent> parseDrumsSetKit (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"kit"}))
+        return std::nullopt;
+
+    DrumsSetKit message;
+    if (!readInt (*payload, "kit", DrumsSetKit::kitMin, DrumsSetKit::kitMax, message.kit)) return std::nullopt;
+    return Intent {message};
+}
+
 std::optional<Intent> parseTransportRecord (const juce::var& payloadVar)
 {
     const auto* payload = payloadVar.getDynamicObject();
@@ -841,6 +884,107 @@ std::optional<Intent> parseClipEditNote (const juce::var& payloadVar)
     if (!readInt (*payload, "gesture", ClipEditNote::gestureMin, ClipEditNote::gestureMax, message.gesture)) return std::nullopt;
     return Intent {message};
 }
+
+std::optional<Intent> parseBusAdd (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {}))
+        return std::nullopt;
+
+    BusAdd message;
+
+    return Intent {message};
+}
+
+std::optional<Intent> parseBusRemove (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"bus"}))
+        return std::nullopt;
+
+    BusRemove message;
+    if (!readInt (*payload, "bus", BusRemove::busMin, BusRemove::busMax, message.bus)) return std::nullopt;
+    return Intent {message};
+}
+
+std::optional<Intent> parseBusRename (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"bus", "name"}))
+        return std::nullopt;
+
+    BusRename message;
+    if (!readInt (*payload, "bus", BusRename::busMin, BusRename::busMax, message.bus)) return std::nullopt;
+    if (!readString (*payload, "name", BusRename::nameMaxLength, message.name)) return std::nullopt;
+    return Intent {message};
+}
+
+std::optional<Intent> parseBusSetVolume (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"bus", "volumeDb", "gesture"}))
+        return std::nullopt;
+
+    BusSetVolume message;
+    if (!readInt (*payload, "bus", BusSetVolume::busMin, BusSetVolume::busMax, message.bus)) return std::nullopt;
+    if (!readNumber (*payload, "volumeDb", BusSetVolume::volumeDbMin, BusSetVolume::volumeDbMax, message.volumeDb)) return std::nullopt;
+    if (!readInt (*payload, "gesture", BusSetVolume::gestureMin, BusSetVolume::gestureMax, message.gesture)) return std::nullopt;
+    return Intent {message};
+}
+
+std::optional<Intent> parseBusSetPan (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"bus", "pan", "gesture"}))
+        return std::nullopt;
+
+    BusSetPan message;
+    if (!readInt (*payload, "bus", BusSetPan::busMin, BusSetPan::busMax, message.bus)) return std::nullopt;
+    if (!readNumber (*payload, "pan", BusSetPan::panMin, BusSetPan::panMax, message.pan)) return std::nullopt;
+    if (!readInt (*payload, "gesture", BusSetPan::gestureMin, BusSetPan::gestureMax, message.gesture)) return std::nullopt;
+    return Intent {message};
+}
+
+std::optional<Intent> parseBusSetMute (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"bus", "muted"}))
+        return std::nullopt;
+
+    BusSetMute message;
+    if (!readInt (*payload, "bus", BusSetMute::busMin, BusSetMute::busMax, message.bus)) return std::nullopt;
+    if (!readBool (*payload, "muted", message.muted)) return std::nullopt;
+    return Intent {message};
+}
+
+std::optional<Intent> parseBusSetEffect (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"bus", "effect", "enabled", "values", "gesture"}))
+        return std::nullopt;
+
+    BusSetEffect message;
+    if (!readInt (*payload, "bus", BusSetEffect::busMin, BusSetEffect::busMax, message.bus)) return std::nullopt;
+    if (!readInt (*payload, "effect", BusSetEffect::effectMin, BusSetEffect::effectMax, message.effect)) return std::nullopt;
+    if (!readBool (*payload, "enabled", message.enabled)) return std::nullopt;
+    if (!readFloatArray (*payload, "values", BusSetEffect::valuesMin, BusSetEffect::valuesMax, BusSetEffect::valuesMaxItems, message.values)) return std::nullopt;
+    if (!readInt (*payload, "gesture", BusSetEffect::gestureMin, BusSetEffect::gestureMax, message.gesture)) return std::nullopt;
+    return Intent {message};
+}
+
+std::optional<Intent> parseTrackSetSend (const juce::var& payloadVar)
+{
+    const auto* payload = payloadVar.getDynamicObject();
+    if (payload == nullptr || !hasOnlyKeys (*payload, {"track", "bus", "levelDb", "gesture"}))
+        return std::nullopt;
+
+    TrackSetSend message;
+    if (!readInt (*payload, "track", TrackSetSend::trackMin, TrackSetSend::trackMax, message.track)) return std::nullopt;
+    if (!readInt (*payload, "bus", TrackSetSend::busMin, TrackSetSend::busMax, message.bus)) return std::nullopt;
+    if (!readNumber (*payload, "levelDb", TrackSetSend::levelDbMin, TrackSetSend::levelDbMax, message.levelDb)) return std::nullopt;
+    if (!readInt (*payload, "gesture", TrackSetSend::gestureMin, TrackSetSend::gestureMax, message.gesture)) return std::nullopt;
+    return Intent {message};
+}
 } // namespace
 
 std::optional<Intent> parseIntent (const juce::var& message)
@@ -916,6 +1060,8 @@ std::optional<Intent> parseIntent (const juce::var& message)
         return parseDrumsLoadPad (payload);
     if (typeName == DrumsResetPad::type)
         return parseDrumsResetPad (payload);
+    if (typeName == DrumsSetKit::type)
+        return parseDrumsSetKit (payload);
     if (typeName == TransportRecord::type)
         return parseTransportRecord (payload);
     if (typeName == TransportCapture::type)
@@ -966,6 +1112,22 @@ std::optional<Intent> parseIntent (const juce::var& message)
         return parseClipRemoveNote (payload);
     if (typeName == ClipEditNote::type)
         return parseClipEditNote (payload);
+    if (typeName == BusAdd::type)
+        return parseBusAdd (payload);
+    if (typeName == BusRemove::type)
+        return parseBusRemove (payload);
+    if (typeName == BusRename::type)
+        return parseBusRename (payload);
+    if (typeName == BusSetVolume::type)
+        return parseBusSetVolume (payload);
+    if (typeName == BusSetPan::type)
+        return parseBusSetPan (payload);
+    if (typeName == BusSetMute::type)
+        return parseBusSetMute (payload);
+    if (typeName == BusSetEffect::type)
+        return parseBusSetEffect (payload);
+    if (typeName == TrackSetSend::type)
+        return parseTrackSetSend (payload);
 
     return std::nullopt;
 }
@@ -1077,6 +1239,12 @@ juce::var toVar (const Event& event)
                 payload->setProperty ("overview", toVarArray (m.overview));
                 return envelope (SamplerState::type, payload);
             },
+            [] (const DrumsKit& m) -> juce::var
+            {
+                auto* payload = new juce::DynamicObject();
+                payload->setProperty ("kit", m.kit);
+                return envelope (DrumsKit::type, payload);
+            },
             [] (const DrumsPad& m) -> juce::var
             {
                 auto* payload = new juce::DynamicObject();
@@ -1093,6 +1261,7 @@ juce::var toVar (const Event& event)
             {
                 auto* payload = new juce::DynamicObject();
                 payload->setProperty ("tracks", toVarList (m.tracks));
+                payload->setProperty ("buses", toVarList (m.buses));
                 return envelope (TimelineState::type, payload);
             },
             [] (const TimelineAssets& m) -> juce::var

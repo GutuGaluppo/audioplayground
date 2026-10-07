@@ -18,7 +18,7 @@ namespace ap::instruments
 // 4x4 pad drum machine (guide §13.2). Patterns are note clips on the drum track (ADR-007): the
 // engine plays them sample-accurately by rendering in chunks between hits.
 //
-// - Every pad plays the factory sound unless a user sample is loaded into it.
+// - Every pad plays its sound from the selected factory kit unless a user sample is loaded into it.
 // - Closed hat chokes open hat.
 // - Threading: setPad() any thread (atomics); loadPadSample/collectGarbage message thread;
 //   trigger/handle/render audio thread.
@@ -37,6 +37,10 @@ public:
     void setPad (int pad, float volumeDb, float pitchSemitones, bool muted) noexcept;
 
     // --- Message thread ---------------------------------------------------------------------
+    // Selects which factory kit pads play when they hold no user sample. Builds the kit on first use
+    // (allocates), so it belongs on the message thread; the audio thread only reads the index.
+    void setKit (int kit);
+    [[nodiscard]] int getKit() const noexcept { return activeKit.load (std::memory_order_relaxed); }
     void loadPadSample (int pad, std::unique_ptr<SampleBuffer> buffer) noexcept; // empty -> factory sound
     std::size_t collectGarbage() noexcept;
 
@@ -75,7 +79,10 @@ private:
     void fadeOutVoices (int pad) noexcept AP_NONBLOCKING;
     void renderVoices (core::AudioBlock output, int offset, int length) noexcept AP_NONBLOCKING;
 
-    std::array<std::unique_ptr<SampleBuffer>, numPads> factory;
+    using Kit = std::array<std::unique_ptr<SampleBuffer>, numPads>;
+    std::array<Kit, factoryKitCount> kits; // built on demand; kit 0 in prepare()
+    std::atomic<int> activeKit {0};
+    int requestedKit = 0; // message thread: what prepare() must rebuild
     std::array<SampleSlot, numPads> user;
     std::array<Pad, numPads> pads;
     std::array<Voice, maxVoices> voices {};

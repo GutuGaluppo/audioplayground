@@ -35,17 +35,23 @@ void Engine::prepare (double newSampleRate, int maxBlockSize)
     busStorage.assign (model::numInstrumentKinds * 2 * static_cast<std::size_t> (maxBlock), 0.0f);
     trackBusStorage.assign (model::Project::maxTracks * 2 * static_cast<std::size_t> (maxBlock), 0.0f);
     directBus.assign (2 * static_cast<std::size_t> (maxBlock), 0.0f);
-    for (auto& line : directDelay)
-        line.fill (0.0f);
-    directDelayPosition = 0;
+    trackMix.assign (2 * static_cast<std::size_t> (maxBlock), 0.0f);
+    busReturn.assign (2 * static_cast<std::size_t> (maxBlock), 0.0f);
+    busStorageIn.assign (model::Bus::maxBuses * 2 * static_cast<std::size_t> (maxBlock), 0.0f);
+    trackDelay.reset();
+    directDelay.reset();
+    sendState = {};
+    busState = {};
     limiter.prepare (sampleRate);
-    outputLatency.store (TrackChain::latency() + limiter.latency(), std::memory_order_relaxed);
+    outputLatency.store (2 * TrackChain::latency() + limiter.latency(), std::memory_order_relaxed);
     {
         // The audio callback is stopped: the chains the current graph points at can be rebuilt.
         const std::scoped_lock lock (chainLock);
         chainRate = sampleRate;
         chainBlock = maxBlock;
         for (auto& [id, chain] : chains)
+            chain->prepare (chainRate, chainBlock);
+        for (auto& [id, chain] : busChains)
             chain->prepare (chainRate, chainBlock);
     }
 
@@ -81,6 +87,20 @@ void Engine::publishRenderGraph (std::unique_ptr<RenderGraph> next)
         }
         // Chains of deleted tracks go with the last graph that uses them (freed off the audio thread).
         chains = std::move (used);
+
+        std::map<std::uint64_t, std::shared_ptr<TrackChain>> usedBuses;
+        for (auto& bus : next->buses)
+        {
+            auto& chain = busChains[bus.id.value];
+            if (chain == nullptr)
+            {
+                chain = std::make_shared<TrackChain>();
+                chain->prepare (chainRate, chainBlock);
+            }
+            bus.chain = chain;
+            usedBuses.emplace (bus.id.value, chain);
+        }
+        busChains = std::move (usedBuses);
     }
     graphs.publish (std::move (next));
 }
@@ -204,16 +224,30 @@ void Engine::processBlock (core::AudioBlock output, core::InputBlock input) noex
     }
 
     renderTestTone (direct);
-    mixTracks (output, buses);
-    mixDirect (output);
+
+    const TrackBuses sends {
+        busStorageIn.data(), maxBlock,
+        currentGraph != nullptr ? std::min (currentGraph->buses.size(), model::Bus::maxBuses) : 0};
+    mixTracks (buses, sends, n);
+    processBuses (sends, n);
+    mixOutput (output);
     limiter.process (output);
 
     clock.store (clock.load (std::memory_order_relaxed) + n, std::memory_order_relaxed);
 }
 
-void Engine::mixTracks (core::AudioBlock output, const TrackBuses& buses) noexcept AP_NONBLOCKING
+void Engine::mixTracks (const TrackBuses& buses, const TrackBuses& sends, int n) noexcept AP_NONBLOCKING
 {
-    const int n = output.numSamples;
+    float* const mixLeft = trackMix.data();
+    float* const mixRight = trackMix.data() + maxBlock;
+    std::fill_n (mixLeft, n, 0.0f);
+    std::fill_n (mixRight, n, 0.0f);
+    for (std::size_t b = 0; b < sends.count; ++b)
+    {
+        std::fill_n (sends.left (b), n, 0.0f);
+        std::fill_n (sends.right (b), n, 0.0f);
+    }
+
     for (std::size_t t = 0; t < buses.count; ++t)
     {
         const auto& track = currentGraph->tracks[t];
@@ -224,45 +258,108 @@ void Engine::mixTracks (core::AudioBlock output, const TrackBuses& buses) noexce
             chain->process ({channels.data(), 2, n});
         }
 
+        auto& state = sendState[t];
+        if (state.track != track.id)
+        {
+            // A different track in this slot: start from where it is going, without a ramp.
+            state.track = track.id;
+            state.gain = track.sendGain;
+        }
+
         const auto gain = timeline.trackGain (t);
-        if (gain.isSilent())
-            continue;
-        if (output.numChannels >= 2)
+        if (!gain.isSilent())
+        {
             for (int i = 0; i < n; ++i)
             {
-                output.channels[0][i] += channels[0][i] * gain.left (i, n);
-                output.channels[1][i] += channels[1][i] * gain.right (i, n);
+                mixLeft[i] += channels[0][i] * gain.left (i, n);
+                mixRight[i] += channels[1][i] * gain.right (i, n);
             }
-        else
-            for (int i = 0; i < n; ++i)
-                output.channels[0][i]
-                    += 0.5f * (channels[0][i] * gain.left (i, n) + channels[1][i] * gain.right (i, n));
+
+            // Sends are taken after the fader and pan, so mute, solo and volume apply to them too.
+            for (std::size_t b = 0; b < sends.count; ++b)
+            {
+                const float from = state.gain[b];
+                const float to = track.sendGain[b];
+                if (from == 0.0f && to == 0.0f)
+                    continue;
+                float* const toLeft = sends.left (b);
+                float* const toRight = sends.right (b);
+                for (int i = 0; i < n; ++i)
+                {
+                    const float level = from + (to - from) * static_cast<float> (i + 1) / static_cast<float> (n);
+                    toLeft[i] += channels[0][i] * gain.left (i, n) * level;
+                    toRight[i] += channels[1][i] * gain.right (i, n) * level;
+                }
+            }
+        }
+        state.gain = track.sendGain;
     }
 }
 
-void Engine::mixDirect (core::AudioBlock output) noexcept AP_NONBLOCKING
+void Engine::processBuses (const TrackBuses& sends, int n) noexcept AP_NONBLOCKING
 {
-    // Delay by the chains' latency, so the metronome and track-less sources line up with tracks.
+    float* const returnLeft = busReturn.data();
+    float* const returnRight = busReturn.data() + maxBlock;
+    std::fill_n (returnLeft, n, 0.0f);
+    std::fill_n (returnRight, n, 0.0f);
+
+    // Every bus always runs, so a reverb or delay tail rings out after the sends stop.
+    for (std::size_t b = 0; b < sends.count; ++b)
+    {
+        const auto& bus = currentGraph->buses[b];
+        std::array<float*, 2> channels {sends.left (b), sends.right (b)};
+        if (auto* chain = bus.chain.get(); chain != nullptr && chain->getSampleRate() == sampleRate)
+        {
+            chain->set (bus.effects);
+            chain->process ({channels.data(), 2, n});
+        }
+
+        auto& state = busState[b];
+        if (state.bus != bus.id)
+        {
+            state.bus = bus.id;
+            state.left = bus.leftGain;
+            state.right = bus.rightGain;
+        }
+        const float fromLeft = state.left;
+        const float fromRight = state.right;
+        for (int i = 0; i < n; ++i)
+        {
+            const float t = static_cast<float> (i + 1) / static_cast<float> (n);
+            returnLeft[i] += channels[0][i] * (fromLeft + (bus.leftGain - fromLeft) * t);
+            returnRight[i] += channels[1][i] * (fromRight + (bus.rightGain - fromRight) * t);
+        }
+        state.left = bus.leftGain;
+        state.right = bus.rightGain;
+    }
+}
+
+void Engine::mixOutput (core::AudioBlock output) noexcept AP_NONBLOCKING
+{
     const int n = output.numSamples;
-    const float* left = directBus.data();
-    const float* right = directBus.data() + maxBlock;
-    auto position = directDelayPosition;
+    // Tracks have been through one chain, sources without a track through none, bus returns
+    // through two: delay the first by one latency and the second by two so all line up.
+    trackDelay.process (trackMix.data(), trackMix.data() + maxBlock, n);
+    directDelay.process (directBus.data(), directBus.data() + maxBlock, n);
+
+    const std::array<const float*, 3> lefts {trackMix.data(), directBus.data(), busReturn.data()};
     for (int i = 0; i < n; ++i)
     {
-        const float delayedLeft = directDelay[0][position];
-        const float delayedRight = directDelay[1][position];
-        directDelay[0][position] = left[i];
-        directDelay[1][position] = right[i];
-        position = (position + 1) % directDelay[0].size();
+        float left = 0.0f;
+        float right = 0.0f;
+        for (const auto* source : lefts)
+        {
+            left += source[i];
+            right += source[maxBlock + i];
+        }
         if (output.numChannels >= 2)
         {
-            output.channels[0][i] += delayedLeft;
-            output.channels[1][i] += delayedRight;
+            output.channels[0][i] += left;
+            output.channels[1][i] += right;
         }
         else
-            output.channels[0][i] += 0.5f * (delayedLeft + delayedRight);
+            output.channels[0][i] += 0.5f * (left + right);
     }
-    directDelayPosition = position;
 }
 
 void Engine::routeLiveNote (const instruments::NoteEvent& note) noexcept AP_NONBLOCKING

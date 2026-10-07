@@ -361,6 +361,15 @@ Limiter
 Audio Output
 ```
 
+Effect buses (ADR-010) add one parallel path: after the track's effects, volume and pan, a track
+may *send* some of its signal to up to 8 buses. Each bus runs its own fixed effect chain and fader
+and returns into the Master, next to the tracks. Buses do not feed other buses.
+
+```text
+Track ──► (chain, fader, pan) ──► Master
+                  └─ send ──► Bus (chain, fader, pan) ──► Master
+```
+
 Do not build a generic modular graph editor during MVP.
 
 Internally, the architecture may use a graph abstraction if it simplifies future routing.

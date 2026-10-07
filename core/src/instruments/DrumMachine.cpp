@@ -20,10 +20,29 @@ void DrumMachine::prepare (double newSampleRate)
 {
     sampleRate = newSampleRate > 0.0 ? newSampleRate : 48000.0;
     fadeStep = static_cast<float> (1.0 / (0.003 * sampleRate));
-    for (std::size_t pad = 0; pad < factory.size(); ++pad)
-        factory[pad] = makeFactorySound (pad, sampleRate);
+    // The rate may have changed: rebuild kit 0 and the kit in use; other kits are built when picked.
+    for (auto& kit : kits)
+        for (auto& sound : kit)
+            sound.reset();
+    for (const auto kit : {std::size_t {0}, static_cast<std::size_t> (requestedKit)})
+        for (std::size_t pad = 0; pad < numPads; ++pad)
+            if (!kits[kit][pad])
+                kits[kit][pad] = makeFactorySound (pad, sampleRate, kit);
+    activeKit.store (requestedKit, std::memory_order_release);
     for (auto& voice : voices)
         voice = {};
+}
+
+void DrumMachine::setKit (int kit)
+{
+    if (kit < 0 || kit >= static_cast<int> (factoryKitCount))
+        return;
+    const auto index = static_cast<std::size_t> (kit);
+    for (std::size_t pad = 0; pad < numPads; ++pad)
+        if (!kits[index][pad])
+            kits[index][pad] = makeFactorySound (pad, sampleRate, index);
+    requestedKit = kit;
+    activeKit.store (kit, std::memory_order_release); // sounds are complete before the audio thread can see it
 }
 
 void DrumMachine::setPad (int pad, float volumeDb, float pitchSemitones, bool muted) noexcept
@@ -58,7 +77,7 @@ const SampleBuffer* DrumMachine::soundFor (int pad) const noexcept AP_NONBLOCKIN
     const auto index = static_cast<std::size_t> (pad);
     if (const auto* custom = user[index].get())
         return custom;
-    return factory[index].get();
+    return kits[static_cast<std::size_t> (activeKit.load (std::memory_order_acquire))][index].get();
 }
 
 int DrumMachine::activeVoiceCount() const noexcept AP_NONBLOCKING

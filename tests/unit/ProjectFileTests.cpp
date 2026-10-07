@@ -29,6 +29,7 @@ Project sampleProject()
     REQUIRE (doc.perform (SetParameter {ap::params::ParamId::toneLevel, -30.0f}));
     REQUIRE (doc.perform (AddAsset {"audio/1-kick.wav", "kick.wav"}));
     REQUIRE (doc.perform (SetSamplerAsset {doc.project().assets[0].id}));
+    REQUIRE (doc.perform (SetDrumKit {2}));
     REQUIRE (doc.perform (SetDrumPad {1, DrumPad {doc.project().assets[0].id, -6.0f, 2.0f, true}}));
 
     Clip audio;
@@ -58,6 +59,17 @@ Project sampleProject()
     delay.enabled = true;
     delay.values[static_cast<std::size_t> (ap::params::DelayParam::time)] = 250.0f;
     REQUIRE (doc.perform (SetTrackEffect {doc.project().tracks[2].id, ap::params::EffectKind::delay, delay}));
+
+    REQUIRE (doc.perform (AddBus {"Space"}));
+    REQUIRE (doc.perform (AddBus {}));
+    REQUIRE (doc.perform (SetBusVolume {doc.project().buses[0].id, -3.0f}));
+    REQUIRE (doc.perform (SetBusPan {doc.project().buses[1].id, 0.5f}));
+    REQUIRE (doc.perform (SetBusMute {doc.project().buses[1].id, true}));
+    auto reverb = defaultEffectState (ap::params::EffectKind::reverb);
+    reverb.enabled = true;
+    REQUIRE (doc.perform (SetBusEffect {doc.project().buses[0].id, ap::params::EffectKind::reverb, reverb}));
+    REQUIRE (doc.perform (SetTrackSend {doc.project().tracks[0].id, doc.project().buses[1].id, -9.0f}));
+    REQUIRE (doc.perform (SetTrackSend {doc.project().tracks[0].id, doc.project().buses[0].id, -4.5f}));
     return doc.project();
 }
 
@@ -150,6 +162,32 @@ TEST_CASE ("Projects from a newer version are refused, not partially loaded", "[
     CHECK (errorOf (parseProject (text)).code == LoadError::Code::newerVersion);
 }
 
+TEST_CASE ("Projects saved before buses existed load without any", "[persistence]")
+{
+    const auto text = mutate (
+        [] (nlohmann::json& j)
+        {
+            j.erase ("buses");
+            j.erase ("nextBusId");
+            for (auto& track : j["tracks"])
+                track.erase ("sends");
+        });
+    const auto result = parseProject (text);
+    REQUIRE (std::holds_alternative<LoadedProject> (result));
+    const auto& project = std::get<LoadedProject> (result).project;
+    CHECK (project.buses.empty());
+    CHECK (project.nextBusId == 1);
+    CHECK (project.tracks[0].sends.empty());
+}
+
+TEST_CASE ("Projects saved before drum kits existed load with the classic kit", "[persistence]")
+{
+    const auto text = mutate ([] (nlohmann::json& j) { j["drums"].erase ("kit"); });
+    const auto result = parseProject (text);
+    REQUIRE (std::holds_alternative<LoadedProject> (result));
+    CHECK (std::get<LoadedProject> (result).project.drums.kit == 0);
+}
+
 TEST_CASE ("Malformed and hostile project files are rejected", "[persistence][security]")
 {
     using Change = std::function<void (nlohmann::json&)>;
@@ -211,6 +249,31 @@ TEST_CASE ("Malformed and hostile project files are rejected", "[persistence][se
         {"loop too short", [] (auto& j) { j["tracks"][2]["clips"][0]["loopLength"] = 1; }},
         {"drum pad missing asset", [] (auto& j) { j["drums"]["pads"][0]["sample"] = 42; }},
         {"drum pad volume too high", [] (auto& j) { j["drums"]["pads"][0]["volumeDb"] = 20; }},
+        {"send to a missing bus", [] (auto& j) { j["tracks"][0]["sends"][0]["bus"] = 77; }},
+        {"send at the minimum level", [] (auto& j) { j["tracks"][0]["sends"][0]["levelDb"] = -60; }},
+        {"send level too high", [] (auto& j) { j["tracks"][0]["sends"][0]["levelDb"] = 30; }},
+        {"two sends to one bus", [] (auto& j) { j["tracks"][0]["sends"][1]["bus"] = j["tracks"][0]["sends"][0]["bus"]; }},
+        {"send extra key", [] (auto& j) { j["tracks"][0]["sends"][0]["pre"] = true; }},
+        {"sends not a list", [] (auto& j) { j["tracks"][0]["sends"] = 1; }},
+        {"duplicate bus ids", [] (auto& j) { j["buses"][1]["id"] = j["buses"][0]["id"]; }},
+        {"nextBusId not above ids", [] (auto& j) { j["nextBusId"] = 1; }},
+        {"buses without nextBusId", [] (auto& j) { j.erase ("nextBusId"); }},
+        {"bus extra key", [] (auto& j) { j["buses"][0]["path"] = "/etc/passwd"; }},
+        {"bus volume out of range", [] (auto& j) { j["buses"][0]["volumeDb"] = 50; }},
+        {"bus effect unknown", [] (auto& j) { j["buses"][0]["effects"]["flanger"] = {{"enabled", true}}; }},
+        {"too many buses",
+         [] (auto& j)
+         {
+             for (int i = 0; i < 10; ++i)
+             {
+                 auto b = j["buses"][0];
+                 b["id"] = 100 + i;
+                 j["buses"].push_back (b);
+             }
+             j["nextBusId"] = 1000;
+         }},
+        {"drum kit out of range", [] (auto& j) { j["drums"]["kit"] = 9; }},
+        {"drum kit as text", [] (auto& j) { j["drums"]["kit"] = "808"; }},
         {"drum pad extra key", [] (auto& j) { j["drums"]["pads"][0]["file"] = "x"; }},
         {"too many tracks",
          [] (auto& j)

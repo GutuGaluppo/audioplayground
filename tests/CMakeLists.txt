@@ -9,6 +9,7 @@ add_executable(ap_unit_tests
     unit/ConcurrencyTests.cpp
     unit/DelayTests.cpp
     unit/DistortionTests.cpp
+    unit/BusTests.cpp
     unit/DrumMachineTests.cpp
     unit/EffectChainTests.cpp
     unit/EngineTests.cpp

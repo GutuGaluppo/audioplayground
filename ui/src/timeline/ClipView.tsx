@@ -1,5 +1,7 @@
 import { useEffect, useRef } from 'react';
 
+import { useLayoutPrefs } from '../state/layoutPrefs';
+
 import { useBridge } from '../bridge/BridgeContext';
 import type { TimelineAsset, TimelineClip, TimelineTrack } from '../bridge/generated';
 import { beginGesture } from '../params/gestures';
@@ -47,6 +49,7 @@ function AudioWaveform({
   width: number;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const { laneHeight } = useLayoutPrefs();
   const peaksEvent = useKeyed(useStores().peaks, asset.id);
   const peaks = peaksEvent ? decodePeaks(peaksEvent) : null;
 
@@ -93,7 +96,7 @@ function AudioWaveform({
       const bar = Math.max(1, peak * (h - 2));
       context.fillRect(x, middle - bar / 2, 1, bar);
     }
-  }, [clip.length, clip.sourceOffsetSeconds, asset, peaks, bpm, width]);
+  }, [clip.length, clip.sourceOffsetSeconds, asset, peaks, bpm, width, laneHeight]);
 
   return <canvas ref={canvasRef} className="clip__waveform" />;
 }

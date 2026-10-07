@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { Splitter } from '../components/Splitter';
 import { VuMeter } from '../components/VuMeter';
 import { useBridge } from '../bridge/BridgeContext';
 import { useLatest } from '../state/latestEvent';
@@ -135,6 +136,7 @@ function PianoKeyboard() {
 
   return (
     <section className="keyboard" aria-label="Keyboard">
+      <Splitter pref="keyboardHeight" orientation="horizontal" grow={-1} label="Keyboard height" />
       <div className="keyboard__info">
         <span className="keyboard__group">
           Octave

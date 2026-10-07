@@ -11,6 +11,11 @@ namespace ap::desktop
 {
 namespace
 {
+model::BusId toBus (int id)
+{
+    return model::BusId {static_cast<std::uint64_t> (id)};
+}
+
 model::TrackId toTrack (int id)
 {
     return model::TrackId {static_cast<std::uint64_t> (id)};
@@ -228,6 +233,68 @@ void WebUiHost::handle (const ap::bridge::TrackSetEffect& intent)
     // The model clamps and snaps the values (ADR-003); a rejected edit re-sends the real state.
     if (!session.perform (model::SetTrackEffect {toTrack (intent.track), effect, state},
                           toGesture (intent.gesture)))
+        sendTimeline();
+}
+
+void WebUiHost::handle (const ap::bridge::TrackSetSend& intent)
+{
+    if (!session.perform (
+            model::SetTrackSend {toTrack (intent.track), toBus (intent.bus), static_cast<float> (intent.levelDb)},
+            toGesture (intent.gesture)))
+        sendTimeline();
+}
+
+void WebUiHost::handle (const ap::bridge::BusAdd&)
+{
+    if (!session.perform (model::AddBus {}))
+        sendTimeline();
+}
+
+void WebUiHost::handle (const ap::bridge::BusRemove& intent)
+{
+    if (!session.perform (model::RemoveBus {toBus (intent.bus)}))
+        sendTimeline();
+}
+
+void WebUiHost::handle (const ap::bridge::BusRename& intent)
+{
+    if (!session.perform (model::RenameBus {toBus (intent.bus), intent.name}))
+        sendTimeline();
+}
+
+void WebUiHost::handle (const ap::bridge::BusSetVolume& intent)
+{
+    if (!session.perform (model::SetBusVolume {toBus (intent.bus), static_cast<float> (intent.volumeDb)},
+                          toGesture (intent.gesture)))
+        sendTimeline();
+}
+
+void WebUiHost::handle (const ap::bridge::BusSetPan& intent)
+{
+    if (!session.perform (model::SetBusPan {toBus (intent.bus), static_cast<float> (intent.pan)},
+                          toGesture (intent.gesture)))
+        sendTimeline();
+}
+
+void WebUiHost::handle (const ap::bridge::BusSetMute& intent)
+{
+    if (!session.perform (model::SetBusMute {toBus (intent.bus), intent.muted}))
+        sendTimeline();
+}
+
+void WebUiHost::handle (const ap::bridge::BusSetEffect& intent)
+{
+    const auto effect = static_cast<params::EffectKind> (intent.effect);
+    const auto& descriptor = params::effectDescriptors[static_cast<std::size_t> (intent.effect)];
+    model::EffectState state;
+    state.enabled = intent.enabled;
+    if (intent.values.size() != descriptor.numParameters)
+    {
+        sendTimeline();
+        return;
+    }
+    std::copy (intent.values.begin(), intent.values.end(), state.values.begin());
+    if (!session.perform (model::SetBusEffect {toBus (intent.bus), effect, state}, toGesture (intent.gesture)))
         sendTimeline();
 }
 
@@ -480,7 +547,28 @@ void WebUiHost::sendTimeline()
                                                         + static_cast<std::ptrdiff_t> (
                                                             params::effectDescriptors[e].numParameters))});
         }
+        for (const auto& send : track.sends)
+            t.sends.push_back ({toInt (send.bus.value), static_cast<double> (send.levelDb)});
         event.tracks.push_back (std::move (t));
+    }
+    for (const auto& bus : session.project().buses)
+    {
+        ap::bridge::TimelineBus b;
+        b.id = toInt (bus.id.value);
+        b.name = model::sanitiseName (bus.name, ap::bridge::TimelineBus::nameMaxLength).value_or ("Bus");
+        b.volumeDb = static_cast<double> (bus.volumeDb);
+        b.pan = static_cast<double> (bus.pan);
+        b.muted = bus.muted;
+        for (std::size_t e = 0; e < params::numEffects; ++e)
+        {
+            const auto& state = bus.effects[e];
+            b.effects.push_back (
+                {state.enabled, std::vector<float> (state.values.begin(),
+                                                    state.values.begin()
+                                                        + static_cast<std::ptrdiff_t> (
+                                                            params::effectDescriptors[e].numParameters))});
+        }
+        event.buses.push_back (std::move (b));
     }
     emit (event);
 }

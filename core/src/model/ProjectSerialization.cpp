@@ -85,6 +85,27 @@ void requireExactKeys (const Json& object, std::initializer_list<const char*> ke
             invalid (std::string (what) + " is missing \"" + key + "\"");
 }
 
+// Like requireExactKeys, but the keys in `optional` may be absent (fields added after the first
+// drafts of the format).
+void requireKeys (const Json& object, std::initializer_list<const char*> required,
+                  std::initializer_list<const char*> optional, const char* what)
+{
+    if (!object.is_object())
+        invalid (std::string (what) + " must be an object");
+    std::size_t present = 0;
+    for (const auto* key : required)
+    {
+        if (!object.contains (key))
+            invalid (std::string (what) + " is missing \"" + key + "\"");
+        ++present;
+    }
+    for (const auto* key : optional)
+        if (object.contains (key))
+            ++present;
+    if (object.size() != present)
+        invalid (std::string (what) + " has unexpected fields");
+}
+
 double finiteNumber (const Json& value, const char* what)
 {
     if (!value.is_number())
@@ -293,26 +314,15 @@ Track parseTrack (const Json& json, const Project& project)
     if (kind == "audio")
     {
         track.kind = TrackKind::audio;
-        if (json.contains ("effects"))
-            requireExactKeys (
-                json, {"id", "kind", "name", "volumeDb", "pan", "muted", "soloed", "clips", "effects"},
-                "track");
-        else
-            requireExactKeys (json, {"id", "kind", "name", "volumeDb", "pan", "muted", "soloed", "clips"},
-                              "track");
+        requireKeys (json, {"id", "kind", "name", "volumeDb", "pan", "muted", "soloed", "clips"},
+                     {"effects", "sends"}, "track");
     }
     else if (kind == "instrument")
     {
         track.kind = TrackKind::instrument;
-        if (json.contains ("effects"))
-            requireExactKeys (json,
-                              {"id", "kind", "instrument", "name", "volumeDb", "pan", "muted", "soloed",
-                               "clips", "effects"},
-                              "track");
-        else
-            requireExactKeys (
-                json, {"id", "kind", "instrument", "name", "volumeDb", "pan", "muted", "soloed", "clips"},
-                "track");
+        requireKeys (
+            json, {"id", "kind", "instrument", "name", "volumeDb", "pan", "muted", "soloed", "clips"},
+            {"effects", "sends"}, "track");
         const auto& instrument = json["instrument"];
         if (instrument == "synth")
             track.instrument = InstrumentKind::synth;
@@ -336,6 +346,29 @@ Track parseTrack (const Json& json, const Project& project)
     track.soloed = boolean (json["soloed"], "track solo");
     if (json.contains ("effects"))
         track.effects = parseEffects (json["effects"]);
+    if (json.contains ("sends"))
+    {
+        const auto& sends = json["sends"];
+        if (!sends.is_array() || sends.size() > Bus::maxBuses)
+            invalid ("track sends must be a short list");
+        for (const auto& s : sends)
+        {
+            requireExactKeys (s, {"bus", "levelDb"}, "send");
+            Send send;
+            send.bus = BusId {positiveInteger (s["bus"], "send bus")};
+            if (project.findBus (send.bus) == nullptr)
+                invalid ("a send refers to a missing bus");
+            send.levelDb = static_cast<float> (numberInRange (
+                s["levelDb"], static_cast<double> (Send::minLevelDb), static_cast<double> (Send::maxLevelDb),
+                "send level"));
+            if (send.levelDb <= Send::minLevelDb)
+                invalid ("a send at minimum level must be left out");
+            if (std::any_of (track.sends.begin(), track.sends.end(),
+                             [&send] (const Send& other) { return other.bus == send.bus; }))
+                invalid ("a track sends to the same bus twice");
+            track.sends.push_back (send);
+        }
+    }
 
     const auto& clips = json["clips"];
     if (!clips.is_array())
@@ -349,13 +382,28 @@ Track parseTrack (const Json& json, const Project& project)
     return track;
 }
 
+Bus parseBus (const Json& json)
+{
+    requireExactKeys (json, {"id", "name", "volumeDb", "pan", "muted", "effects"}, "bus");
+    Bus bus;
+    bus.id = BusId {positiveInteger (json["id"], "bus id")};
+    bus.name = name (json["name"], Bus::maxNameLength, "bus name");
+    bus.volumeDb
+        = static_cast<float> (numberInRange (json["volumeDb"], static_cast<double> (Bus::minVolumeDb),
+                                             static_cast<double> (Bus::maxVolumeDb), "bus volume"));
+    bus.pan = static_cast<float> (numberInRange (json["pan"], -1.0, 1.0, "bus pan"));
+    bus.muted = boolean (json["muted"], "bus mute");
+    bus.effects = parseEffects (json["effects"]);
+    return bus;
+}
+
 LoadedProject parseV1 (const Json& root)
 {
-    requireExactKeys (root,
-                      {"format", "schemaVersion", "name", "createdAt", "updatedAt", "tempo", "timeSignature",
-                       "exportSampleRate", "nextTrackId", "nextClipId", "tracks", "parameters", "assets",
-                       "nextAssetId", "samplerAsset", "drums"},
-                      "project");
+    requireKeys (root,
+                 {"format", "schemaVersion", "name", "createdAt", "updatedAt", "tempo", "timeSignature",
+                  "exportSampleRate", "nextTrackId", "nextClipId", "tracks", "parameters", "assets",
+                  "nextAssetId", "samplerAsset", "drums"},
+                 {"buses", "nextBusId"}, "project");
 
     LoadedProject loaded;
     auto& project = loaded.project;
@@ -404,6 +452,27 @@ LoadedProject parseV1 (const Json& root)
     if (project.nextAssetId <= highestAssetId)
         invalid ("nextAssetId must be greater than every asset id");
 
+    if (root.contains ("buses") != root.contains ("nextBusId"))
+        invalid ("buses and nextBusId go together");
+    if (root.contains ("buses"))
+    {
+        const auto& buses = root["buses"];
+        if (!buses.is_array() || buses.size() > Bus::maxBuses)
+            invalid ("too many buses");
+        std::uint64_t highestBus = 0;
+        for (const auto& json : buses)
+        {
+            auto bus = parseBus (json);
+            if (project.findBus (bus.id) != nullptr)
+                invalid ("two buses share the same id");
+            highestBus = std::max (highestBus, bus.id.value);
+            project.buses.push_back (std::move (bus));
+        }
+        project.nextBusId = positiveInteger (root["nextBusId"], "nextBusId");
+        if (project.nextBusId <= highestBus)
+            invalid ("nextBusId must be greater than every bus id");
+    }
+
     const auto& tracks = root["tracks"];
     if (!tracks.is_array())
         invalid ("tracks must be a list");
@@ -444,7 +513,14 @@ LoadedProject parseV1 (const Json& root)
         invalid ("samplerAsset refers to a missing asset");
 
     const auto& drums = root["drums"];
-    requireExactKeys (drums, {"pads"}, "drums");
+    // "kit" arrived after the first drafts of the format: files without it use the classic kit.
+    if (drums.is_object() && drums.contains ("kit"))
+    {
+        requireExactKeys (drums, {"pads", "kit"}, "drums");
+        project.drums.kit = static_cast<std::uint8_t> (ticks (drums["kit"], 0, DrumKit::kitCount - 1, "drum kit"));
+    }
+    else
+        requireExactKeys (drums, {"pads"}, "drums");
     const auto& pads = drums["pads"];
     if (!pads.is_array() || pads.size() != DrumKit::numPads)
         invalid ("the drum kit must have 16 pads");
@@ -488,6 +564,23 @@ LoadedProject parseV1 (const Json& root)
     }
 
     return loaded;
+}
+// Effects by id; a value's key is the part of its parameter id after the effect's
+// ("eq.lowGain" -> "lowGain"). Both are persistence contracts (schema/parameters.json).
+OrderedJson effectsJson (const TrackEffects& chain)
+{
+    auto effects = OrderedJson::object();
+    for (std::size_t e = 0; e < params::numEffects; ++e)
+    {
+        const auto& descriptor = params::effectDescriptors[e];
+        const auto& state = chain[e];
+        OrderedJson effect;
+        effect["enabled"] = state.enabled;
+        for (std::size_t i = 0; i < descriptor.numParameters; ++i)
+            effect[std::string (effectValueKey (descriptor.parameters[i]))] = state.values[i];
+        effects[std::string (descriptor.id)] = std::move (effect);
+    }
+    return effects;
 }
 } // namespace
 
@@ -544,23 +637,40 @@ std::string serialiseProject (const Project& project, const ProjectMetadata& met
         }
         json["clips"] = std::move (clips);
 
-        // Effects by id; a value's key is the part of its parameter id after the effect's
-        // ("eq.lowGain" -> "lowGain"). Both are persistence contracts (schema/parameters.json).
-        auto effects = OrderedJson::object();
-        for (std::size_t e = 0; e < params::numEffects; ++e)
+        json["effects"] = effectsJson (track.effects);
+        if (!track.sends.empty())
         {
-            const auto& descriptor = params::effectDescriptors[e];
-            const auto& state = track.effects[e];
-            OrderedJson effect;
-            effect["enabled"] = state.enabled;
-            for (std::size_t i = 0; i < descriptor.numParameters; ++i)
-                effect[std::string (effectValueKey (descriptor.parameters[i]))] = state.values[i];
-            effects[std::string (descriptor.id)] = std::move (effect);
+            auto sends = OrderedJson::array();
+            for (const auto& send : track.sends)
+            {
+                OrderedJson s;
+                s["bus"] = send.bus.value;
+                s["levelDb"] = send.levelDb;
+                sends.push_back (std::move (s));
+            }
+            json["sends"] = std::move (sends);
         }
-        json["effects"] = std::move (effects);
         tracks.push_back (std::move (json));
     }
     root["tracks"] = std::move (tracks);
+
+    if (!project.buses.empty() || project.nextBusId != 1)
+    {
+        auto buses = OrderedJson::array();
+        for (const auto& bus : project.buses)
+        {
+            OrderedJson json;
+            json["id"] = bus.id.value;
+            json["name"] = bus.name;
+            json["volumeDb"] = bus.volumeDb;
+            json["pan"] = bus.pan;
+            json["muted"] = bus.muted;
+            json["effects"] = effectsJson (bus.effects);
+            buses.push_back (std::move (json));
+        }
+        root["buses"] = std::move (buses);
+        root["nextBusId"] = project.nextBusId;
+    }
 
     auto parameters = OrderedJson::object();
     for (std::size_t i = 0; i < params::numParameters; ++i)
@@ -595,6 +705,7 @@ std::string serialiseProject (const Project& project, const ProjectMetadata& met
     }
     OrderedJson drums;
     drums["pads"] = std::move (pads);
+    drums["kit"] = project.drums.kit;
     root["drums"] = std::move (drums);
 
     return root.dump (2) + "\n";

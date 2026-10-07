@@ -1,6 +1,7 @@
 # ADR-009: Track effect chains, engine latency and the master limiter
 
-**Status:** Accepted (2026-10-06)
+**Status:** Accepted (2026-10-06). Amended by ADR-010 (effect buses): output latency is now two
+chain latencies.
 
 ## Context
 Task 024 puts the effects of Tasks 018–023 on tracks and protects the output with a limiter. The

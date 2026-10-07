@@ -3,6 +3,8 @@ import { useSyncExternalStore } from 'react';
 export interface Selection {
   readonly track: number | null;
   readonly clip: number | null;
+  /** An effect bus selected instead of a track (its effects show in the effects panel). */
+  readonly bus: number | null;
 }
 
 export interface SelectionStore {
@@ -13,7 +15,7 @@ export interface SelectionStore {
 
 /** What the user has selected in the timeline. UI state only: never part of the project. */
 export function createSelectionStore(): SelectionStore {
-  let value: Selection = { track: null, clip: null };
+  let value: Selection = { track: null, clip: null, bus: null };
   const listeners = new Set<() => void>();
   return {
     subscribe: (listener) => {
@@ -22,7 +24,7 @@ export function createSelectionStore(): SelectionStore {
     },
     get: () => value,
     set: (next) => {
-      if (next.track === value.track && next.clip === value.clip) return;
+      if (next.track === value.track && next.clip === value.clip && next.bus === value.bus) return;
       value = next;
       listeners.forEach((listener) => {
         listener();

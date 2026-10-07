@@ -24,6 +24,21 @@ RenderGraph buildRenderGraph (const model::Project& project, std::uint64_t proje
     const bool anySolo = std::any_of (project.tracks.begin(), project.tracks.end(),
                                       [] (const model::Track& t) { return t.soloed; });
 
+    for (const auto& bus : project.buses)
+    {
+        BusRender render;
+        render.id = bus.id;
+        render.effects = bus.effects;
+        if (!bus.muted && bus.volumeDb > model::Bus::minVolumeDb)
+        {
+            const float volume = std::pow (10.0f, bus.volumeDb / 20.0f);
+            const auto pan = constantPowerPan (bus.pan);
+            render.leftGain = volume * pan.left;
+            render.rightGain = volume * pan.right;
+        }
+        graph.buses.push_back (std::move (render));
+    }
+
     for (const auto& track : project.tracks)
     {
         TrackRender render;
@@ -31,6 +46,10 @@ RenderGraph buildRenderGraph (const model::Project& project, std::uint64_t proje
         render.kind = track.kind;
         render.instrument = track.instrument;
         render.effects = track.effects;
+        for (const auto& send : track.sends)
+            for (std::size_t b = 0; b < project.buses.size(); ++b)
+                if (project.buses[b].id == send.bus)
+                    render.sendGain[b] = std::pow (10.0f, send.levelDb / 20.0f);
         render.audible
             = !track.muted && (!anySolo || track.soloed) && track.volumeDb > model::Track::minVolumeDb;
 

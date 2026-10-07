@@ -295,6 +295,9 @@ Cada fase termina num **gate**: CI verde (sanitizers inclusos), benchmarks dentr
 | Fase 6 — partes técnicas | ✅ Acessibilidade (contraste AA testado, alvos de 32 px, clipes pelo teclado, nomes acessíveis testados); primeiro uso (beat pronto + dicas); "Localizar…" para áudio ausente; benchmark do projeto de referência (p99.9 ≈ 30 % do bloco de 128 a 48 kHz; meta 50 %); script de assinatura/notarização macOS (`docs/RELEASING.md`) |
 | Fase 6 — precisa de humanos | ⏳ Aceite da §27 por alguém que nunca usou uma DAW; certificado Developer ID e notarização; assinatura Windows |
 | Reverb V2 (FDN) | ✅ Concluída: FDN própria de 8 linhas (Hadamard, ganhos por linha para o RT60 exato de 0,3–12 s, amortecimento, difusores, modulação lenta), mesmos parâmetros do V1; RT60 medido por Schroeder (T20) dentro de 15 %; golden `reverb_hit_48k` regravado. Precisa de escuta |
+| Buses de efeito (ADR-010) | ✅ Concluída: até 8 buses com cadeia, fader e pan próprios, envios por faixa pós-fader, retorno no Master; mesma latência constante do motor; testes de modelo/undo, determinismo por tamanho de bloco, cauda e export com bus. Sem bus solo, bus→bus nem automação de envio (de propósito) |
+| Kits de bateria | ✅ Concluída: 5 kits sintetizados (Classic, 808, Lo-fi, Acoustic, Electro) escolhidos por `drums.setKit`, salvos no projeto |
+| Layout redimensionável | ✅ Concluída: divisores arrastáveis com preferência guardada (`layoutPrefs.ts`) |
 | Escuta dos goldens de FX | ⏳ Precisa de um ouvinte humano (`tests/golden/*.wav`) |
 
 Decisões tomadas durante a execução:

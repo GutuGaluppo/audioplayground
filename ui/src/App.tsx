@@ -11,6 +11,8 @@ import { PianoRoll } from './editor/PianoRoll';
 import { EffectsPanel } from './effects/EffectsPanel';
 import { Keyboard } from './instrument/Keyboard';
 import { InstrumentArea } from './instrument/InstrumentArea';
+import { Splitter } from './components/Splitter';
+import { resetLayoutPrefs, useLayoutPrefs } from './state/layoutPrefs';
 import { useLatest } from './state/latestEvent';
 import { useStores } from './state/StoresContext';
 import { findClip, isAudioClip, TrackKind } from './timeline/model';
@@ -45,13 +47,24 @@ export function App() {
     bridge.send({ type: 'app.ready', payload: {} });
   }, [bridge]);
 
+  const layout = useLayoutPrefs();
   const toneEnabled = status?.toneEnabled ?? false;
   const openSettings = () => {
     bridge.send({ type: 'audio.openSettings', payload: {} });
   };
 
   return (
-    <div className="app">
+    <div
+      className="app"
+      style={
+        {
+          '--bottom-height': `${String(layout.bottomHeight)}px`,
+          '--instrument-width': `${String(layout.instrumentWidth)}px`,
+          '--effects-width': `${String(layout.effectsWidth)}px`,
+          '--keyboard-height': `${String(layout.keyboardHeight)}px`,
+        } as React.CSSProperties
+      }
+    >
       <h1 className="visually-hidden">Audio Playground</h1>
       {status?.error ? (
         <div className="banner" role="alert">
@@ -66,9 +79,21 @@ export function App() {
 
       <main className="workspace">
         <Timeline />
+        <Splitter
+          pref="bottomHeight"
+          orientation="horizontal"
+          grow={-1}
+          label="Editor panel height"
+        />
         <div className="workspace__bottom">
           <QuickStart />
           <InstrumentArea />
+          <Splitter
+            pref="instrumentWidth"
+            orientation="vertical"
+            grow={1}
+            label="Instrument panel width"
+          />
           <ClipEditor />
           <EffectsPanel />
         </div>
@@ -96,6 +121,14 @@ export function App() {
           <PeakMeter />
           <LimiterLight />
         </div>
+        <button
+          type="button"
+          className="button button--quiet"
+          title="Restore the default size of every panel"
+          onClick={resetLayoutPrefs}
+        >
+          Reset layout
+        </button>
         {bridge.isNative ? (
           <button type="button" className="button button--quiet" onClick={openSettings}>
             Audio settings

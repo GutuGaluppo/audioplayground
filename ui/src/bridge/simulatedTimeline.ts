@@ -28,6 +28,15 @@ interface SimTrack {
   soloed: boolean;
   clips: SimClip[];
   effects: { enabled: boolean; values: number[] }[];
+  sends: { bus: number; levelDb: number }[];
+}
+interface SimBus {
+  id: number;
+  name: string;
+  volumeDb: number;
+  pan: number;
+  muted: boolean;
+  effects: { enabled: boolean; values: number[] }[];
 }
 
 export interface SimulatedEdit {
@@ -88,12 +97,17 @@ const byNote = (a: SimNote, b: SimNote) => a.start - b.start || a.pitch - b.pitc
  */
 export function createSimulatedTimeline(host: Host) {
   let tracks: SimTrack[] = [];
+  let buses: SimBus[] = [];
+  let nextBus = 1;
   let nextTrack = 1;
   let nextClip = 1;
   let assetsUsed = false;
 
   const send = () => {
-    host.dispatch({ type: 'timeline.state', payload: { tracks: clone(tracks) } });
+    host.dispatch({
+      type: 'timeline.state',
+      payload: { tracks: clone(tracks), buses: clone(buses) },
+    });
   };
   const sendAssets = () => {
     host.dispatch({ type: 'timeline.assets', payload: { assets: assetsUsed ? [FAKE_ASSET] : [] } });
@@ -109,10 +123,14 @@ export function createSimulatedTimeline(host: Host) {
     label: string,
     key: string,
     gesture: number,
-    change: (draft: SimTrack[]) => boolean,
+    change: (draft: SimTrack[], draftBuses: SimBus[]) => boolean,
   ) => {
     const draft = clone(tracks);
-    if (!change(draft) || JSON.stringify(draft) === JSON.stringify(tracks)) {
+    const draftBuses = clone(buses);
+    if (
+      !change(draft, draftBuses) ||
+      JSON.stringify([draft, draftBuses]) === JSON.stringify([tracks, buses])
+    ) {
       send();
       return;
     }
@@ -120,10 +138,12 @@ export function createSimulatedTimeline(host: Host) {
       key,
       gesture,
       label,
-      before: clone(tracks),
-      after: draft,
+      before: clone({ tracks, buses }),
+      after: { tracks: draft, buses: draftBuses },
       set: (value) => {
-        tracks = clone(value as SimTrack[]);
+        const snapshot = clone(value as { tracks: SimTrack[]; buses: SimBus[] });
+        tracks = snapshot.tracks;
+        buses = snapshot.buses;
         send();
       },
     });
@@ -199,6 +219,7 @@ export function createSimulatedTimeline(host: Host) {
               soloed: false,
               clips: [],
               effects: defaultEffects(),
+              sends: [],
             });
             return true;
           });
@@ -224,6 +245,91 @@ export function createSimulatedTimeline(host: Host) {
               return true;
             },
           );
+          return true;
+        }
+        case 'bus.add':
+          edit('Add bus', 'bus.add', 0, (_, draftBuses) => {
+            if (draftBuses.length >= 8) return false;
+            draftBuses.push({
+              id: nextBus++,
+              name: `Bus ${String(draftBuses.length + 1)}`,
+              volumeDb: 0,
+              pan: 0,
+              muted: false,
+              effects: defaultEffects(),
+            });
+            return true;
+          });
+          return true;
+        case 'bus.remove':
+          edit('Delete bus', 'bus.remove', 0, (draft, draftBuses) => {
+            const index = draftBuses.findIndex((b) => b.id === intent.payload.bus);
+            if (index < 0) return false;
+            draftBuses.splice(index, 1);
+            for (const t of draft) t.sends = t.sends.filter((s) => s.bus !== intent.payload.bus);
+            return true;
+          });
+          return true;
+        case 'bus.rename':
+        case 'bus.setVolume':
+        case 'bus.setPan':
+        case 'bus.setMute': {
+          const labels = {
+            'bus.rename': 'Rename bus',
+            'bus.setVolume': 'Change bus volume',
+            'bus.setPan': 'Change bus pan',
+            'bus.setMute': 'Mute bus',
+          } as const;
+          const payload = intent.payload as { bus: number; gesture?: number };
+          edit(
+            labels[intent.type],
+            `${intent.type}:${String(payload.bus)}`,
+            payload.gesture ?? 0,
+            (_, draftBuses) => {
+              const bus = draftBuses.find((b) => b.id === payload.bus);
+              if (!bus) return false;
+              if (intent.type === 'bus.rename') bus.name = intent.payload.name.trim() || bus.name;
+              if (intent.type === 'bus.setVolume') bus.volumeDb = intent.payload.volumeDb;
+              if (intent.type === 'bus.setPan') bus.pan = intent.payload.pan;
+              if (intent.type === 'bus.setMute') bus.muted = intent.payload.muted;
+              return true;
+            },
+          );
+          return true;
+        }
+        case 'bus.setEffect': {
+          const { bus: id, effect, enabled, values, gesture } = intent.payload;
+          const descriptor = EFFECTS[effect];
+          edit(
+            descriptor?.name ?? 'Effect',
+            `bus.setEffect:${String(id)}:${String(effect)}`,
+            gesture,
+            (_, draftBuses) => {
+              const slot = draftBuses.find((b) => b.id === id)?.effects[effect];
+              if (!descriptor || !slot || values.length !== descriptor.parameters.length)
+                return false;
+              slot.enabled = enabled;
+              slot.values = values.map((v, i) => {
+                const d = descriptor.parameters[i];
+                return d ? Math.min(d.max, Math.max(d.min, v)) : v;
+              });
+              return true;
+            },
+          );
+          return true;
+        }
+        case 'track.setSend': {
+          const { track: id, bus, levelDb, gesture } = intent.payload;
+          edit('Change send', `track.setSend:${String(id)}:${String(bus)}`, gesture, (draft, b) => {
+            const track = draft.find((t) => t.id === id);
+            if (!track || !b.some((x) => x.id === bus)) return false;
+            const level = Math.min(6, Math.max(-60, levelDb));
+            const existing = track.sends.find((s) => s.bus === bus);
+            if (level <= -60) track.sends = track.sends.filter((s) => s.bus !== bus);
+            else if (existing) existing.levelDb = level;
+            else track.sends.push({ bus, levelDb: level });
+            return true;
+          });
           return true;
         }
         case 'track.remove':
@@ -443,6 +549,7 @@ export function createSimulatedTimeline(host: Host) {
                 soloed: false,
                 clips: [],
                 effects: defaultEffects(),
+                sends: [],
               };
               draft.push(drums);
             }

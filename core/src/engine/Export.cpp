@@ -18,6 +18,7 @@ void configureEngine (Engine& engine, const model::Project& project, std::uint64
         engine.getParameters().set (static_cast<params::ParamId> (i), project.parameters[i]);
 
     auto& drums = engine.getDrums();
+    drums.setKit (project.drums.kit);
     for (std::size_t pad = 0; pad < model::DrumKit::numPads; ++pad)
     {
         const auto& settings = project.drums.pads[pad];

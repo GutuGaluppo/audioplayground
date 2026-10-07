@@ -15,6 +15,7 @@ export function createStores(bridge: Bridge) {
     exportState: createLatestEventStore(bridge, 'export.state'),
     instrument: createLatestEventStore(bridge, 'instrument.state'),
     sampler: createLatestEventStore(bridge, 'sampler.state'),
+    drumKit: createLatestEventStore(bridge, 'drums.kit'),
     drumPads: createKeyedEventStore(bridge, 'drums.pad', (pad) => pad.pad),
     timeline: createLatestEventStore(bridge, 'timeline.state'),
     timelineAssets: createLatestEventStore(bridge, 'timeline.assets'),

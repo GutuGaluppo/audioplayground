@@ -37,6 +37,19 @@ struct NoteClipRender
     bool operator== (const NoteClipRender&) const = default;
 };
 
+// An effect bus (ADR-010), pre-resolved like a track: gains are linear, mute is already applied.
+struct BusRender
+{
+    model::BusId id;
+    float leftGain = 0.0f; // volume x pan law x mute, linear
+    float rightGain = 0.0f;
+    model::TrackEffects effects = model::defaultTrackEffects();
+    // Kept across graphs like a track's chain; set by Engine::publishRenderGraph.
+    std::shared_ptr<TrackChain> chain;
+
+    bool operator== (const BusRender&) const = default;
+};
+
 // Everything the audio thread needs to know about one track, pre-resolved on the message
 // thread: no lookups, branching on solo state or dB conversion in the audio callback.
 struct TrackRender
@@ -50,6 +63,8 @@ struct TrackRender
     std::vector<AudioClipRender> audioClips; // sorted by start
     std::vector<NoteClipRender> noteClips;   // sorted by start
     model::TrackEffects effects = model::defaultTrackEffects();
+    // Linear send gain to each bus of RenderGraph::buses, by index there; 0 = not sent.
+    std::array<float, model::Bus::maxBuses> sendGain {};
     // The track's effect processors, which keep their state (delay lines, reverb tails) across
     // graphs. Set by Engine::publishRenderGraph; never freed on the audio thread (ADR-005).
     std::shared_ptr<TrackChain> chain;
@@ -63,6 +78,7 @@ struct RenderGraph
 {
     std::uint64_t projectVersion = 0;
     std::vector<TrackRender> tracks;
+    std::vector<BusRender> buses;
     std::array<int, model::numInstrumentKinds> instrumentTrack {-1, -1, -1}; // index into tracks, or -1
 };
 

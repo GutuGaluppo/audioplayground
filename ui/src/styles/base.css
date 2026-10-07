@@ -64,8 +64,8 @@ kbd {
 }
 
 .workspace__bottom {
-  flex: 0 1 auto;
-  max-height: 52%;
+  flex: 0 0 auto;
+  height: min(var(--bottom-height, 300px), 70%);
   display: flex;
   align-items: flex-start;
   gap: var(--ap-space-4);
@@ -502,7 +502,7 @@ kbd {
 .keyboard__keys {
   --white-keys: 15;
   position: relative;
-  height: 84px;
+  height: var(--keyboard-height, 84px);
   touch-action: none;
 }
 
@@ -555,7 +555,8 @@ kbd {
 .instrument {
   display: grid;
   gap: var(--ap-space-3);
-  width: min(520px, 100%);
+  width: min(var(--instrument-width, 520px), 100%);
+  flex: none;
 }
 
 .tabs {
@@ -868,7 +869,7 @@ kbd {
   display: grid;
   grid-template-columns: var(--header-width) var(--lanes-width);
   grid-template-rows: 28px;
-  grid-auto-rows: 76px;
+  grid-auto-rows: var(--lane-height, 76px);
   width: max-content;
   align-content: start;
 }
@@ -1378,7 +1379,7 @@ kbd {
   display: grid;
   gap: var(--ap-space-2);
   min-width: 0;
-  flex: 1 1 520px;
+  flex: 1 1 var(--effects-width, 520px);
 }
 
 .effects__title {

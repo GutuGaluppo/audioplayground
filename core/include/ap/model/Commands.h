@@ -253,6 +253,139 @@ struct SetDrumPad
     DrumPad previous;
 };
 
+// Chooses the factory kit pads play when they hold no user sample.
+struct SetDrumKit
+{
+    explicit SetDrumKit (std::uint8_t newKit) noexcept
+        : kit (newKit)
+    {
+    }
+
+    std::uint8_t kit = 0;
+    std::uint8_t previous = 0;
+};
+
+// --- Effect buses (ADR-010) ----------------------------------------------------------------
+
+// Adds an effect bus at the end. Rejected past Bus::maxBuses.
+struct AddBus
+{
+    explicit AddBus (std::string busName = {})
+        : name (std::move (busName))
+    {
+    }
+
+    std::string name; // empty: "Bus 1", "Bus 2", ...
+    BusId created;    // captured
+    std::uint64_t previousNextBusId = 0;
+};
+
+// Removes a bus and every send that fed it (restored by undo).
+struct RemoveBus
+{
+    explicit RemoveBus (BusId bus) noexcept
+        : id (bus)
+    {
+    }
+
+    BusId id;
+    Bus removed; // captured
+    std::size_t index = 0;
+
+    struct RemovedSend
+    {
+        TrackId track;
+        std::size_t position = 0; // in the track's send list
+        Send send;
+    };
+    std::vector<RemovedSend> removedSends; // captured
+};
+
+struct RenameBus
+{
+    RenameBus (BusId bus, std::string newName)
+        : id (bus)
+        , name (std::move (newName))
+    {
+    }
+
+    BusId id;
+    std::string name;
+    std::string previous;
+};
+
+struct SetBusVolume
+{
+    SetBusVolume (BusId bus, float db) noexcept
+        : id (bus)
+        , volumeDb (db)
+    {
+    }
+
+    BusId id;
+    float volumeDb = 0.0f;
+    float previous = 0.0f;
+};
+
+struct SetBusPan
+{
+    SetBusPan (BusId bus, float newPan) noexcept
+        : id (bus)
+        , pan (newPan)
+    {
+    }
+
+    BusId id;
+    float pan = 0.0f;
+    float previous = 0.0f;
+};
+
+struct SetBusMute
+{
+    SetBusMute (BusId bus, bool mute) noexcept
+        : id (bus)
+        , muted (mute)
+    {
+    }
+
+    BusId id;
+    bool muted = false;
+    bool previous = false;
+};
+
+// Changes one effect of a bus's chain. Gestures merge per bus and effect.
+struct SetBusEffect
+{
+    SetBusEffect (BusId bus, params::EffectKind which, EffectState state) noexcept
+        : id (bus)
+        , effect (which)
+        , value (state)
+    {
+    }
+
+    BusId id;
+    params::EffectKind effect;
+    EffectState value;
+    EffectState previous;
+};
+
+// Sets how much of a track goes to a bus. At or below Send::minLevelDb the send is removed.
+struct SetTrackSend
+{
+    SetTrackSend (TrackId fromTrack, BusId toBus, float db) noexcept
+        : track (fromTrack)
+        , bus (toBus)
+        , levelDb (db)
+    {
+    }
+
+    TrackId track;
+    BusId bus;
+    float levelDb = 0.0f;
+    std::optional<float> previous; // captured: the send's level before, if there was one
+    std::size_t position = 0;      // captured: where in the track's send list it was or went
+};
+
 // Adds a clip to a track (ADR-007). The clip's id is assigned here; the one passed is ignored.
 struct AddClip
 {
@@ -329,7 +462,8 @@ struct SplitClip
 
 using Command = std::variant<SetTempo, SetTimeSignature, RenameProject, AddTrack, RemoveTrack, MoveTrack,
                              RenameTrack, SetTrackVolume, SetTrackPan, SetTrackEffect, SetTrackMute,
-                             SetTrackSolo, SetParameter, AddAsset, RelinkAsset, SetSamplerAsset, SetDrumPad,
+                             SetTrackSolo, SetParameter, AddAsset, RelinkAsset, SetSamplerAsset, SetDrumPad, SetDrumKit,
+                             AddBus, RemoveBus, RenameBus, SetBusVolume, SetBusPan, SetBusMute, SetBusEffect, SetTrackSend,
                              AddClip, RemoveClip, SetClip, SplitClip>;
 
 enum class ApplyResult

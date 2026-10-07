@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { useBridge } from '../bridge/BridgeContext';
-import type { TimelineAsset, TimelineTrack } from '../bridge/generated';
+import type { TimelineAsset, TimelineBus, TimelineTrack } from '../bridge/generated';
+import { LANE_PRESETS, setLayoutPref, useLayoutPrefs } from '../state/layoutPrefs';
 import { useLatest } from '../state/latestEvent';
 import { useStores } from '../state/StoresContext';
 import { ClipView } from './ClipView';
@@ -20,11 +21,14 @@ import {
   TrackKind,
 } from './model';
 import { useSelection } from './selection';
+import { BusHeader } from './BusHeader';
 import { TrackHeader } from './TrackHeader';
 
 const MIN_PX_PER_BEAT = 6;
 const MAX_PX_PER_BEAT = 96;
 const HEADER_WIDTH = 228;
+const MAX_BUSES = 8;
+const NO_BUSES: readonly TimelineBus[] = [];
 const NO_TRACKS: readonly TimelineTrack[] = [];
 
 function useMeter() {
@@ -207,7 +211,7 @@ function Lane({
   const { bar, beat, bpm } = useMeter();
 
   const select = (clip: number | null) => {
-    stores.selection.set({ track: track.id, clip });
+    stores.selection.set({ track: track.id, clip, bus: null });
     const instrument = instrumentOf(track.kind);
     if (instrument !== null) bridge.send({ type: 'instrument.select', payload: { instrument } });
   };
@@ -271,6 +275,9 @@ function Lane({
 }
 
 /** Arrangement view (guide §14): tracks, clips, ruler and playhead. */
+/** Below this lane height the track header drops its second row of controls. */
+const COMPACT_BELOW = 64;
+
 export function Timeline() {
   const bridge = useBridge();
   const stores = useStores();
@@ -281,8 +288,10 @@ export function Timeline() {
   const { bar, beat } = useMeter();
   const [pxPerBeat, setPxPerBeat] = useState(24);
   const scrollerRef = useRef<HTMLDivElement>(null);
+  const { laneHeight } = useLayoutPrefs();
 
   const tracks = timeline?.tracks ?? NO_TRACKS;
+  const buses = timeline?.buses ?? NO_BUSES;
   const pxPerTick = pxPerBeat / beat;
   const totalTicks = Math.min(MAX_TICKS, Math.max(timelineEnd(tracks) + 16 * bar, 64 * bar));
   const playhead = Math.max(0, position?.ticks ?? 0);
@@ -292,12 +301,17 @@ export function Timeline() {
 
   // Forget a selection whose clip or track is gone (deleted, undone).
   useEffect(() => {
-    const { track, clip } = stores.selection.get();
+    const { track, clip, bus } = stores.selection.get();
     const trackGone = track !== null && !tracks.some((t) => t.id === track);
     const clipGone = clip !== null && findClip(tracks, clip) === null;
-    if (trackGone || clipGone)
-      stores.selection.set({ track: trackGone ? null : track, clip: null });
-  }, [tracks, stores.selection]);
+    const busGone = bus !== null && !buses.some((b) => b.id === bus);
+    if (trackGone || clipGone || busGone)
+      stores.selection.set({
+        track: trackGone ? null : track,
+        clip: null,
+        bus: busGone ? null : bus,
+      });
+  }, [tracks, buses, stores.selection]);
 
   const actions = {
     split: () => {
@@ -357,7 +371,8 @@ export function Timeline() {
         !(event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement)
       )
         actionsRef.current.nudge(event.key === 'ArrowLeft' ? -1 : 1, event.shiftKey);
-      else if (!mod && event.key === 'Escape') stores.selection.set({ track: null, clip: null });
+      else if (!mod && event.key === 'Escape')
+        stores.selection.set({ track: null, clip: null, bus: null });
       else return;
       event.preventDefault();
     };
@@ -376,6 +391,17 @@ export function Timeline() {
     <section className="timeline" aria-label="Timeline">
       <div className="timeline__toolbar">
         <AddTrackMenu tracks={tracks} />
+        <button
+          type="button"
+          className="button"
+          disabled={buses.length >= MAX_BUSES}
+          title="Add an effect bus: a shared reverb or delay that tracks send to"
+          onClick={() => {
+            bridge.send({ type: 'bus.add', payload: {} });
+          }}
+        >
+          + Bus
+        </button>
         <span className="timeline__divider" aria-hidden="true" />
         <button
           type="button"
@@ -415,6 +441,23 @@ export function Timeline() {
           Delete
         </button>
         <span className="timeline__spacer" />
+        <div className="timeline__sizes" role="group" aria-label="Track height">
+          {LANE_PRESETS.map((preset) => (
+            <button
+              key={preset.label}
+              type="button"
+              className="toggle"
+              aria-pressed={laneHeight === preset.height}
+              aria-label={`${preset.name} tracks`}
+              title={`${preset.name} tracks`}
+              onClick={() => {
+                setLayoutPref('laneHeight', preset.height);
+              }}
+            >
+              {preset.label}
+            </button>
+          ))}
+        </div>
         <button
           type="button"
           className="button"
@@ -446,10 +489,12 @@ export function Timeline() {
       >
         <div
           className="timeline__grid"
+          data-compact={laneHeight < COMPACT_BELOW}
           style={
             {
               '--header-width': `${String(HEADER_WIDTH)}px`,
               '--lanes-width': `${String(totalTicks * pxPerTick)}px`,
+              '--lane-height': `${String(laneHeight)}px`,
             } as React.CSSProperties
           }
         >
@@ -469,12 +514,15 @@ export function Timeline() {
                 });
               }}
               onSelect={() => {
-                stores.selection.set({ track: track.id, clip: null });
+                stores.selection.set({ track: track.id, clip: null, bus: null });
                 const instrument = instrumentOf(track.kind);
                 if (instrument !== null)
                   bridge.send({ type: 'instrument.select', payload: { instrument } });
               }}
             />
+          ))}
+          {buses.map((bus) => (
+            <BusRow key={`bus-${String(bus.id)}`} bus={bus} selected={selection.bus === bus.id} />
           ))}
           {tracks.length === 0 ? (
             <p className="timeline__empty">
@@ -510,6 +558,24 @@ function TimelineRow({
     <>
       <TrackHeader track={track} selected={selected} onSelect={onSelect} onImport={onImport} />
       <Lane track={track} assets={assets} pxPerTick={pxPerTick} />
+    </>
+  );
+}
+
+function BusRow({ bus, selected }: { bus: TimelineBus; selected: boolean }) {
+  const stores = useStores();
+  return (
+    <>
+      <BusHeader
+        bus={bus}
+        selected={selected}
+        onSelect={() => {
+          stores.selection.set({ track: null, clip: null, bus: bus.id });
+        }}
+      />
+      <div className="lane lane--bus" data-selected={selected}>
+        <span className="lane__note">Effect bus: tracks send to it from their effects panel</span>
+      </div>
     </>
   );
 }

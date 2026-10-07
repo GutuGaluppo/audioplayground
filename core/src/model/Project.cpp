@@ -26,6 +26,18 @@ std::optional<std::size_t> Project::indexOf (TrackId id) const noexcept
     return static_cast<std::size_t> (it - tracks.begin());
 }
 
+const Bus* Project::findBus (BusId id) const noexcept
+{
+    const auto it = std::find_if (buses.begin(), buses.end(), [id] (const Bus& b) { return b.id == id; });
+    return it == buses.end() ? nullptr : &*it;
+}
+
+Bus* Project::findBus (BusId id) noexcept
+{
+    const auto it = std::find_if (buses.begin(), buses.end(), [id] (const Bus& b) { return b.id == id; });
+    return it == buses.end() ? nullptr : &*it;
+}
+
 const Asset* Project::findAsset (AssetId id) const noexcept
 {
     const auto it = std::find_if (assets.begin(), assets.end(), [id] (const Asset& a) { return a.id == id; });

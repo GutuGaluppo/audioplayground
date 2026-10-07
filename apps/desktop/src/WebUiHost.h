@@ -69,6 +69,7 @@ private:
     void handle (const ap::bridge::DrumsSetPad&);
     void handle (const ap::bridge::DrumsLoadPad&);
     void handle (const ap::bridge::DrumsResetPad&);
+    void handle (const ap::bridge::DrumsSetKit&);
     void handle (const ap::bridge::TransportPlay&);
     void handle (const ap::bridge::TransportStop&);
     void handle (const ap::bridge::TransportReturnToStart&);
@@ -88,6 +89,14 @@ private:
     void handle (const ap::bridge::TrackSetSolo&);
     void handle (const ap::bridge::TrackSetArmed&);
     void handle (const ap::bridge::TrackSetEffect&);
+    void handle (const ap::bridge::TrackSetSend&);
+    void handle (const ap::bridge::BusAdd&);
+    void handle (const ap::bridge::BusRemove&);
+    void handle (const ap::bridge::BusRename&);
+    void handle (const ap::bridge::BusSetVolume&);
+    void handle (const ap::bridge::BusSetPan&);
+    void handle (const ap::bridge::BusSetMute&);
+    void handle (const ap::bridge::BusSetEffect&);
     void handle (const ap::bridge::TrackImportAudio&);
     void handle (const ap::bridge::AssetLocate&);
     void handle (const ap::bridge::ClipCreate&);
@@ -125,6 +134,7 @@ private:
     void sendInstrumentState();
     void sendSamplerState();
     void sendDrumPad (std::size_t pad);
+    void sendDrumKit();
     void onProjectChanged();
     void sendTransportPosition (bool force);
     void timerCallback() override;

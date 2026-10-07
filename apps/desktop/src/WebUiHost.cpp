@@ -218,6 +218,7 @@ void WebUiHost::handle (const ap::bridge::AppReady&)
     sendProjectState();
     sendInstrumentState();
     sendSamplerState();
+    sendDrumKit();
     for (std::size_t pad = 0; pad < model::DrumKit::numPads; ++pad)
         sendDrumPad (pad);
     sendTimeline();
@@ -420,6 +421,17 @@ void WebUiHost::handle (const ap::bridge::DrumsResetPad& intent)
     session.perform (model::SetDrumPad {pad, settings});
 }
 
+void WebUiHost::handle (const ap::bridge::DrumsSetKit& intent)
+{
+    if (!session.perform (model::SetDrumKit {static_cast<std::uint8_t> (intent.kit)}))
+        sendDrumKit();
+}
+
+void WebUiHost::sendDrumKit()
+{
+    emit (ap::bridge::DrumsKit {static_cast<int> (session.project().drums.kit)});
+}
+
 void WebUiHost::sendDrumPad (std::size_t pad)
 {
     const auto& settings = session.project().drums.pads[pad];
@@ -468,6 +480,7 @@ void WebUiHost::onProjectChanged()
     samples.sync (host.getStatus().sampleRate);
     sendProjectState();
     sendTimeline();
+    sendDrumKit();
     for (std::size_t pad = 0; pad < model::DrumKit::numPads; ++pad)
         sendDrumPad (pad);
     sendTransportState();

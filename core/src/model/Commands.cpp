@@ -275,6 +275,145 @@ ApplyResult apply (Command& command, Project& project)
                 c.previous = std::exchange (project.drums.pads[c.pad], c.value);
                 return ApplyResult::applied;
             },
+            [&project] (SetDrumKit& c) -> ApplyResult
+            {
+                if (c.kit >= DrumKit::kitCount)
+                    return ApplyResult::rejected;
+                if (c.kit == project.drums.kit)
+                    return ApplyResult::unchanged;
+                c.previous = std::exchange (project.drums.kit, c.kit);
+                return ApplyResult::applied;
+            },
+            [&project] (AddBus& c) -> ApplyResult
+            {
+                if (project.buses.size() >= Bus::maxBuses)
+                    return ApplyResult::rejected;
+                std::string name;
+                if (c.name.empty())
+                    name = "Bus " + std::to_string (project.buses.size() + 1);
+                else if (auto sanitised = sanitiseName (c.name, Bus::maxNameLength))
+                    name = std::move (*sanitised);
+                else
+                    return ApplyResult::rejected;
+
+                Bus bus;
+                bus.id = BusId {project.nextBusId};
+                bus.name = std::move (name);
+                c.created = bus.id;
+                c.previousNextBusId = project.nextBusId;
+                project.buses.push_back (std::move (bus));
+                ++project.nextBusId;
+                return ApplyResult::applied;
+            },
+            [&project] (RemoveBus& c) -> ApplyResult
+            {
+                const auto it = std::find_if (project.buses.begin(), project.buses.end(),
+                                              [&c] (const Bus& b) { return b.id == c.id; });
+                if (it == project.buses.end())
+                    return ApplyResult::rejected;
+                c.index = static_cast<std::size_t> (it - project.buses.begin());
+                c.removed = *it;
+                c.removedSends.clear();
+                for (auto& track : project.tracks)
+                    for (std::size_t i = 0; i < track.sends.size(); ++i)
+                        if (track.sends[i].bus == c.id)
+                        {
+                            c.removedSends.push_back ({track.id, i, track.sends[i]});
+                            track.sends.erase (track.sends.begin() + static_cast<std::ptrdiff_t> (i));
+                            break;
+                        }
+                project.buses.erase (it);
+                return ApplyResult::applied;
+            },
+            [&project] (RenameBus& c) -> ApplyResult
+            {
+                auto* bus = project.findBus (c.id);
+                auto name = sanitiseName (c.name, Bus::maxNameLength);
+                if (bus == nullptr || !name)
+                    return ApplyResult::rejected;
+                c.name = std::move (*name);
+                if (bus->name == c.name)
+                    return ApplyResult::unchanged;
+                c.previous = std::exchange (bus->name, c.name);
+                return ApplyResult::applied;
+            },
+            [&project] (SetBusVolume& c) -> ApplyResult
+            {
+                auto* bus = project.findBus (c.id);
+                const auto value = finiteClamped (c.volumeDb, Bus::minVolumeDb, Bus::maxVolumeDb);
+                if (bus == nullptr || !value)
+                    return ApplyResult::rejected;
+                c.volumeDb = *value;
+                if (bus->volumeDb == c.volumeDb)
+                    return ApplyResult::unchanged;
+                c.previous = std::exchange (bus->volumeDb, c.volumeDb);
+                return ApplyResult::applied;
+            },
+            [&project] (SetBusPan& c) -> ApplyResult
+            {
+                auto* bus = project.findBus (c.id);
+                const auto value = finiteClamped (c.pan, -1.0f, 1.0f);
+                if (bus == nullptr || !value)
+                    return ApplyResult::rejected;
+                c.pan = *value;
+                if (bus->pan == c.pan)
+                    return ApplyResult::unchanged;
+                c.previous = std::exchange (bus->pan, c.pan);
+                return ApplyResult::applied;
+            },
+            [&project] (SetBusMute& c) -> ApplyResult
+            {
+                auto* bus = project.findBus (c.id);
+                if (bus == nullptr)
+                    return ApplyResult::rejected;
+                if (bus->muted == c.muted)
+                    return ApplyResult::unchanged;
+                c.previous = std::exchange (bus->muted, c.muted);
+                return ApplyResult::applied;
+            },
+            [&project] (SetBusEffect& c) -> ApplyResult
+            {
+                auto* bus = project.findBus (c.id);
+                const auto value = normaliseEffect (c.effect, c.value);
+                if (bus == nullptr || !value)
+                    return ApplyResult::rejected;
+                c.value = *value;
+                auto& slot = bus->effects[static_cast<std::size_t> (c.effect)];
+                if (slot == c.value)
+                    return ApplyResult::unchanged;
+                c.previous = slot;
+                slot = c.value;
+                return ApplyResult::applied;
+            },
+            [&project] (SetTrackSend& c) -> ApplyResult
+            {
+                auto* track = project.findTrack (c.track);
+                const auto level = finiteClamped (c.levelDb, Send::minLevelDb, Send::maxLevelDb);
+                if (track == nullptr || project.findBus (c.bus) == nullptr || !level)
+                    return ApplyResult::rejected;
+                c.levelDb = *level;
+                const auto it = std::find_if (track->sends.begin(), track->sends.end(),
+                                              [&c] (const Send& s) { return s.bus == c.bus; });
+                const bool remove = c.levelDb <= Send::minLevelDb;
+                if (it == track->sends.end())
+                {
+                    if (remove)
+                        return ApplyResult::unchanged;
+                    c.previous.reset();
+                    c.position = track->sends.size();
+                    track->sends.push_back ({c.bus, c.levelDb});
+                    return ApplyResult::applied;
+                }
+                c.position = static_cast<std::size_t> (it - track->sends.begin());
+                if (!remove && it->levelDb == c.levelDb)
+                    return ApplyResult::unchanged;
+                c.previous = it->levelDb;
+                if (remove)
+                    track->sends.erase (it);
+                else
+                    it->levelDb = c.levelDb;
+                return ApplyResult::applied;
+            },
             [&project] (SetParameter& c) -> ApplyResult
             {
                 const auto index = static_cast<std::size_t> (c.id);
@@ -441,6 +580,66 @@ void revert (const Command& command, Project& project)
             },
             [&project] (const SetSamplerAsset& c) { project.samplerAsset = c.previous; },
             [&project] (const SetDrumPad& c) { project.drums.pads[c.pad] = c.previous; },
+            [&project] (const SetDrumKit& c) { project.drums.kit = c.previous; },
+            [&project] (const AddBus& c)
+            {
+                std::erase_if (project.buses, [&c] (const Bus& b) { return b.id == c.created; });
+                project.nextBusId = c.previousNextBusId;
+            },
+            [&project] (const RemoveBus& c)
+            {
+                project.buses.insert (project.buses.begin() + static_cast<std::ptrdiff_t> (c.index), c.removed);
+                // Sends go back in the order they were taken out, each to its old position.
+                for (auto it = c.removedSends.rbegin(); it != c.removedSends.rend(); ++it)
+                    if (auto* t = project.findTrack (it->track))
+                        t->sends.insert (t->sends.begin()
+                                             + static_cast<std::ptrdiff_t> (std::min (it->position, t->sends.size())),
+                                         it->send);
+            },
+            [&project] (const RenameBus& c)
+            {
+                if (auto* b = project.findBus (c.id))
+                    b->name = c.previous;
+            },
+            [&project] (const SetBusVolume& c)
+            {
+                if (auto* b = project.findBus (c.id))
+                    b->volumeDb = c.previous;
+            },
+            [&project] (const SetBusPan& c)
+            {
+                if (auto* b = project.findBus (c.id))
+                    b->pan = c.previous;
+            },
+            [&project] (const SetBusMute& c)
+            {
+                if (auto* b = project.findBus (c.id))
+                    b->muted = c.previous;
+            },
+            [&project] (const SetBusEffect& c)
+            {
+                if (auto* b = project.findBus (c.id))
+                    b->effects[static_cast<std::size_t> (c.effect)] = c.previous;
+            },
+            [&project] (const SetTrackSend& c)
+            {
+                auto* t = project.findTrack (c.track);
+                if (t == nullptr)
+                    return;
+                const auto it = std::find_if (t->sends.begin(), t->sends.end(),
+                                              [&c] (const Send& s) { return s.bus == c.bus; });
+                if (!c.previous)
+                {
+                    if (it != t->sends.end())
+                        t->sends.erase (it); // the send did not exist before
+                }
+                else if (it != t->sends.end())
+                    it->levelDb = *c.previous;
+                else
+                    t->sends.insert (t->sends.begin()
+                                         + static_cast<std::ptrdiff_t> (std::min (c.position, t->sends.size())),
+                                     Send {c.bus, *c.previous}); // it had been removed by this edit
+            },
             [&project] (const SetParameter& c)
             { project.parameters[static_cast<std::size_t> (c.id)] = c.previous; },
             [&project] (const AddClip& c)
@@ -493,6 +692,16 @@ std::string_view describe (const Command& command) noexcept
             [] (const RelinkAsset&) { return std::string_view ("Locate audio"); },
             [] (const SetSamplerAsset&) { return std::string_view ("Change sample"); },
             [] (const SetDrumPad&) { return std::string_view ("Change pad"); },
+            [] (const SetDrumKit&) { return std::string_view ("Change drum kit"); },
+            [] (const AddBus&) { return std::string_view ("Add bus"); },
+            [] (const RemoveBus&) { return std::string_view ("Delete bus"); },
+            [] (const RenameBus&) { return std::string_view ("Rename bus"); },
+            [] (const SetBusVolume&) { return std::string_view ("Change bus volume"); },
+            [] (const SetBusPan&) { return std::string_view ("Change bus pan"); },
+            [] (const SetBusMute&) { return std::string_view ("Mute bus"); },
+            [] (const SetBusEffect& c)
+            { return params::effectDescriptors[static_cast<std::size_t> (c.effect)].name; },
+            [] (const SetTrackSend&) { return std::string_view ("Change send"); },
             [] (const AddClip&) { return std::string_view ("Add clip"); },
             [] (const RemoveClip&) { return std::string_view ("Delete clip"); },
             [] (const SetClip& c)
@@ -541,6 +750,12 @@ bool canMerge (const Command& previous, const Command& next) noexcept
                 return p.id == n.id;
             else if constexpr (std::is_same_v<T, SetTrackEffect>)
                 return p.id == n.id && p.effect == n.effect;
+            else if constexpr (std::is_same_v<T, SetBusVolume> || std::is_same_v<T, SetBusPan>)
+                return p.id == n.id;
+            else if constexpr (std::is_same_v<T, SetBusEffect>)
+                return p.id == n.id && p.effect == n.effect;
+            else if constexpr (std::is_same_v<T, SetTrackSend>)
+                return p.track == n.track && p.bus == n.bus;
             else if constexpr (std::is_same_v<T, SetClip>)
                 return p.id == n.id && p.edit == n.edit;
             else if constexpr (std::is_same_v<T, SetDrumPad>)
@@ -578,8 +793,14 @@ void merge (Command& previous, const Command& next)
                 p.volumeDb = n->volumeDb;
             else if constexpr (std::is_same_v<T, SetTrackPan>)
                 p.pan = n->pan;
-            else if constexpr (std::is_same_v<T, SetTrackEffect>)
+            else if constexpr (std::is_same_v<T, SetTrackEffect> || std::is_same_v<T, SetBusEffect>)
                 p.value = n->value;
+            else if constexpr (std::is_same_v<T, SetBusVolume>)
+                p.volumeDb = n->volumeDb;
+            else if constexpr (std::is_same_v<T, SetBusPan>)
+                p.pan = n->pan;
+            else if constexpr (std::is_same_v<T, SetTrackSend>)
+                p.levelDb = n->levelDb;
             else if constexpr (std::is_same_v<T, SetParameter>)
                 p.value = n->value;
             else if constexpr (std::is_same_v<T, SetClip>)

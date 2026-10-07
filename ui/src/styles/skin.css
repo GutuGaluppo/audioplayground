@@ -578,7 +578,7 @@ select,
 }
 
 .keyboard__keys {
-  height: 96px;
+  height: var(--keyboard-height, 96px);
   padding-top: 3px;
   border-top: 3px solid #000;
 }
@@ -1004,4 +1004,142 @@ kbd {
 .keyboard__master .vu {
   width: 84px;
   height: 46px;
+}
+
+/* Resizing ------------------------------------------------------------------------------------- */
+
+.splitter {
+  position: relative;
+  z-index: 5;
+  flex: none;
+  touch-action: none;
+}
+
+.splitter[data-orientation='horizontal'] {
+  height: 8px;
+  cursor: row-resize;
+}
+
+.splitter[data-orientation='vertical'] {
+  width: 8px;
+  cursor: col-resize;
+}
+
+/* A thin grip line that lights up on hover and focus. */
+.splitter::after {
+  content: '';
+  position: absolute;
+  inset: 3px 0;
+  border-radius: 2px;
+  background: var(--ap-border-strong);
+  opacity: 0.5;
+  transition: opacity var(--ap-motion-fast);
+}
+
+.splitter[data-orientation='vertical']::after {
+  inset: 0 3px;
+}
+
+.splitter:hover::after,
+.splitter:focus-visible::after {
+  background: var(--ap-accent);
+  opacity: 1;
+}
+
+.splitter:focus-visible {
+  outline: none;
+}
+
+/* Track height handle: the bottom edge of each track header. */
+.track-header > .splitter {
+  position: absolute;
+  right: 0;
+  bottom: -4px;
+  left: 0;
+}
+
+.timeline__sizes {
+  display: flex;
+  gap: 2px;
+}
+
+.timeline__sizes .toggle {
+  min-width: 28px;
+  padding: var(--ap-space-1) 0;
+}
+
+/* Small tracks keep only the name row and the mute/solo buttons. */
+.timeline__grid[data-compact='true'] .track-header__bottom,
+.timeline__grid[data-compact='true'] .track-header__hint,
+.timeline__grid[data-compact='true'] .track-header__input {
+  display: none;
+}
+
+.timeline__grid[data-compact='true'] .track-header {
+  gap: 0;
+}
+
+.workspace__bottom > .splitter[data-orientation='vertical'] {
+  align-self: stretch;
+}
+
+.keyboard > .splitter {
+  position: absolute;
+  top: -4px;
+  right: 0;
+  left: 0;
+  z-index: 6;
+}
+
+.workspace > .splitter[data-orientation='horizontal'] {
+  margin: -4px 0;
+}
+
+.drums__kit {
+  display: flex;
+  align-items: center;
+  gap: var(--ap-space-2);
+  margin-left: auto;
+  color: var(--ap-text-muted);
+  font-size: var(--ap-text-sm);
+}
+
+.drums__kit select {
+  min-height: 28px;
+  padding: 0 var(--ap-space-2);
+}
+
+/* Effect buses ---------------------------------------------------------------------------------- */
+
+.track-header[data-kind='bus'] {
+  --track-colour: #b8b2a6;
+}
+
+.lane--bus {
+  display: flex;
+  align-items: center;
+  padding-left: var(--ap-space-4);
+  background-color: #101216;
+  background-image: repeating-linear-gradient(
+    135deg,
+    rgb(255 255 255 / 2%) 0 6px,
+    transparent 6px 12px
+  );
+}
+
+.lane__note {
+  position: sticky;
+  left: calc(var(--header-width) + var(--ap-space-4));
+  color: var(--ap-text-muted);
+  font-size: var(--ap-text-xs);
+  letter-spacing: 0.02em;
+}
+
+.effect__title {
+  font-family: var(--ap-font-display);
+  font-weight: 500;
+}
+
+.effect--sends {
+  --effect-colour: var(--ap-accent);
 }

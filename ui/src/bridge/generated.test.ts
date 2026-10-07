@@ -72,11 +72,35 @@ describe('parseNativeEvent with lists of records', () => {
     soloed: false,
     clips: [clip],
     effects: [{ enabled: true, values: [1, 2, 3] }],
+    sends: [{ bus: 1, levelDb: -6 }],
   };
-  const state = (tracks: unknown) => ({ type: 'timeline.state', payload: { tracks } });
+  const bus = {
+    id: 1,
+    name: 'Bus 1',
+    volumeDb: 0,
+    pan: 0,
+    muted: false,
+    effects: [{ enabled: false, values: [1] }],
+  };
+  const state = (tracks: unknown, buses: unknown = []) => ({
+    type: 'timeline.state',
+    payload: { tracks, buses },
+  });
 
   it('accepts a nested timeline', () => {
     expect(parseNativeEvent(state([track]))).toEqual(state([track]));
+  });
+
+  it('accepts buses and sends', () => {
+    expect(parseNativeEvent(state([track], [bus]))).toEqual(state([track], [bus]));
+  });
+
+  it.each([
+    ['a bus with an extra key', [{ ...bus, extra: 1 }]],
+    ['a bus volume out of range', [{ ...bus, volumeDb: 99 }]],
+    ['too many buses', Array.from({ length: 9 }, () => bus)],
+  ])('rejects %s', (_label, buses) => {
+    expect(parseNativeEvent(state([track], buses))).toBeNull();
   });
 
   it.each([

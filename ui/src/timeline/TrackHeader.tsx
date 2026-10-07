@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import { useBridge } from '../bridge/BridgeContext';
 import type { TimelineTrack } from '../bridge/generated';
 import { PeakMeter } from '../components/PeakMeter';
+import { Splitter } from '../components/Splitter';
 import { beginGesture } from '../params/gestures';
 import { useLatest } from '../state/latestEvent';
 import { useStores } from '../state/StoresContext';
@@ -46,6 +47,7 @@ export function TrackHeader({
       aria-label={`${track.name} track`}
       onPointerDown={onSelect}
     >
+      <Splitter pref="laneHeight" orientation="horizontal" grow={1} label="Track height" />
       <div className="track-header__top">
         <span className="track-header__icon" title={kindLabel(track.kind)} aria-hidden="true">
           {(() => {

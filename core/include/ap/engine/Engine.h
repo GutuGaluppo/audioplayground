@@ -145,7 +145,7 @@ public:
     }
 
     // Delay from the timeline (and live notes) to the output, in samples at the prepared rate:
-    // the track chains' constant latency plus the master limiter's lookahead (ADR-009). Offline
+    // two chain latencies (a track's, then a bus's; ADR-010) plus the master limiter's lookahead. Offline
     // rendering and recording compensate it.
     [[nodiscard]] int getOutputLatency() const noexcept
     {
@@ -167,14 +167,44 @@ public:
     [[nodiscard]] int getNonFiniteSampleCount() const noexcept;
 
 private:
+    // Fixed delay of a stereo signal, in place. N samples exactly.
+    template <std::size_t N>
+    struct StereoDelay
+    {
+        std::array<std::array<float, N>, 2> line {};
+        std::size_t position = 0;
+
+        void reset() noexcept
+        {
+            line[0].fill (0.0f);
+            line[1].fill (0.0f);
+            position = 0;
+        }
+
+        void process (float* left, float* right, int numSamples) noexcept AP_NONBLOCKING
+        {
+            for (int i = 0; i < numSamples; ++i)
+            {
+                const float delayedLeft = line[0][position];
+                const float delayedRight = line[1][position];
+                line[0][position] = left[i];
+                line[1][position] = right[i];
+                left[i] = delayedLeft;
+                right[i] = delayedRight;
+                position = (position + 1) % N;
+            }
+        }
+    };
+
     void processBlock (core::AudioBlock output, core::InputBlock input) noexcept AP_NONBLOCKING;
     void meterInput (core::InputBlock input) noexcept AP_NONBLOCKING;
     void routeLiveNote (const instruments::NoteEvent& note) noexcept AP_NONBLOCKING;
     void handleNote (model::InstrumentKind instrument,
                      const instruments::NoteEvent& note) noexcept AP_NONBLOCKING;
     void renderInstrument (model::InstrumentKind instrument, int numSamples) noexcept AP_NONBLOCKING;
-    void mixTracks (core::AudioBlock output, const TrackBuses& buses) noexcept AP_NONBLOCKING;
-    void mixDirect (core::AudioBlock output) noexcept AP_NONBLOCKING;
+    void mixTracks (const TrackBuses& buses, const TrackBuses& sends, int numSamples) noexcept AP_NONBLOCKING;
+    void processBuses (const TrackBuses& sends, int numSamples) noexcept AP_NONBLOCKING;
+    void mixOutput (core::AudioBlock output) noexcept AP_NONBLOCKING;
     void renderTestTone (core::AudioBlock output) noexcept AP_NONBLOCKING;
     void finaliseOutput (core::AudioBlock output) noexcept AP_NONBLOCKING;
     static void updatePeak (std::atomic<float>& peak, float blockPeak) noexcept AP_NONBLOCKING;
@@ -200,17 +230,38 @@ private:
     TimelinePlayer timeline;
     std::vector<float> busStorage;      // 2 channels x maxBlock per instrument, allocated in prepare()
     std::vector<float> trackBusStorage; // 2 channels x maxBlock per track (Project::maxTracks)
-    // Sources that belong to no track (metronome, test tone, an instrument without a track) are
-    // delayed by the chains' latency so they stay in time with the tracks.
-    std::vector<float> directBus; // 2 x maxBlock
-    std::array<std::array<float, TrackChain::latency()>, 2> directDelay {};
-    std::size_t directDelayPosition = 0;
+    // Signal paths (ADR-010). A track goes through its chain; its send goes on through a bus chain.
+    // Everything that does not go through a bus chain is delayed by one chain latency, and sources
+    // that belong to no track (metronome, test tone, an instrument without a track) by two, so
+    // every path takes exactly two chain latencies and nothing ever moves in time.
+    std::vector<float> directBus;   // 2 x maxBlock
+    std::vector<float> trackMix;    // 2 x maxBlock: the tracks, after chain and fader
+    std::vector<float> busReturn;   // 2 x maxBlock: the buses, after chain and fader
+    std::vector<float> busStorageIn; // 2 x maxBlock per bus (Bus::maxBuses): what the sends collected
+    StereoDelay<TrackChain::latency()> trackDelay;
+    StereoDelay<2 * TrackChain::latency()> directDelay;
+
+    // Gains at the end of the previous block, so send and bus changes ramp instead of clicking.
+    struct SendGainState
+    {
+        model::TrackId track;
+        std::array<float, model::Bus::maxBuses> gain {};
+    };
+    std::array<SendGainState, model::Project::maxTracks> sendState {};
+    struct BusGainState
+    {
+        model::BusId bus;
+        float left = 0.0f;
+        float right = 0.0f;
+    };
+    std::array<BusGainState, model::Bus::maxBuses> busState {};
     fx::Limiter limiter;
     std::atomic<int> outputLatency {0};
 
     // Effect chains by track id. Message thread (publish) and prepare(); never the audio thread.
     std::mutex chainLock;
     std::map<std::uint64_t, std::shared_ptr<TrackChain>> chains;
+    std::map<std::uint64_t, std::shared_ptr<TrackChain>> busChains;
     double chainRate = 48000.0; // guarded by chainLock
     int chainBlock = 512;       // guarded by chainLock
 

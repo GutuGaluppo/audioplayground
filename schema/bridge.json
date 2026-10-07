@@ -183,6 +183,13 @@
         "max": 15
       }
     },
+    "drums.setKit": {
+      "kit": {
+        "type": "int",
+        "min": 0,
+        "max": 4
+      }
+    },
     "transport.record": {},
     "transport.capture": {},
     "transport.seek": {
@@ -518,6 +525,117 @@
         "min": 0,
         "max": 2147483647
       }
+    },
+    "bus.add": {},
+    "bus.remove": {
+      "bus": {
+        "type": "int",
+        "min": 1,
+        "max": 2147483647
+      }
+    },
+    "bus.rename": {
+      "bus": {
+        "type": "int",
+        "min": 1,
+        "max": 2147483647
+      },
+      "name": {
+        "type": "string",
+        "maxLength": 512
+      }
+    },
+    "bus.setVolume": {
+      "bus": {
+        "type": "int",
+        "min": 1,
+        "max": 2147483647
+      },
+      "volumeDb": {
+        "type": "number",
+        "min": -60,
+        "max": 6
+      },
+      "gesture": {
+        "type": "int",
+        "min": 0,
+        "max": 2147483647
+      }
+    },
+    "bus.setPan": {
+      "bus": {
+        "type": "int",
+        "min": 1,
+        "max": 2147483647
+      },
+      "pan": {
+        "type": "number",
+        "min": -1,
+        "max": 1
+      },
+      "gesture": {
+        "type": "int",
+        "min": 0,
+        "max": 2147483647
+      }
+    },
+    "bus.setMute": {
+      "bus": {
+        "type": "int",
+        "min": 1,
+        "max": 2147483647
+      },
+      "muted": {
+        "type": "bool"
+      }
+    },
+    "bus.setEffect": {
+      "bus": {
+        "type": "int",
+        "min": 1,
+        "max": 2147483647
+      },
+      "effect": {
+        "type": "int",
+        "min": 0,
+        "max": 5
+      },
+      "enabled": {
+        "type": "bool"
+      },
+      "values": {
+        "type": "floatArray",
+        "min": -100000,
+        "max": 100000,
+        "maxItems": 8
+      },
+      "gesture": {
+        "type": "int",
+        "min": 0,
+        "max": 2147483647
+      }
+    },
+    "track.setSend": {
+      "track": {
+        "type": "int",
+        "min": 1,
+        "max": 2147483647
+      },
+      "bus": {
+        "type": "int",
+        "min": 1,
+        "max": 2147483647
+      },
+      "levelDb": {
+        "type": "number",
+        "min": -60,
+        "max": 6
+      },
+      "gesture": {
+        "type": "int",
+        "min": 0,
+        "max": 2147483647
+      }
     }
   },
   "events": {
@@ -745,6 +863,13 @@
         "maxItems": 512
       }
     },
+    "drums.kit": {
+      "kit": {
+        "type": "int",
+        "min": 0,
+        "max": 4
+      }
+    },
     "drums.pad": {
       "pad": {
         "type": "int",
@@ -883,6 +1008,68 @@
           "effects": {
             "type": "list",
             "item": "TimelineEffect",
+            "maxItems": 6,
+            "fields": {
+              "enabled": {
+                "type": "bool"
+              },
+              "values": {
+                "type": "floatArray",
+                "min": -100000,
+                "max": 100000,
+                "maxItems": 8
+              }
+            }
+          },
+          "sends": {
+            "type": "list",
+            "item": "TimelineSend",
+            "maxItems": 8,
+            "fields": {
+              "bus": {
+                "type": "int",
+                "min": 1,
+                "max": 2147483647
+              },
+              "levelDb": {
+                "type": "number",
+                "min": -60,
+                "max": 6
+              }
+            }
+          }
+        }
+      },
+      "buses": {
+        "type": "list",
+        "item": "TimelineBus",
+        "maxItems": 8,
+        "fields": {
+          "id": {
+            "type": "int",
+            "min": 1,
+            "max": 2147483647
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 256
+          },
+          "volumeDb": {
+            "type": "number",
+            "min": -60,
+            "max": 6
+          },
+          "pan": {
+            "type": "number",
+            "min": -1,
+            "max": 1
+          },
+          "muted": {
+            "type": "bool"
+          },
+          "effects": {
+            "type": "list",
+            "item": "BusEffect",
             "maxItems": 6,
             "fields": {
               "enabled": {
