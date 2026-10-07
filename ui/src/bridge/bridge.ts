@@ -14,12 +14,28 @@ type Handler<T extends NativeEventType> = (payload: PayloadOf<T>) => void;
 
 /** Transport between the UI and the native host. The UI never processes audio (ADR-002). */
 export interface Bridge {
+  /** Which engine answers: the desktop app's, the browser's WebAssembly one, or the test stand-in. */
+  readonly kind: 'native' | 'wasm' | 'simulated';
   readonly isNative: boolean;
+  /** Only the browser engine: it cannot make sound until the page is allowed to (a user gesture). */
+  readonly audio?: AudioGate;
   send(intent: Intent): void;
   on<T extends NativeEventType>(type: T, handler: Handler<T>): () => void;
 }
 
-class EventRouter {
+export type AudioGateState = 'loading' | 'blocked' | 'running' | 'failed';
+
+/** The browser's permission to play audio: needs one click, and can fail to start. */
+export interface AudioGate {
+  state(): AudioGateState;
+  /** A message for the user when the state is 'failed'. */
+  error(): string;
+  subscribe(listener: () => void): () => void;
+  /** Call from a click or key press. */
+  start(): Promise<void>;
+}
+
+export class EventRouter {
   private readonly handlers = new Map<NativeEventType, Set<(payload: unknown) => void>>();
 
   on<T extends NativeEventType>(type: T, handler: Handler<T>): () => void {
@@ -45,7 +61,7 @@ class EventRouter {
   }
 }
 
-function createNativeBridge(juce: JuceGlobal): Bridge {
+export function createNativeBridge(juce: JuceGlobal): Bridge {
   const nativeVersion = juce.initialisationData['apProtocolVersion'];
   const version = Array.isArray(nativeVersion) ? (nativeVersion[0] as unknown) : nativeVersion;
   if (version !== PROTOCOL_VERSION) {
@@ -60,6 +76,7 @@ function createNativeBridge(juce: JuceGlobal): Bridge {
   });
 
   return {
+    kind: 'native',
     isNative: true,
     send: (intent) => {
       juce.backend.emitEvent(INTENT_EVENT_ID, intent);
@@ -252,6 +269,7 @@ export function createSimulatedBridge(): Bridge {
   }
 
   return {
+    kind: 'simulated',
     isNative: false,
     send: (intent) => {
       if (timeline.handle(intent)) return;
@@ -550,8 +568,4 @@ export function createSimulatedBridge(): Bridge {
     },
     on: (type, handler) => router.on(type, handler),
   };
-}
-
-export function createBridge(): Bridge {
-  return window.__JUCE__ ? createNativeBridge(window.__JUCE__) : createSimulatedBridge();
 }

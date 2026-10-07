@@ -3,34 +3,42 @@ import react from '@vitejs/plugin-react';
 import { defineConfig, type Plugin } from 'vite';
 
 // Strict CSP for the shipped bundle. Not applied to the dev server, whose HMR needs inline scripts.
-const CONTENT_SECURITY_POLICY = [
-  "default-src 'self'",
-  "script-src 'self'",
-  "style-src 'self'",
-  "img-src 'self' data: blob:",
-  "font-src 'self'",
-  "connect-src 'self'",
-  "object-src 'none'",
-  "base-uri 'none'",
-  "form-action 'none'",
-].join('; ');
+// The browser build also runs WebAssembly, which needs 'wasm-unsafe-eval' (not arbitrary eval).
+const contentSecurityPolicyFor = (webEngine: boolean) =>
+  [
+    "default-src 'self'",
+    webEngine ? "script-src 'self' 'wasm-unsafe-eval'" : "script-src 'self'",
+    "style-src 'self'",
+    "img-src 'self' data: blob:",
+    "font-src 'self'",
+    "connect-src 'self'",
+    "object-src 'none'",
+    "base-uri 'none'",
+    "form-action 'none'",
+  ].join('; ');
 
-function contentSecurityPolicy(): Plugin {
+function contentSecurityPolicy(webEngine: boolean): Plugin {
   return {
     name: 'ap-content-security-policy',
     apply: 'build',
     transformIndexHtml: () => [
       {
         tag: 'meta',
-        attrs: { 'http-equiv': 'Content-Security-Policy', content: CONTENT_SECURITY_POLICY },
+        attrs: {
+          'http-equiv': 'Content-Security-Policy',
+          content: contentSecurityPolicyFor(webEngine),
+        },
         injectTo: 'head-prepend',
       },
     ],
   };
 }
 
-export default defineConfig({
-  plugins: [react(), contentSecurityPolicy()],
+// `--mode web` builds the browser version: it ships the WebAssembly engine next to the page. The
+// desktop bundle, which embeds everything it serves, carries none of those files.
+export default defineConfig(({ command, mode }) => ({
+  plugins: [react(), contentSecurityPolicy(mode === 'web')],
+  publicDir: command === 'serve' || mode === 'web' ? 'public' : false,
   // Relative asset URLs: the desktop app serves the bundle from embedded resources, not a web server.
   base: './',
   build: {
@@ -45,4 +53,4 @@ export default defineConfig({
     // The contrast test reads the design tokens (other stylesheets stay empty in tests).
     css: { include: [/tokens\.css/] },
   },
-});
+}));

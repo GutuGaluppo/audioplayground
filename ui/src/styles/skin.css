@@ -1262,3 +1262,30 @@ kbd {
   flex-shrink: 0;
   gap: var(--ap-space-2);
 }
+
+/* The browser build asks for one click before it can play ------------------------------------ */
+
+.audio-gate {
+  position: fixed;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, #000 70%, transparent);
+  inset: 0;
+}
+
+.audio-gate__card {
+  display: grid;
+  max-width: 360px;
+  padding: var(--ap-space-6);
+  border: 1px solid var(--ap-border);
+  border-radius: var(--ap-radius-md);
+  background: var(--ap-surface);
+  gap: var(--ap-space-3);
+  text-align: center;
+}
+
+.audio-gate__card h2,
+.audio-gate__card p {
+  margin: 0;
+}

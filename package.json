@@ -10,6 +10,9 @@
     "ui:build": "pnpm --filter @ap/ui build",
     "check": "pnpm codegen:check && pnpm -r run typecheck && pnpm -r run lint && pnpm -r run format:check && pnpm -r run test",
     "codegen": "node tools/codegen/bridge.mjs && node tools/codegen/parameters.mjs",
-    "codegen:check": "node tools/codegen/bridge.mjs --check && node tools/codegen/parameters.mjs --check"
+    "codegen:check": "node tools/codegen/bridge.mjs --check && node tools/codegen/parameters.mjs --check",
+    "web:wasm": "tools/web/build.sh",
+    "web:test": "node --test apps/web/test/engine.test.mjs",
+    "web:build": "pnpm web:wasm && pnpm --filter @ap/ui build:web"
   }
 }

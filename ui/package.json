@@ -10,7 +10,8 @@
     "lint": "eslint . --max-warnings 0",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "build:web": "tsc --noEmit && vite build --mode web --outDir dist-web --emptyOutDir"
   },
   "dependencies": {
     "react": "19.3.0",

@@ -141,3 +141,38 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
       - run: pnpm ui:build
+
+  web:
+    name: Browser build (WebAssembly)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@d9184bf108216479bc5a137cc391f4d7b14c870b # v6.1.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Emscripten from the official emsdk, pinned to a release tag and cached.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: emsdk
+        with:
+          path: ~/emsdk
+          key: emsdk-6.0.10-${{ runner.os }}
+      - name: Install Emscripten
+        if: steps.emsdk.outputs.cache-hit != 'true'
+        run: |
+          git clone --depth 1 --branch 6.0.10 https://github.com/emscripten-core/emsdk.git ~/emsdk
+          ~/emsdk/emsdk install 6.0.10
+      - name: Build the engine
+        run: |
+          ~/emsdk/emsdk activate 6.0.10
+          source ~/emsdk/emsdk_env.sh
+          tools/web/build.sh
+        timeout-minutes: 20
+      - run: pnpm web:test
+      - run: pnpm --filter @ap/ui build:web
+

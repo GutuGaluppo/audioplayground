@@ -2,7 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
 import { App } from './App';
-import { createBridge } from './bridge/bridge';
+import { createBridge } from './bridge/createBridge';
 import { BridgeContext } from './bridge/BridgeContext';
 import { createStores } from './state/stores';
 import { StoresContext } from './state/StoresContext';

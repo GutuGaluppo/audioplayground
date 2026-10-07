@@ -11,6 +11,17 @@ Every third-party library, algorithm, sample, impulse response, preset source an
 | Microsoft Edge WebView2 SDK (Windows) | 1.0.3485.44 | BSD-3-Clause | SHA-256 in `cmake/Dependencies.cmake` | Static loader linked into the Windows app |
 | React / React DOM | 19.3.0 | MIT | `ui/package.json` + `pnpm-lock.yaml` | |
 
+## Shipped in the browser build only (`ap_web.wasm`, ADR-016)
+
+| Component | Licence | Notes |
+|---|---|---|
+| Emscripten runtime libraries linked into the module: musl libc, dlmalloc | MIT; public domain | Come with the toolchain; no separate files shipped |
+| LLVM libc++, libc++abi, libunwind (Emscripten's builds) | Apache-2.0 with LLVM exceptions | Linked statically into the module |
+| nlohmann/json | MIT | As above |
+
+The Emscripten toolchain itself (emcc, LLVM, binaryen) is a build tool and is not distributed. CI
+pins it through emsdk 6.0.10.
+
 ## Algorithms (our own implementations of published designs)
 
 | Algorithm | Source | Licence | Where |

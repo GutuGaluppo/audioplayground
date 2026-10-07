@@ -11,8 +11,9 @@ Instructions for coding agents (Claude Code, Codex) and human contributors.
 ## Layout
 
 ```text
-core/          C++ headless core (model, engine, DSP). No UI, no WebView, no windowing.
+core/          C++ headless core (model, engine, DSP, shared intent handling in core/host). No UI, no WebView, no windowing.
 apps/desktop/  JUCE shell: window, WebView host, audio device manager.
+apps/web/      Browser host: the core as WebAssembly, run by an AudioWorklet (ADR-016).
 ui/            React + TypeScript UI (shared by desktop and web).
 tests/         C++ tests (Catch2).
 schema/        JSON Schemas — single source for bridge messages and parameters.
@@ -40,6 +41,11 @@ cmake --preset release && cmake --build --preset release --target ap_benchmarks 
 # Regenerate golden audio references after an intended sound change (review + listen before committing)
 AP_UPDATE_GOLDENS=1 ./build/dev/tests/ap_unit_tests "[golden]"
 
+# Browser (needs Emscripten: brew install emscripten, or an emsdk shell)
+pnpm web:wasm                       # core -> ui/public/engine/ap_web.wasm
+pnpm web:test                       # the module through the same engine.js the worklet loads
+pnpm web:build                      # ui/dist-web: the page plus the engine; try it with ?engine=wasm in pnpm ui:dev
+
 # UI
 pnpm install
 pnpm check                          # typecheck + lint + format:check + test
@@ -57,6 +63,7 @@ pnpm ui:build
 - Recording: the input opens only when a track is armed, never monitored; takes are journalled for crash recovery (ADR-008).
 - Effects: fixed per-track chain, settings in the project, constant engine latency (`Engine::getOutputLatency`) that offline renders and recordings compensate (ADR-009).
 - Bridge integration tests (`tests/desktop/BridgeIntegrationTests.cpp`) build `WebUiHost` without its web view (`AP_HEADLESS_UI=1`): they send intents as JSON and read the emitted events. A new intent that changes the project needs a case there. Keep WebView-only code inside `#if !AP_HEADLESS_UI`.
+- A UI intent that only edits the project or drives the engine belongs in `core/host/IntentApplier` (shared by the desktop and the browser), with its test in `tests/unit/IntentApplierTests.cpp`. `WebUiHost` keeps what needs the desktop platform (devices, files, recording, export); the browser host says "not available yet" for those.
 - Never rename parameter IDs or change persisted schemas without a migration and an ADR.
 - New dependency: justify it (guide §29), pin version and hash, and add it to `docs/THIRD_PARTY_LICENSES.md`.
 - First-party C++ builds with warnings as errors. Do not silence warnings to pass CI.

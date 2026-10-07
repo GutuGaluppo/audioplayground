@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 
 import { useBridge } from './bridge/BridgeContext';
 import type { EngineStatus } from './bridge/generated';
+import { AudioGate } from './components/AudioGate';
 import { AccompanimentBar } from './components/AccompanimentBar';
 import { AudioDevicesMenu } from './components/AudioDevicesMenu';
 import { Notices } from './components/Notices';
@@ -105,6 +106,7 @@ export function App() {
       <Keyboard />
 
       <Notices />
+      <AudioGate />
 
       <footer className="statusbar">
         <span>{status ? formatDevice(status) : 'Connecting to audio engine…'}</span>
@@ -132,10 +134,12 @@ export function App() {
         >
           Reset layout
         </button>
-        {bridge.isNative ? (
+        {bridge.kind === 'native' ? (
           <AudioDevicesMenu />
         ) : (
-          <span className="statusbar__badge">Simulated engine</span>
+          <span className="statusbar__badge">
+            {bridge.kind === 'wasm' ? 'Browser engine' : 'Simulated engine'}
+          </span>
         )}
       </footer>
     </div>
